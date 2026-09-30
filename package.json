@@ -1,0 +1,75 @@
+{
+  "name": "ccblackbox",
+  "version": "0.1.0",
+  "description": "Visual debugger and analytics dashboard for Claude Code sessions",
+  "keywords": [
+    "claude-code",
+    "anthropic",
+    "debugger",
+    "replay",
+    "analytics",
+    "visualization",
+    "dashboard",
+    "agent"
+  ],
+  "homepage": "https://github.com/n-pizzetta/ccblackbox",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/n-pizzetta/ccblackbox.git"
+  },
+  "bugs": {
+    "url": "https://github.com/n-pizzetta/ccblackbox/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Nathan Pizzetta",
+    "url": "https://github.com/n-pizzetta"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "ccblackbox": "scripts/serve.mjs"
+  },
+  "files": [
+    "dist",
+    "!dist/sessions.json",
+    "scripts",
+    "hooks",
+    "commands",
+    ".claude-plugin",
+    "ARCHITECTURE.md"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "parse": "node scripts/parse-sessions.mjs",
+    "serve": "node scripts/serve.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc -b --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@types/diff": "^8.0.0",
+    "diff": "^9.0.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@fontsource-variable/inter-tight": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@types/node": "^24.12.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.5.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.58.2",
+    "vite": "^8.0.9"
+  }
+}

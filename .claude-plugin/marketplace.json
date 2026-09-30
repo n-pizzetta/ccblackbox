@@ -1,0 +1,18 @@
+{
+  "name": "ccblackbox",
+  "metadata": {
+    "description": "Visual debugger and analytics dashboard for Claude Code sessions"
+  },
+  "owner": {
+    "name": "Nathan Pizzetta",
+    "url": "https://github.com/n-pizzetta"
+  },
+  "plugins": [
+    {
+      "name": "ccblackbox",
+      "description": "Replay turns, inspect tool calls and file diffs, track tokens/cost, and surface friction patterns across your fleet.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

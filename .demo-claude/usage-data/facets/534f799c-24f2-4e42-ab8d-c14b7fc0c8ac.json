@@ -1,0 +1,1 @@
+{"outcome":"partially_achieved","underlying_goal":"Write a getting-started guide for the CLI","brief_summary":"Write a getting-started guide for the CLI. Partly done; follow-ups noted.","friction_counts":{"buggy_code":2},"friction_detail":"A command failed once before the fix landed.","user_satisfaction_counts":{"likely_satisfied":3,"neutral":0}}

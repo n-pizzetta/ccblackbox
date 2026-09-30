@@ -1,0 +1,146 @@
+#!/usr/bin/env node
+/**
+ * ccblackbox local server.
+ *
+ * Serves the prebuilt dashboard (dist/) and the API from scripts/api.mjs
+ * (also used by the Vite dev server), on 127.0.0.1 only.
+ *
+ * Used in two modes:
+ *   1. `npx ccblackbox` (or `pnpm serve`)
+ *   2. The `/replay` slash command from the Claude Code plugin
+ */
+
+import { createServer } from "node:http";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { platform } from "node:os";
+import { dirname, join, resolve, extname, normalize, sep } from "node:path";
+import { existsSync, statSync, createReadStream } from "node:fs";
+import { handleRequest, startApi } from "./api.mjs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const ROOT = resolve(__dirname, "..");
+const DIST = join(ROOT, "dist");
+
+const MIME = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ico": "image/x-icon",
+  ".map": "application/json; charset=utf-8",
+};
+
+function parseArgs(argv) {
+  const args = { port: 3333, open: true };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--port") {
+      args.port = Number(argv[++i]);
+      if (!Number.isInteger(args.port) || args.port < 1 || args.port > 65535) {
+        console.error(`[ccblackbox] invalid --port: ${argv[i]}`);
+        process.exit(1);
+      }
+    }
+    else if (a === "--no-open") args.open = false;
+    else if (a === "--open") args.open = true;
+    else if (a === "--help" || a === "-h") {
+      console.log(
+        "ccblackbox — local dashboard for Claude Code sessions\n" +
+        "\n" +
+        "Usage: ccblackbox [options]\n" +
+        "  --port <n>       listen on port (default: 3333)\n" +
+        "  --no-open        do not open the browser on start\n",
+      );
+      process.exit(0);
+    }
+  }
+  return args;
+}
+
+function send(res, code, body) {
+  res.statusCode = code;
+  res.setHeader("content-type", "text/plain; charset=utf-8");
+  res.end(body);
+}
+
+async function serveStatic(req, res) {
+  let urlPath = (req.url || "/").split("?")[0];
+  if (urlPath === "/") urlPath = "/index.html";
+
+  const safe = normalize(urlPath).replace(/^([./\\])+/, "");
+  const filePath = join(DIST, safe);
+  if (!filePath.startsWith(DIST + sep) && filePath !== DIST) {
+    return send(res, 403, "forbidden");
+  }
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+    // SPA fallback: any unknown path → index.html
+    const index = join(DIST, "index.html");
+    if (existsSync(index)) {
+      res.setHeader("content-type", MIME[".html"]);
+      return createReadStream(index).pipe(res);
+    }
+    return send(res, 404, "not found");
+  }
+  const ext = extname(filePath).toLowerCase();
+  res.setHeader("content-type", MIME[ext] || "application/octet-stream");
+  createReadStream(filePath).pipe(res);
+}
+
+async function openBrowser(url) {
+  const opener = platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
+  try {
+    execFile(opener, [url], { shell: platform() === "win32" });
+  } catch { /* best-effort */ }
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+
+  if (!existsSync(DIST)) {
+    console.warn("[ccblackbox] dist/ not found — run `pnpm build` to produce the UI bundle.");
+  }
+
+  await startApi();
+
+  const server = createServer(async (req, res) => {
+    try {
+      if (await handleRequest(req, res)) return;
+      return serveStatic(req, res);
+    } catch (e) {
+      console.error("[ccblackbox] handler error:", e);
+      send(res, 500, "internal error");
+    }
+  });
+
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      const url = `http://localhost:${args.port}`;
+      console.log(`[ccblackbox] port ${args.port} is already in use. If ccblackbox is running, it is at ${url}; otherwise pass --port <n>.`);
+      if (args.open) openBrowser(url);
+      process.exit(0);
+    }
+    console.error("[ccblackbox] server error:", err.message);
+    process.exit(1);
+  });
+
+  // Loopback only: the API serves prompts, file snapshots and account info.
+  server.listen(args.port, "127.0.0.1", () => {
+    const url = `http://localhost:${args.port}`;
+    console.log(`[ccblackbox] listening on ${url}`);
+    if (args.open) openBrowser(url);
+  });
+}
+
+main().catch((err) => {
+  console.error("[ccblackbox] fatal:", err);
+  process.exit(1);
+});

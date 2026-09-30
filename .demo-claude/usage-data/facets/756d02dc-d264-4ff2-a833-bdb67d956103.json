@@ -1,0 +1,1 @@
+{"outcome":"partially_achieved","underlying_goal":"Debug the crash on cold start in release builds","brief_summary":"Debug the crash on cold start in release builds. Partly done; follow-ups noted.","friction_counts":{"wrong_approach":1},"friction_detail":"A command failed once before the fix landed.","user_satisfaction_counts":{"likely_satisfied":2,"neutral":0}}

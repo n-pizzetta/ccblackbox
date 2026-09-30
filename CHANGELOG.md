@@ -1,0 +1,215 @@
+# Changelog
+
+All notable changes to `ccblackbox` are tracked here. Format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely;
+versioning follows [SemVer](https://semver.org/) once published.
+
+## [Unreleased]
+
+### Security
+
+- The server now listens on `127.0.0.1` only (it was reachable from the local
+  network), rejects foreign `Host` headers (DNS rebinding) and cross-site
+  state-changing requests (CSRF), in production and in the Vite dev server.
+- Delete endpoints only accept sessions classified as ghosts.
+- `pnpm parse` writes its dump to `~/.claude/ccblackbox/sessions.json`
+  instead of `public/` (the build copied it into `dist/`, so it would have
+  been published to npm); `dist/sessions.json` is excluded from the package.
+- The capture hook writes owner-only files (0600) and validates the session id.
+- Fonts are bundled instead of loaded from Google Fonts: the dashboard makes
+  no network requests. The insights report is served with a CSP sandbox.
+
+### Added
+
+- Real usage limits: `/ccblackbox:limits` installs a status line wrapper
+  that records Claude Code's `rate_limits` (5h and 7-day `used_percentage`,
+  `resets_at`) to `~/.claude/ccblackbox/limits.json` and keeps rendering the
+  user's previous status line. The dashboard shows both limits, anchors
+  the 5h window exactly on `resets_at` and runs spike detection on the
+  real %. New `/api/limits` endpoint.
+- Pricing overrides: `~/.claude/ccblackbox/models.json` adds or corrects
+  model prices locally. Costs that include a model missing from the table
+  are marked `~` with a tooltip (header, model mix, session detail,
+  compare).
+- `/api/profile`: the sidebar shows the signed-in account from
+  `~/.claude.json` instead of a hardcoded name.
+- Logo and favicon.
+
+### Fixed
+
+- Dev and production servers share one API module (`scripts/api.mjs`): the
+  insights report and `/api/report-status` now work under `pnpm dev`, and
+  "reveal in file manager" works on Linux and Windows.
+- Status line: if the chained status line fails or prints nothing, the
+  wrapper shows its own line instead of a blank one. The installer refuses a
+  non-object `settings.json`, writes atomically, and `--uninstall` always
+  cleans up its files.
+- Range totals (header, model mix, project rollup, top sessions) only count
+  the turns inside the selected range, per model; "Today" used to include
+  the whole cost of any session touched today.
+- Price ratios in tooltips are computed from the session's model (cache read
+  is 0.05x input on Opus 5.5, not 10%); stale advice (Glob/Grep, "caveman
+  mode") removed; help overlay shortcuts match the code.
+- Session compare shows files edited; the tools chart shares are of all
+  calls; long tool names (MCP servers) are truncated with a tooltip.
+- /insights friction kinds (tool_failure, user_rejected_action,
+  misunderstood_request…) map to the right category.
+- Deleting a ghost also removes its sub-agent transcripts and capture file.
+- An empty ~/.claude shows an empty dashboard instead of demo data; demo data
+  is dated relative to now and priced from the model table.
+- `/ccblackbox:replay` starts the server in the background and forwards its
+  arguments.
+- Tokens and costs were counted about 2x: Claude Code writes one transcript
+  line per content block, each repeating the message's usage. Lines are now
+  merged per API message (last usage wins).
+- Sub-agent transcripts (`<session>/subagents/*.jsonl`) are now read: their
+  tokens, cost and tool calls were missing (up to 3x the main thread).
+- Transcripts are looked up by session id: the cwd-based path missed projects
+  whose path contains `.` or `_` (their sessions showed a fraction of their
+  real cost), and worktree sessions.
+- Numbers (tokens, cost, durations, counts, timeline) now always come from the
+  transcript. `/insights` session-meta is a snapshot written in batch, so it
+  only enriches goal, summary, outcome and frictions.
+- Every tool is counted (MCP tools grouped per server, Task*, Skill,
+  WebSearch, AskUserQuestion…); ~15% of tool calls were dropped.
+- Durations are active time (idle gaps over 5 min excluded); wall-clock is
+  kept as `wallMs`. Timelines use real timestamps instead of evenly spread
+  placeholders; commits come from `git commit` calls in the transcript.
+- Sessions without a facet show outcome "unknown" instead of
+  "partially_achieved"; commands, interrupts and compaction summaries no
+  longer count as user prompts.
+- "Ghost" now means an empty session or one whose Claude Code process died.
+  Sessions `/insights` hadn't analyzed were all shown as ghosts.
+- 1h cache writes are priced at 2x input in the cost breakdowns.
+- Re-parsing: unchanged transcripts are cached (a full pass is ~0.4 s instead
+  of ~3.4 s), re-parses are throttled to one per 5 s, and `/api/sessions`
+  answers 304 via an ETag when nothing changed (it resent ~15 MB every 5 s).
+- The capture hook kept every tool call waiting ~1.5 s (an un-cleared stdin
+  timeout); it now exits in ~25 ms. Bash output previews are captured.
+- The parser no longer moves Claude Code's own `~/.claude/sessions` pid files
+  into `.stale/`; dead sessions are classified in memory.
+- Server: a clear message instead of a crash when the port is taken; invalid
+  `--port` values are rejected.
+
+- Models and costs: only Opus 4.7 / Sonnet 4.6 / Haiku 4.5 were known, and
+  every other model (Opus 5.5, Fable 5.x, Sonnet 5.x, Opus 4.8…) was shown as
+  "opus-4.7" and priced at a stale $15/$75 per MTok, inflating costs roughly
+  4x. Model ids are now normalized generically (`claude-opus-5-5[1m]` →
+  `opus-5.5`, future ids included), priced from current public rates
+  (per-model cache reads, 5m vs 1h cache writes), and priced per turn so
+  sessions that switch models cost right. Pricing lives in one place:
+  `scripts/models.mjs`, shared by the parser and the UI.
+
+### Removed
+
+- Dead code: `FrictionPanel`, `Heatmap`, the `StatsStrip` wrapper, and ~110
+  CSS rules that matched nothing.
+- `--export`: it always crashed, and an exported page had no data source.
+
+### Changed
+
+- Renamed from `claude-replay` to `ccblackbox` (the former name is taken on
+  npm). The plugin cache moved from `~/.claude/claude-replay/cache/` to
+  `~/.claude/ccblackbox/cache/`.
+- The 5h budget setting (hand-picked USD cap, default "$165") and the manual
+  window "calibrate" control are gone. They are replaced by the real usage
+  limits Claude Code reports to the status line.
+- Fixed all ESLint errors (React hooks purity / set-state-in-effect rules,
+  typed Vite dev middleware).
+
+### Planned
+
+- Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
+- `CLAUDE_CONFIG_DIR` environment variable support (currently hardcoded
+  to `~/.claude/`).
+- Sub-Agent Tree component.
+- Cross-Session Patterns component.
+- Delta vs `~/.claude/usage-data/report.html` view.
+- Tests: parser unit tests around `mapFrictions`, `linkClearedChains`,
+  `reassignLiveToChainTail`, plugin-cache merge.
+- CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
+  macOS/Linux).
+- Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
+  with mtime invalidation, so cold start doesn't re-parse the full set.
+
+## [0.1.0] — 2026-04-28
+
+First version. Pre-release, not yet published to GitHub.
+
+### Added
+
+- Initial Vite + React 19 + TypeScript 6 dashboard with:
+  - Session list (virtualised, filterable, keyboard-navigable).
+  - Session detail overlay (Turns / Artifacts / Quality / Frictions tabs).
+  - Session compare view.
+  - Fleet dashboard (13 analytics cards: live ticker, 5h burn, top
+    sessions, token time series, model mix, project rollup, tools
+    heatmap, anomaly flags, burn-spike banner / drill-down, etc.).
+  - Activity heatmap, friction panel, budget editor, help overlay.
+- `scripts/parse-sessions.mjs` (979 lines) parsing every session
+  reachable from `~/.claude/`:
+  - `usage-data/session-meta/*.json`, `usage-data/facets/*.json`
+  - `sessions/*.json` (live PIDs, with liveness recheck)
+  - `projects/{slug}/*.jsonl` (full transcripts)
+  - `file-history/{id}/{hash}@v{n}` (versioned file snapshots)
+  - `token-optimizer/quality-cache-*.json`
+  - `history.jsonl`
+  - `ccblackbox/cache/{id}.jsonl` (PostToolUse hook output)
+- Cleared-chain linkage (sibling sessions sharing `cwd` + `customTitle`
+  with sequential `mtime`) and live-tail reassignment.
+- Ghost-session detection (empty / crashed / orphan) with Trash /
+  `.stale/` quarantine.
+- Vite dev middleware exposing `/api/ghost/*`, `/api/file-history/*`,
+  `/api/parse-error/*` for in-dashboard cleanup.
+- Mock data fallback (8 sessions) so the UI renders without
+  `~/.claude/` populated.
+- `LICENSE` (MIT), `README.md`, `ARCHITECTURE.md`.
+
+### Plugin packaging
+
+- `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json`
+  registering ccblackbox as a Claude Code plugin (validated with
+  `claude plugin validate`).
+- `commands/replay.md` — `/replay` slash command spawns the dashboard
+  server and opens the browser.
+- `hooks/hooks.json` + `hooks/capture.mjs` — `PostToolUse` and `Stop`
+  hooks append per-tool entries to `~/.claude/ccblackbox/cache/{sessionId}.jsonl`.
+- Parser merges those entries into `Session.toolSequence` (transcript
+  entries take precedence on near-simultaneous duplicates within
+  500 ms). Adds `Session.pluginCapture` metadata
+  (`{ entries, lastEventAt, stoppedAt }`) and a cyan badge in
+  `SessionList` when present.
+- `scripts/serve.mjs` — production HTTP server (also the npm `bin`):
+  - In-memory parsed cache, refreshed on `~/.claude/` change.
+  - SPA fallback for `dist/`.
+  - Migrated `/api/ghost/*`, `/api/file-history/*`,
+    `/api/parse-error/*` from `vite.config.ts` so they work in
+    production builds and from the plugin.
+  - Flags: `--port`, `--no-open`, `--export <path>`.
+
+### Refactored
+
+- `scripts/parse-sessions.mjs` exports `parseAllSessions()` and
+  `summarizeSession()`; runs as CLI only when invoked directly.
+- `serve.mjs` and `vite.config.ts` both serve the same API:
+  - `GET /api/sessions` → light summaries (~400 KB for 387 sessions,
+    96% smaller than the previous monolith).
+  - `GET /api/sessions/:id` → full Session detail.
+- `src/data/loadSessions.ts` — `loadSessions()` hits `/api/sessions`;
+  new `loadSessionDetail(id)` fetches full data on overlay open.
+- `App.tsx` hydrates `SessionDetail` lazily: list-derived summary
+  first, then merges full payload once the fetch resolves.
+
+### Removed
+
+- `public/sessions.json` and `dist/sessions.json` (10 MB monolith).
+  No longer the data path; gitignored.
+- `pnpm parse` from `pnpm build` (parser only runs at server startup
+  or on demand now).
+
+### Privacy
+
+- `public/sessions.json` and `dist/sessions.json` ignored from day one.
+- Plugin install via local `directory` source intentionally pulls the
+  working tree (including untracked files) — published `github` source
+  installs respect gitignore.

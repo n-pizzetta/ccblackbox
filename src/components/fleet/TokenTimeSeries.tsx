@@ -1,0 +1,246 @@
+import { useMemo, useState } from "react";
+import type { Session } from "../../types";
+import type { Range } from "../../utils/range";
+import {
+  bucketizeByProject,
+  rangeBoundsMs,
+  topProjectsByTokens,
+  sumTokens,
+  costOfTokens,
+  PROJECT_PALETTE,
+  OTHER_COLOR,
+} from "../../utils/fleetStats";
+import { formatCost, formatTokens } from "../../utils/format";
+import { DEFAULT_MODEL } from "../../../scripts/models.mjs";
+
+interface Props {
+  sessions: Session[];
+  range: Range;
+}
+
+type Axis = "tokens" | "cost";
+
+function formatBucketTime(ms: number, range: Range): string {
+  const d = new Date(ms);
+  if (range === "today") return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+  if (range === "7d") return `${d.toLocaleDateString(undefined, { weekday: "short" })} ${d.getHours()}h`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+export function TokenTimeSeries({ sessions, range }: Props) {
+  const [axis, setAxis] = useState<Axis>("tokens");
+  const [hover, setHover] = useState<number | null>(null);
+
+  const { buckets, projects, colorFor, maxTotal, modelForProject } = useMemo(() => {
+    const top = topProjectsByTokens(sessions, 5);
+    const projects = [...top, "other"];
+    const colorFor = new Map<string, string>();
+    top.forEach((p, i) => colorFor.set(p, PROJECT_PALETTE[i] ?? "var(--c-text-dim)"));
+    colorFor.set("other", OTHER_COLOR);
+
+    // Use a default model per project (majority) for cost calc from bucketed tokens
+    const modelCount = new Map<string, Map<string, number>>();
+    for (const s of sessions) {
+      const proj = s.project || "unknown";
+      const m = modelCount.get(proj) ?? new Map<string, number>();
+      m.set(s.model, (m.get(s.model) ?? 0) + sumTokens(s.tokens));
+      modelCount.set(proj, m);
+    }
+    const modelForProject = new Map<string, string>();
+    for (const [proj, counts] of modelCount.entries()) {
+      let best = DEFAULT_MODEL;
+      let bestN = -1;
+      for (const [m, n] of counts.entries()) if (n > bestN) { best = m; bestN = n; }
+      modelForProject.set(proj, best);
+    }
+
+    const { fromMs, toMs } = rangeBoundsMs(sessions, range);
+    const rawBuckets = bucketizeByProject(sessions, range, fromMs, toMs);
+
+    // Collapse non-top projects into "other"
+    const collapsed = rawBuckets.map((b) => {
+      const byProject = new Map<string, { input: number; output: number; cacheRead: number; cacheWrite: number }>();
+      const other = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+      for (const [proj, tb] of b.byProject.entries()) {
+        if (top.includes(proj)) byProject.set(proj, tb);
+        else {
+          other.input += tb.input;
+          other.output += tb.output;
+          other.cacheRead += tb.cacheRead;
+          other.cacheWrite += tb.cacheWrite;
+        }
+      }
+      if (sumTokens(other) > 0) byProject.set("other", other);
+      return { ...b, byProject };
+    });
+
+    let maxTotal = 0;
+    for (const b of collapsed) {
+      let total = 0;
+      for (const [proj, tb] of b.byProject.entries()) {
+        const v = axis === "tokens"
+          ? sumTokens(tb)
+          : costOfTokens(modelForProject.get(proj) ?? DEFAULT_MODEL, tb);
+        total += v;
+      }
+      if (total > maxTotal) maxTotal = total;
+    }
+
+    return { buckets: collapsed, projects, colorFor, maxTotal, modelForProject };
+  }, [sessions, range, axis]);
+
+  if (buckets.length === 0 || maxTotal === 0) {
+    return (
+      <div className="fleet-block">
+        <div className="section-title">
+          <span>Tokens over time</span>
+        </div>
+        <div className="placeholder mono dim">No turn-level data in range.</div>
+      </div>
+    );
+  }
+
+  const W = 1000;
+  const H = 180;
+  const PAD_L = 48;
+  const PAD_R = 12;
+  const PAD_T = 8;
+  const PAD_B = 22;
+  const plotW = W - PAD_L - PAD_R;
+  const plotH = H - PAD_T - PAD_B;
+  const barW = plotW / buckets.length;
+
+  return (
+    <div className="fleet-block">
+      <div className="section-title">
+        <span>Tokens over time · stacked by project</span>
+        <span className="timeseries-toggle">
+          <button className={axis === "tokens" ? "active" : ""} onClick={() => setAxis("tokens")}>tokens</button>
+          <button className={axis === "cost" ? "active" : ""} onClick={() => setAxis("cost")}>$</button>
+        </span>
+      </div>
+      <div className="timeseries-wrap">
+        <svg viewBox={`0 0 ${W} ${H}`} className="timeseries-svg" preserveAspectRatio="none">
+          {/* Y axis label */}
+          <text x={8} y={PAD_T + 10} className="timeseries-axis">
+            {axis === "tokens" ? formatTokens(maxTotal) : formatCost(maxTotal)}
+          </text>
+          <text x={8} y={H - PAD_B - 2} className="timeseries-axis">0</text>
+          {/* bars */}
+          {buckets.map((b, i) => {
+            let yOffset = 0;
+            const x = PAD_L + i * barW;
+            return (
+              <g
+                key={i}
+                onMouseEnter={() => setHover(i)}
+                onMouseLeave={() => setHover((h) => (h === i ? null : h))}
+              >
+                {projects.map((proj) => {
+                  const tb = b.byProject.get(proj);
+                  if (!tb) return null;
+                  const v = axis === "tokens"
+                    ? sumTokens(tb)
+                    : costOfTokens(modelForProject.get(proj) ?? DEFAULT_MODEL, tb);
+                  if (v <= 0) return null;
+                  const h = (v / maxTotal) * plotH;
+                  const y = PAD_T + plotH - yOffset - h;
+                  yOffset += h;
+                  return (
+                    <rect
+                      key={proj}
+                      x={x + 0.5}
+                      y={y}
+                      width={Math.max(1, barW - 1)}
+                      height={h}
+                      fill={colorFor.get(proj)}
+                      opacity={hover === null || hover === i ? 0.9 : 0.35}
+                    />
+                  );
+                })}
+              </g>
+            );
+          })}
+          {/* X axis ticks (first, middle, last) */}
+          {[0, Math.floor(buckets.length / 2), buckets.length - 1].map((i) => (
+            <text
+              key={i}
+              x={PAD_L + i * barW + barW / 2}
+              y={H - 6}
+              textAnchor="middle"
+              className="timeseries-axis"
+            >
+              {buckets[i] ? formatBucketTime(buckets[i].fromMs, range) : ""}
+            </text>
+          ))}
+        </svg>
+        <div className="timeseries-legend mono dim">
+          {projects.map((p) => (
+            <span key={p} className="timeseries-legend-item">
+              <span className="timeseries-legend-swatch" style={{ background: colorFor.get(p) }} />
+              {p}
+            </span>
+          ))}
+        </div>
+        {hover !== null && buckets[hover] && (
+          <TimeSeriesTooltip
+            bucket={buckets[hover]}
+            axis={axis}
+            projects={projects}
+            colorFor={colorFor}
+            modelForProject={modelForProject}
+            range={range}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TimeSeriesTooltip({
+  bucket,
+  axis,
+  projects,
+  colorFor,
+  modelForProject,
+  range,
+}: {
+  bucket: ReturnType<typeof bucketizeByProject>[number];
+  axis: Axis;
+  projects: string[];
+  colorFor: Map<string, string>;
+  modelForProject: Map<string, string>;
+  range: Range;
+}) {
+  const rows = projects
+    .map((p) => {
+      const tb = bucket.byProject.get(p);
+      if (!tb) return null;
+      const v = axis === "tokens"
+        ? sumTokens(tb)
+        : costOfTokens(modelForProject.get(p) ?? DEFAULT_MODEL, tb);
+      return { proj: p, v };
+    })
+    .filter((r): r is { proj: string; v: number } => !!r && r.v > 0)
+    .sort((a, b) => b.v - a.v);
+  const total = rows.reduce((a, r) => a + r.v, 0);
+  return (
+    <div className="timeseries-tooltip mono">
+      <div className="timeseries-tooltip-head dim">
+        {formatBucketTime(bucket.fromMs, range)} → {formatBucketTime(bucket.toMs, range)}
+      </div>
+      {rows.map((r) => (
+        <div key={r.proj} className="timeseries-tooltip-row">
+          <span className="swatch" style={{ background: colorFor.get(r.proj) }} />
+          <span>{r.proj}</span>
+          <span className="tabular right">
+            {axis === "tokens" ? formatTokens(r.v) : formatCost(r.v)}
+          </span>
+        </div>
+      ))}
+      <div className="timeseries-tooltip-foot">
+        <strong>{axis === "tokens" ? formatTokens(total) : formatCost(total)}</strong>
+      </div>
+    </div>
+  );
+}

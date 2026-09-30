@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist-ssr
+*.local
+
+# Override global gitignore that blocks dist/ — we ship the prebuilt UI
+!dist/
+!dist/**
+
+# Legacy `pnpm parse` output location (it now writes to ~/.claude/ccblackbox/).
+# Kept ignored so personal session data can never be committed.
+public/sessions.json
+dist/sessions.json
+
+# Claude Code worktrees / local state
+.claude/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
