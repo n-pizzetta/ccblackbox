@@ -17,7 +17,8 @@ import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const DIR = join(homedir(), ".claude", "ccblackbox");
+// Honors CLAUDE_CONFIG_DIR, like Claude Code.
+const DIR = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "ccblackbox");
 
 function readStdin() {
   try {

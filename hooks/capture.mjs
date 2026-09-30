@@ -15,7 +15,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdir, appendFile } from "node:fs/promises";
 
-const CACHE_DIR = join(homedir(), ".claude", "ccblackbox", "cache");
+// Honors CLAUDE_CONFIG_DIR, like Claude Code.
+const CACHE_DIR = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "ccblackbox", "cache");
 const STOP_FLAG = process.argv.includes("--stop");
 const TIMEOUT_MS = 1500;
 const SESSION_ID_RE = /^[a-f0-9-]{36}$/i;
