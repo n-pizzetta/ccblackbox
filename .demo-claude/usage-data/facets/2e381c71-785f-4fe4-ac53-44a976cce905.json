@@ -1,1 +1,0 @@
-{"outcome":"fully_achieved","underlying_goal":"Generate API reference pages from the OpenAPI spec","brief_summary":"Generate API reference pages from the OpenAPI spec. Done and tested.","friction_counts":{"wrong_approach":2},"friction_detail":"A command failed once before the fix landed.","user_satisfaction_counts":{"likely_satisfied":3,"neutral":1}}
