@@ -47,6 +47,8 @@ There is no database, no network access beyond loopback, and no runtime dependen
 
 ## 2. Data sources
 
+All paths are relative to the Claude config dir: `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set (as in Claude Code). `pnpm seed:demo` writes a synthetic one to `.demo-claude/` for development (`CLAUDE_CONFIG_DIR="$PWD/.demo-claude" pnpm dev`).
+
 ### Read (owned by Claude Code, never modified except where noted)
 
 | Path under `~/.claude/` | Used for |
@@ -252,6 +254,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 | `pnpm serve` | `node scripts/serve.mjs` (default port 3333; `--port`, `--no-open`). Also the `ccblackbox` bin. If the port is taken it assumes an instance is running, opens it and exits. |
 | `pnpm parse` | One-off parse to `~/.claude/ccblackbox/sessions.json`. |
 | `pnpm lint`, `pnpm typecheck` | ESLint, `tsc -b --noEmit`. |
+| `pnpm seed:demo` | Writes synthetic data to `.demo-claude/` (`scripts/seed-demo.mjs`). |
 
 - `dist/` is committed (`!dist/` in `.gitignore`); rebuild and commit it with UI changes.
 - npm `files`: `dist` (minus `sessions.json`), `scripts`, `hooks`, `commands`, `.claude-plugin`, `ARCHITECTURE.md`. Runtime dependencies are only needed for the bundle; the server uses the Node standard library. Node ≥ 20.
@@ -261,12 +264,10 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 ## 11. Known limitations
 
 - **Live detection needs `ps`.** `isClaudePidAlive` shells out to `ps`, which does not exist on Windows; there, running sessions are not detected and their pid files make them look crashed.
-- **No data without `sessions/` or `usage-data/session-meta/`.** `parseAllSessions` returns nothing if neither directory exists, even when transcripts exist under `projects/`.
 - **Transcript changes are picked up by polling.** `projects/` is not watched; updates arrive through the 10 s refresh or through a change in a watched dir (the plugin hook's cache writes trigger one on every tool call).
 - **`/clear` chains are heuristic.** They are linked by identical `custom-title` in the same project/cwd.
 - **Qualitative fields depend on `/insights`.** Without it, outcome is `unknown`, satisfaction defaults to 0.5, frictions are empty. Friction positions (`at`) are synthetic, not timestamps.
 - **Truncation.** Prompts, tool sequence and previews are capped; sub-agent tool calls appear in counts and turns but not in the tool sequence.
 - **Costs are estimates** at public API prices; unknown models are priced at their family's latest model. The per-session share of the real 5h % is pro rata to cost, not Anthropic's actual weighting.
 - **Commits** are counted by matching `git commit` in Bash commands.
-- **Mock fallback.** An unreachable API or an empty session list shows bundled mock data.
-- **Unused components.** `src/components/Heatmap.tsx` and `src/components/FrictionPanel.tsx` are not rendered anywhere.
+- **Mock fallback.** An unreachable API shows bundled mock data; an empty `~/.claude` shows an empty dashboard.

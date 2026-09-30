@@ -8,7 +8,7 @@
 
 The data is already on your disk. Nothing visualizes it. This does.
 
-<!-- TODO: add docs/screenshot.png -->
+![ccblackbox dashboard with synthetic demo data](./docs/screenshot.png)
 
 ## Features
 
@@ -21,7 +21,7 @@ The data is already on your disk. Nothing visualizes it. This does.
 
 ## Privacy
 
-Everything runs locally: no network calls, no telemetry. `ccblackbox` reads:
+Everything runs locally: no network calls, no telemetry. `ccblackbox` reads (from `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set):
 
 - Prompts and assistant outputs (`~/.claude/projects/*/*.jsonl`, `~/.claude/history.jsonl`)
 - Session metadata, tool counts, tokens, cost (`~/.claude/usage-data/`)
@@ -119,12 +119,15 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the parser internals, component m
 
 ## Known limitations
 
-- The `~/.claude` path is hardcoded (no `CLAUDE_CONFIG_DIR` support yet).
 - Cold start re-parses every session (a few seconds with several hundred sessions).
-- "Reveal in Finder" and Trash semantics are macOS-first. Linux falls back to a rename, and Windows is untested.
+- Live-session detection uses `ps`, so on Windows running sessions show as crashed. Windows is otherwise untested.
 - No automated tests yet.
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for release notes and the roadmap.
+
+## Contributing
+
+Issues and pull requests are welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, the synthetic demo data (`pnpm seed:demo`) and the privacy rules.
 
 ## License
 
