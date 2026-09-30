@@ -31,8 +31,8 @@ versioning follows [SemVer](https://semver.org/) once published.
   model prices locally. Costs that include a model missing from the table
   are marked `~` with a tooltip (header, model mix, session detail,
   compare).
-- `/api/profile`: the sidebar shows the signed-in account from
-  `~/.claude.json` instead of a hardcoded name.
+- A Settings button in the sidebar (with the current 5h limit as a hint)
+  replaces the fake profile block, which showed a hardcoded name and email.
 - Logo and favicon.
 
 ### Fixed

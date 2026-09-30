@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Session } from "../types";
-import { UserProfile } from "./UserProfile";
+import { SettingsButton } from "./SettingsButton";
 import { BrandMark } from "./BrandMark";
 import { toastError } from "../utils/toast";
 
@@ -271,7 +271,7 @@ export function Sidebar({ open, filter, onFilterChange, sessions, projectFilter,
 
       <div className="sidebar-spacer" />
 
-      <UserProfile />
+      <SettingsButton />
 
     </aside>
   );
