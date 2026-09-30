@@ -33,3 +33,6 @@ dist/sessions.json
 *.njsproj
 *.sln
 *.sw?
+
+# Synthetic data from scripts/seed-demo.mjs
+.demo-claude/
