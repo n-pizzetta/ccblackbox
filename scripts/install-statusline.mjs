@@ -15,7 +15,8 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const CLAUDE = join(homedir(), ".claude");
+// Honors CLAUDE_CONFIG_DIR, like Claude Code.
+const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
 const DIR = join(CLAUDE, "ccblackbox");
 const SETTINGS = join(CLAUDE, "settings.json");
 const STATE = join(DIR, "statusline.json");

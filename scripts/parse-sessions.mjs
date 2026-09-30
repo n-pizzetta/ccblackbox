@@ -17,8 +17,9 @@ import { createHash } from "node:crypto";
 import { costOf, DEFAULT_MODEL, isKnownModel, normalizeModel, priceFor, setModelOverrides } from "./models.mjs";
 
 // `pnpm parse` dump. Never under public/ or dist/: it holds real prompts and paths.
-const OUT = join(homedir(), ".claude", "ccblackbox", "sessions.json");
-const CLAUDE = join(homedir(), ".claude");
+// Claude Code moves ~/.claude when CLAUDE_CONFIG_DIR is set; so do we.
+const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
+const OUT = join(CLAUDE, "ccblackbox", "sessions.json");
 const META_DIR = join(CLAUDE, "usage-data", "session-meta");
 const FACETS_DIR = join(CLAUDE, "usage-data", "facets");
 const LIVE_DIR = join(CLAUDE, "sessions");
@@ -849,7 +850,7 @@ function normalizeWindow(w, now) {
  */
 export async function readLimits(now = Date.now()) {
   try {
-    const raw = JSON.parse(await readFile(join(homedir(), ".claude", "ccblackbox", "limits.json"), "utf8"));
+    const raw = JSON.parse(await readFile(join(CLAUDE, "ccblackbox", "limits.json"), "utf8"));
     const rl = raw.rate_limits ?? {};
     return {
       capturedAt: raw.capturedAt ?? null,
@@ -861,7 +862,7 @@ export async function readLimits(now = Date.now()) {
   }
 }
 
-const MODEL_OVERRIDES_FILE = join(homedir(), ".claude", "ccblackbox", "models.json");
+const MODEL_OVERRIDES_FILE = join(CLAUDE, "ccblackbox", "models.json");
 
 /** User pricing overrides; see setModelOverrides in models.mjs. */
 async function loadModelOverrides() {

@@ -15,7 +15,8 @@ import { promises as fsp, watch, existsSync, statSync, createReadStream } from "
 import { readdir } from "node:fs/promises";
 import { parseAllSessions, readLimits, summarizeSession } from "./parse-sessions.mjs";
 
-const CLAUDE = join(homedir(), ".claude");
+// Honors CLAUDE_CONFIG_DIR, like Claude Code.
+const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
 const PROJECTS = join(CLAUDE, "projects");
 const STALE = join(CLAUDE, "sessions", ".stale");
 const FILE_HISTORY = join(CLAUDE, "file-history");
