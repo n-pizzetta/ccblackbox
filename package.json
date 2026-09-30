@@ -48,7 +48,8 @@
     "serve": "node scripts/serve.mjs",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "seed:demo": "node scripts/seed-demo.mjs"
   },
   "dependencies": {
     "@types/diff": "^8.0.0",
