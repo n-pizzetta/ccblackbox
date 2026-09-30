@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import { promises as fsp, watch, existsSync, statSync, createReadStream } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { parseAllSessions, readLimits, readProfile, summarizeSession } from "./parse-sessions.mjs";
+import { parseAllSessions, readLimits, summarizeSession } from "./parse-sessions.mjs";
 
 const CLAUDE = join(homedir(), ".claude");
 const PROJECTS = join(CLAUDE, "projects");
@@ -272,11 +272,6 @@ async function handleApi(req, res) {
   if (url === "/api/limits") {
     res.setHeader("cache-control", "no-store");
     return sendJson(res, 200, await readLimits());
-  }
-
-  if (url === "/api/profile") {
-    res.setHeader("cache-control", "no-store");
-    return sendJson(res, 200, await readProfile());
   }
 
   if (url === "/api/report-status") {

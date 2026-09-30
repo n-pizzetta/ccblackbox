@@ -19,7 +19,6 @@ There is no database, no network access beyond loopback, and no runtime dependen
  ├── file-history/<id>/<hash>@v<n>
  ├── history.jsonl
  ├── token-optimizer/quality-cache-<id>.json
- └── ../.claude.json (profile)
                     │
                     ▼
       scripts/parse-sessions.mjs  ── parseAllSessions() / summarizeSession()
@@ -61,7 +60,6 @@ There is no database, no network access beyond loopback, and no runtime dependen
 | `file-history/<id>/<hash>@v<n>` | File snapshots for the Files tab and diffs. |
 | `history.jsonl` | Fallback first prompt when neither transcript nor meta has one. |
 | `token-optimizer/quality-cache-<id>.json` | Optional context-quality score from the token-optimizer plugin. |
-| `~/.claude.json` (`oauthAccount`) | Display name and email for the profile menu. |
 
 ### Written
 
@@ -126,7 +124,6 @@ Sessions are returned sorted by `startedAt` descending.
 ### Other exports
 
 - `readLimits()` normalizes `limits.json` into `{ capturedAt, fiveHour, sevenDay }` with `usedPct` and `resetsAt` (ms). A window whose `resetsAt` is in the past is reported as 0% used.
-- `readProfile()` returns `{ name, email }` from `~/.claude.json`, or `null` (logged out / API key).
 
 ---
 
@@ -177,7 +174,6 @@ Shared by the production server and the Vite dev server, so both expose the same
 | GET | `/api/sessions/:id` | Full session from the cache. | id must be a 36-char UUID; 404 if unknown. |
 | GET | `/api/file-history/:id/:hash@v:n` | Raw snapshot from `file-history/`. | id and file name regex-validated (no path traversal). |
 | GET | `/api/limits` | `readLimits()` or `null`. | `no-store`. |
-| GET | `/api/profile` | `readProfile()` or `null`. | `no-store`. |
 | GET | `/api/report-status` | Whether `usage-data/report.html` exists, and its mtime. | `no-store`. |
 | POST | `/api/ghost/:id/reveal` | Reveal the transcript in the OS file manager (`open -R`, `explorer /select`, `xdg-open` on the folder). | UUID check; POST only. |
 | POST | `/api/ghost/:id/delete` | Delete one ghost's transcript (+ `.stale` file), then re-parse. | UUID check; 409 unless currently classified ghost. |
@@ -211,7 +207,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 ### Data loading
 
 - [`src/data/loadSessions.ts`](src/data/loadSessions.ts): `loadSessions()` fetches `/api/sessions` with `cache: "no-cache"` (ETag revalidation) and applies the `models` overrides; `loadSessionDetail(id)` fetches `/api/sessions/:id` when a session is opened. If the API is unreachable or returns no sessions, the app falls back to `src/data/mockSessions.ts` (shown as mock source in the top bar).
-- **Polling / HMR.** In production `App.tsx` refreshes every 5 s (cheap thanks to 304s). In dev, polling is off and the app refetches on the `ccblackbox:sessions-updated` HMR event pushed after each server-side parse. `/api/report-status` is fetched on each refresh; `/api/limits` is polled separately (5 s); `/api/profile` once.
+- **Polling / HMR.** In production `App.tsx` refreshes every 5 s (cheap thanks to 304s). In dev, polling is off and the app refetches on the `ccblackbox:sessions-updated` HMR event pushed after each server-side parse. `/api/report-status` is fetched on each refresh; `/api/limits` is polled separately (5 s).
 
 ### State and routing (`App.tsx`)
 
@@ -223,7 +219,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 
 | Component | Role |
 |---|---|
-| `Sidebar` | Filters with counts (ghosts split by crashed / empty), project list, parse errors with Trash action, `UserProfile` menu (profile + `LimitsSection` connection status). |
+| `Sidebar` | Filters with counts (ghosts split by crashed / empty), project list, parse errors with Trash action, `SettingsButton` (opens a popover with the `LimitsSection` connection status; its hint shows the 5h limit). |
 | `StatsStrip` (`TopBar`, `StatsRow`) | Range picker, data source + freshness, link to `/usage-report.html`, headline stats for the filtered set. |
 | `SessionList` | Filtered list, search, compare-mode selection, bulk ghost delete bar. |
 | `FleetDashboard` | Right pane when not comparing; composes `fleet/*`. |

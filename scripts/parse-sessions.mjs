@@ -824,18 +824,6 @@ function linkClearedChains(sessions) {
   }
 }
 
-/** Signed-in account from ~/.claude.json, or null when logged out / API-key auth. */
-export async function readProfile() {
-  try {
-    const cfg = JSON.parse(await readFile(join(homedir(), ".claude.json"), "utf8"));
-    const a = cfg.oauthAccount;
-    if (!a) return null;
-    return { name: a.displayName || a.fullName || null, email: a.emailAddress || null };
-  } catch {
-    return null;
-  }
-}
-
 function toMs(v) {
   if (typeof v === "number" && v > 0) return v < 1e12 ? v * 1000 : v;
   if (typeof v === "string") {

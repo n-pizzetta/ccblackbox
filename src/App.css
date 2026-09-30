@@ -668,20 +668,20 @@ a:focus-visible,
 
 /* ---- User profile in sidebar ---- */
 .sidebar-spacer { flex: 1; min-height: 12px; }
-.user-profile {
+.settings {
   position: relative;
   margin-top: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--c-hairline);
 }
-.user-profile-trigger {
+.settings-trigger {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
   background: transparent;
   border: 1px solid transparent;
-  padding: 8px 8px;
+  padding: 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   color: inherit;
@@ -689,47 +689,37 @@ a:focus-visible,
   text-align: left;
   min-width: 0;
 }
-.user-profile-trigger:hover { background: var(--c-bg-elevated); }
-.user-profile-trigger.open { background: var(--c-bg-elevated); border-color: var(--c-hairline-strong); }
-.user-avatar {
+.settings-trigger:hover { background: var(--c-bg-elevated); }
+.settings-trigger.open { background: var(--c-bg-elevated); border-color: var(--c-hairline-strong); }
+.settings-icon {
   width: 30px;
   height: 30px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--c-cyan), var(--c-violet));
-  color: var(--c-bg);
-  font-weight: 700;
-  font-size: 12px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  font-family: var(--f-mono);
-  letter-spacing: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--c-hairline-strong);
+  color: var(--c-text-dim);
+  font-size: 15px;
 }
-.user-profile-name {
+.settings-trigger:hover .settings-icon { color: var(--c-text); }
+.settings-label {
   display: flex;
   flex-direction: column;
-  flex: 1;
   min-width: 0;
 }
-.user-profile-name-text {
+.settings-title {
   color: var(--c-text);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 12.5px;
 }
-.user-profile-email {
+.settings-hint {
   font-size: 10px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.user-profile-chev {
-  font-size: 14px;
-  flex-shrink: 0;
-}
-.user-profile-popover {
+.settings-popover {
   position: absolute;
   bottom: calc(100% + 6px);
   left: 0;
@@ -744,7 +734,7 @@ a:focus-visible,
   flex-direction: column;
   gap: 10px;
 }
-.user-profile-popover-head {
+.settings-popover-head {
   font-size: 10px;
   letter-spacing: 0.1em;
   padding-bottom: 6px;
