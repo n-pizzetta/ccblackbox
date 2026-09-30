@@ -21,6 +21,11 @@ versioning follows [SemVer](https://semver.org/) once published.
 
 ### Added
 
+- `CLAUDE_CONFIG_DIR` support: parser, API, hook and status line read the
+  Claude config dir from it when set, like Claude Code does.
+- `pnpm seed:demo` (`scripts/seed-demo.mjs`) generates a synthetic Claude
+  config dir for development and screenshots; the README screenshot uses it.
+- `CONTRIBUTING.md`.
 - Real usage limits: `/ccblackbox:limits` installs a status line wrapper
   that records Claude Code's `rate_limits` (5h and 7-day `used_percentage`,
   `resets_at`) to `~/.claude/ccblackbox/limits.json` and keeps rendering the
@@ -120,8 +125,6 @@ versioning follows [SemVer](https://semver.org/) once published.
 ### Planned
 
 - Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
-- `CLAUDE_CONFIG_DIR` environment variable support (currently hardcoded
-  to `~/.claude/`).
 - Sub-Agent Tree component.
 - Cross-Session Patterns component.
 - Delta vs `~/.claude/usage-data/report.html` view.
