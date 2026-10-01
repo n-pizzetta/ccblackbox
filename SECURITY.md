@@ -3,7 +3,7 @@
 Report security issues to maintainers privately. Do not open a public issue or pull
 request for a vulnerability.
 
-Use the **Report a vulnerability** button on the [Security tab](https://github.com/n-pizzetta/ccblackbox/security/advisories/new), or email the maintainer directly.
+Use the **Report a vulnerability** button on the [Security tab](https://github.com/n-pizzetta/ccblackbox/security/advisories/new). It is the only reporting channel.
 
 ## Scope
 
