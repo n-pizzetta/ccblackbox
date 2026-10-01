@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import type { Session } from "../types";
 import { formatCost, formatDuration, formatRelative, formatTokens, outcomeColor } from "../utils/format";
 import { projectColor } from "../utils/fleetStats";
-import { freshTokens, formatUsage, formatUsageAlt, useUnit } from "../utils/units";
+import { API_VALUE_HINT, freshTokens, formatUsage, useUnit } from "../utils/units";
 import { ContextLine } from "./ContextCard";
 import { useSnapshotMap } from "../utils/liveContext";
 import { useNow } from "../utils/useNow";
@@ -248,12 +248,14 @@ export function SessionList({
                         >
                           {s.project}
                         </button>
-                        <span>{formatDuration(s.durationMs)}</span>
                         <span>{formatRelative(s.startedAt)}</span>
                       </div>
                       {snapshots.get(s.id) && <ContextLine snap={snapshots.get(s.id)!} now={now} />}
                     </div>
-                    <div className="row-side">
+                    <div
+                      className="row-side"
+                      title={`${formatTokens(freshTokens(s.tokens))} fresh tokens · ${formatCost(s.costUsd)} API value\n${API_VALUE_HINT}`}
+                    >
                       <span className={`row-primary mono tabular ${unit === "usd" ? "is-usd" : ""}`}>{formatUsage(unit, s.tokens, s.costUsd)}</span>
                       <div className="row-chips">
                       {s.pluginCapture && (
@@ -271,7 +273,7 @@ export function SessionList({
                           <span className="tabular">{s.frictions.length}</span>
                         </div>
                       )}
-                        <span className="row-tokens mono tabular">{formatUsageAlt(unit, s.tokens, s.costUsd)}</span>
+                        <span className="row-time mono tabular" title="Active time">{formatDuration(s.durationMs)}</span>
                       </div>
                     </div>
                   </div>

@@ -27,11 +27,6 @@ export function formatUsage(unit: Unit, tokens: TokenCounts, costUsd: number): s
   return unit === "tokens" ? formatTokens(freshTokens(tokens)) : formatCost(costUsd);
 }
 
-/** The figure the unit does not show, formatted as a secondary value. */
-export function formatUsageAlt(unit: Unit, tokens: TokenCounts, costUsd: number): string {
-  return unit === "tokens" ? `${formatCost(costUsd)} API` : `${formatTokens(freshTokens(tokens))} tok`;
-}
-
 const KEY = "ccblackbox:unit";
 const listeners = new Set<() => void>();
 

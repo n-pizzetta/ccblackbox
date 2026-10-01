@@ -262,7 +262,7 @@
 .row-primary { font-size: var(--fs-md); font-weight: 600; color: var(--c-text-soft); }
 .row-primary.is-usd { color: var(--c-amber); }
 .row-side .row-chips { align-self: auto; align-items: center; gap: 8px; }
-.row-tokens { font-size: var(--fs-xs); color: var(--c-text-faint); }
+.row-time { font-size: var(--fs-xs); color: var(--c-text-dim); }
 .friction-chip { color: var(--c-red); }
 
 @media (prefers-reduced-motion: reduce) {
