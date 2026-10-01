@@ -53,11 +53,6 @@ function HitRing({ hit }: { hit: number | null }) {
   );
 }
 
-function details(s: Session): string {
-  const hit = cacheHit(s.tokens);
-  return `${formatTokens(freshTokens(s.tokens))} fresh tokens · ${formatCost(s.costUsd)} API value · ${formatDuration(s.durationMs)} · cache hit ${hit !== null ? `${(hit * 100).toFixed(0)}%` : "—"}`;
-}
-
 export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
   const [category, setCategory] = useState<Category>("tokens");
   const ranked = useMemo(() => rankSessions(sessions, category, limit), [sessions, category, limit]);
@@ -100,7 +95,6 @@ export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
                   key={s.id}
                   className={`podium-card place-${PLACE_CLASS[i]}`}
                   onClick={() => onSelectSession(s.id)}
-                  title={details(s)}
                 >
                   {i === 0 && <FireCanvas />}
                   <span className="mono podium-project">{s.project}</span>
@@ -127,7 +121,7 @@ export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
           {rest.length > 0 && (
             <div className="podium-rest" key={`rest-${category}`}>
               {rest.map(({ s, value }, i) => (
-                <button key={s.id} className="podium-rest-row" onClick={() => onSelectSession(s.id)} title={details(s)}>
+                <button key={s.id} className="podium-rest-row" onClick={() => onSelectSession(s.id)}>
                   <span className="mono dim tabular podium-rest-rank">{i + 4}</span>
                   <span className="podium-rest-main">
                     <span className="podium-rest-goal">{s.goal || "—"}</span>
