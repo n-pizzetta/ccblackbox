@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { LimitsSection } from "./LimitsSection";
-import { useRateLimits } from "../utils/rateLimits";
+import { UnitSetting } from "./UnitSetting";
 
-/** Sidebar footer: opens the settings popover; the hint shows the 5h limit when connected. */
+/** Top-bar gear: opens the settings popover (limits connection status). */
 export function SettingsButton() {
   const [open, setOpen] = useState(false);
   const popRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
-  const limits = useRateLimits();
-  const five = limits?.fiveHour;
-  const hint = five ? `5h limit ${Math.round(five.usedPct)}%` : "Usage limits · not connected";
 
   useEffect(() => {
     if (!open) return;
@@ -35,16 +32,15 @@ export function SettingsButton() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="dialog"
         aria-expanded={open}
+        title="Settings"
+        aria-label="Settings"
       >
         <span className="settings-icon" aria-hidden="true">⚙</span>
-        <span className="settings-label">
-          <span className="settings-title">Settings</span>
-          <span className="mono dim settings-hint">{hint}</span>
-        </span>
       </button>
       {open && (
         <div ref={popRef} className="settings-popover" role="dialog" aria-label="Settings">
           <div className="settings-popover-head mono caps dim">Settings</div>
+          <UnitSetting />
           <LimitsSection />
         </div>
       )}

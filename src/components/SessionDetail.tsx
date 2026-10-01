@@ -1,3 +1,4 @@
+import { LimitsPill } from "./LimitsGauge";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createPatch } from "diff";
 import type { Session, SessionQuality, ToolName } from "../types";
@@ -254,6 +255,7 @@ export function SessionDetail({
             ) : null}
           </div>
           <div className="detail-toolbar-right">
+            <LimitsPill />
             <button
               className="toolbar-btn"
               onClick={() => downloadSessionHtml(session)}
