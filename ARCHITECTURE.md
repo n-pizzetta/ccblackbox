@@ -67,8 +67,9 @@ All paths are relative to the Claude config dir: `~/.claude`, or `$CLAUDE_CONFIG
 
 - Everything ccblackbox writes by itself lives under `~/.claude/ccblackbox/`:
   - `cache/<id>.jsonl`: one line per tool call / stop, appended by the plugin hook (mode `0600`).
-  - `limits.json`: latest `rate_limits` payload, written atomically by the status line wrapper.
-  - `statusline.mjs`, `statusline.json`: installed wrapper and the saved previous `statusLine` setting.
+  - `limits.json`: latest `rate_limits` payload, written atomically by the status line wrapper. `limits-history.jsonl`: one line per change of either window (`{t, five:{p,r}, seven:{p,r}}`, trimmed at 512 KB), kept to calibrate "% of window" later.
+  - `live/<session_id>.json`: sanitized per-session snapshot (context size, prompt-cache state; no paths or prompts) written on every refresh; the API removes ones older than 3 days.
+  - `statusline.mjs`, `context-advice.mjs`, `statusline.json`: installed wrapper, its shared helper, and the saved previous `statusLine` setting (plus `"verdict": false` to hide the terminal segment).
   - `sessions.json`: full parse dump, only when `pnpm parse` is run by hand. The app never reads it.
   - `models.json`: never written; the user creates it to override prices.
 - `~/.claude/settings.json` is modified only by `install-statusline.mjs` (i.e. when the user runs `/ccblackbox:limits`), with a backup at `settings.json.ccblackbox.bak`. `--uninstall` restores the previous `statusLine`.
@@ -152,6 +153,12 @@ Claude Code exposes the real limits (`rate_limits.five_hour` / `seven_day`, as i
 2. On every status line refresh the wrapper writes `limits.json`, then pipes the untouched payload to the user's previous status line command, or prints a minimal `model · 5h n% · 7d n%` line if there was none.
 3. `/api/limits` serves `readLimits()`; [`src/utils/rateLimits.ts`](src/utils/rateLimits.ts) polls it every 5 s (`useRateLimits`).
 
+### Context and prompt-cache advice
+
+The same payload carries `context_window` (size, % used, last-turn usage) and `prompt_cache` (`warm`, `ttl`, `expires_at`, hit ratio, misses, `recache_tokens_if_cold`). [`scripts/context-advice.mjs`](scripts/context-advice.mjs) (pure, shared by the wrapper and the dashboard like `models.mjs`) turns it into a snapshot (`toSnapshot`) and a verdict (`adviseContext`): *keep going*, *wrap up before pausing*, *compact at the next break*, *compact now*, or *clear if the task is done*, each with its reasons. Thresholds are heuristics (`THRESHOLDS`): context ≥ 70% / 85% of the window; a cold cache matters from 40% of the window or 100k tokens to re-cache; a warm cache is "expiring" under 10 min. A cold cache is the case where `/compact` is no cheaper than a normal message (it re-reads everything at full price), so `/clear` is advised.
+
+The wrapper appends a short segment to the status line (`ctx 33% · cache 59m`, plus a hint when it matters). The dashboard polls `/api/live-context` (`useLiveContext`) and shows one `ContextCards` entry per live session in the Today tab, with a countdown computed from `expires_at`.
+
 The 5h window in the UI (`fleet/FiveHourSession.tsx`, `utils/fleetStats.ts`):
 
 - With real limits: window start = `resetsAt − 5h`; the used % is real. Per-session / per-prompt shares of that % are attributed pro rata to estimated cost (an approximation).
@@ -176,6 +183,7 @@ Shared by the production server and the Vite dev server, so both expose the same
 | GET | `/api/sessions/:id` | Full session from the cache. | id must be a 36-char UUID; 404 if unknown. |
 | GET | `/api/file-history/:id/:hash@v:n` | Raw snapshot from `file-history/`. | id and file name regex-validated (no path traversal). |
 | GET | `/api/limits` | `readLimits()` or `null`. | `no-store`. |
+| GET | `/api/live-context` | `readLiveContext()`: context / prompt-cache snapshots per session, newest first. | `no-store`. |
 | GET | `/api/report-status` | Whether `usage-data/report.html` exists, and its mtime. | `no-store`. |
 | POST | `/api/ghost/:id/reveal` | Reveal the transcript in the OS file manager (`open -R`, `explorer /select`, `xdg-open` on the folder). | UUID check; POST only. |
 | POST | `/api/ghost/:id/delete` | Delete one ghost's transcript (+ `.stale` file), then re-parse. | UUID check; 409 unless currently classified ghost. |
@@ -209,7 +217,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 ### Data loading
 
 - [`src/data/loadSessions.ts`](src/data/loadSessions.ts): `loadSessions()` fetches `/api/sessions` with `cache: "no-cache"` (ETag revalidation) and applies the `models` overrides; `loadSessionDetail(id)` fetches `/api/sessions/:id` when a session is opened. If the API is unreachable or returns no sessions, the app falls back to `src/data/mockSessions.ts` (shown as mock source in the top bar).
-- **Polling / HMR.** In production `App.tsx` refreshes every 5 s (cheap thanks to 304s). In dev, polling is off and the app refetches on the `ccblackbox:sessions-updated` HMR event pushed after each server-side parse. `/api/report-status` is fetched on each refresh; `/api/limits` is polled separately (5 s).
+- **Polling / HMR.** In production `App.tsx` refreshes every 5 s (cheap thanks to 304s). In dev, polling is off and the app refetches on the `ccblackbox:sessions-updated` HMR event pushed after each server-side parse. `/api/report-status` is fetched on each refresh; `/api/limits` and `/api/live-context` are polled separately (5 s).
 
 ### State and routing (`App.tsx`)
 
@@ -232,7 +240,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 | `SessionDetail` | Full-screen overlay: header (outcome, cost, resume command, export), live / cleared-chain / ghost banners (reveal, delete), and four tabs: **Overview** (summary, prompts, frictions; friction badge), **Tools** (tool counts and sequence with results, can be focused on one prompt), **Tokens** (per-prompt and per-turn cost breakdown), **Files** (file-history versions with diffs via `diff`). |
 | `HelpOverlay` | Keyboard shortcuts. |
 
-`fleet/`: `LiveTicker` (live burn and limits), `FiveHourSession` (current 5h window, 7d bar, per-session/prompt share), `LiveSessions` (running sessions with sparklines), `TopSessions`, `AnomalyFlags`, `ProjectRollup`, `ModelMix`, `ToolsHeatmap`, `HeavyPrompts`, `TokenTimeSeries` (in the selected range), `BurnSpikeBanner` + `SpikeAnalysisOverlay` + `SpikeHeuristics`.
+`fleet/`: `LiveTicker` (live burn and limits), `FiveHourSession` (current 5h window, 7d bar, per-session/prompt share), `LiveSessions` (running sessions with sparklines), `ContextCards` (context fill, prompt-cache countdown and compact / clear verdict per live session), `TopSessions`, `AnomalyFlags`, `ProjectRollup`, `ModelMix`, `ToolsHeatmap`, `HeavyPrompts`, `TokenTimeSeries` (in the selected range), `BurnSpikeBanner` + `SpikeAnalysisOverlay` + `SpikeHeuristics`.
 
 `utils/`: `fleetStats` (window/bucket aggregations, costs via `models.mjs`), `aggregateByPrompt`, `classifyPrompt`, `burnTracker`, `rateLimits`, `windowState`, `range`, `format`, `exportSession` (standalone HTML export of a session).
 
