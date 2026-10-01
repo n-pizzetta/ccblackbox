@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "../../types";
-import { activityStreak, healthScore, levelOf } from "../../utils/gamify";
+import { activityStreak, levelOf } from "../../utils/gamify";
+import { healthReport } from "../../utils/healthRules";
 import { formatTokens } from "../../utils/format";
 
 interface Props {
@@ -38,7 +39,8 @@ function scoreColor(score: number): string {
 }
 
 export function HeroBanner({ sessions, allSessions }: Props) {
-  const score = useMemo(() => healthScore(sessions), [sessions]);
+  const report = useMemo(() => healthReport(sessions, allSessions), [sessions, allSessions]);
+  const score = report.total ? (report.passed / report.total) * 100 : null;
   const streak = useMemo(() => activityStreak(allSessions), [allSessions]);
   const level = useMemo(() => levelOf(allSessions), [allSessions]);
 
@@ -51,7 +53,7 @@ export function HeroBanner({ sessions, allSessions }: Props) {
 
   return (
     <div className="hero">
-      <div className="hero-cell hero-score" title="Average quality score of the sessions in range">
+      <div className="hero-cell hero-score" title="Health check rules passing in this range (Health tab)">
         <svg width="76" height="76" viewBox="0 0 76 76" aria-hidden="true">
           <circle cx="38" cy="38" r={r} fill="none" stroke="var(--c-hairline-strong)" strokeWidth="6" />
           {score !== null && (
@@ -61,10 +63,10 @@ export function HeroBanner({ sessions, allSessions }: Props) {
             />
           )}
         </svg>
-        <span className="hero-score-num tabular">{score === null ? "—" : Math.round(shownScore)}</span>
+        <span className="hero-score-num tabular">{score === null ? "—" : `${report.passed}/${report.total}`}</span>
         <div className="hero-text">
           <span className="hero-label">Health score</span>
-          <span className="hero-sub">{score === null ? "no quality data yet" : "avg session quality"}</span>
+          <span className="hero-sub">{score === null ? "no data yet" : "checks passing"}</span>
         </div>
       </div>
 

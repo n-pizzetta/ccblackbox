@@ -17,12 +17,14 @@ import { ModelMix } from "./fleet/ModelMix";
 import { ToolsHeatmap } from "./fleet/ToolsHeatmap";
 import { HeroBanner } from "./fleet/HeroBanner";
 import { Badges } from "./fleet/Badges";
+import { HealthCheck } from "./fleet/HealthCheck";
 import "../gamify.css";
 
-type Tab = "today" | "rankings" | "analysis";
+type Tab = "today" | "rankings" | "health" | "analysis";
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "today", label: "Today" },
   { id: "rankings", label: "Rankings" },
+  { id: "health", label: "Health" },
   { id: "analysis", label: "Analysis" },
 ];
 const TAB_KEY = "ccblackbox:fleet-tab";
@@ -30,7 +32,7 @@ const TAB_KEY = "ccblackbox:fleet-tab";
 function loadTab(): Tab {
   try {
     const v = localStorage.getItem(TAB_KEY);
-    if (v === "today" || v === "rankings" || v === "analysis") return v;
+    if (v === "today" || v === "rankings" || v === "health" || v === "analysis") return v;
   } catch {
     /* ignore */
   }
@@ -127,6 +129,16 @@ export function FleetDashboard({
           <TopSessions sessions={sessions} onSelectSession={onSelectSession} />
           <Badges allSessions={allSessions} />
           <ProjectRollup sessions={sessions} allSessions={allSessions} range={range} />
+        </>
+      )}
+
+      {tab === "health" && (
+        <>
+          <div className="fleet-group-label fleet-group-first">
+            <span className="fleet-group-name">In the selected range</span>
+            <span className="fleet-group-note">{rangeNote}</span>
+          </div>
+          <HealthCheck sessions={sessions} allSessions={allSessions} onSelectSession={onSelectSession} />
         </>
       )}
 
