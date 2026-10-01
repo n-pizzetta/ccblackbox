@@ -5,7 +5,7 @@
  *   node scripts/install-statusline.mjs              # install / refresh
  *   node scripts/install-statusline.mjs --uninstall  # restore previous status line
  *
- * Install copies statusline.mjs to a stable path (~/.claude/ccblackbox/, so
+ * Install copies statusline.mjs (and its helper context-advice.mjs) to a stable path (~/.claude/ccblackbox/, so
  * plugin updates don't break settings.json), saves the current `statusLine`
  * setting to ~/.claude/ccblackbox/statusline.json and points `statusLine` at
  * the wrapper, which keeps rendering the previous status line.
@@ -21,7 +21,10 @@ const DIR = join(CLAUDE, "ccblackbox");
 const SETTINGS = join(CLAUDE, "settings.json");
 const STATE = join(DIR, "statusline.json");
 const TARGET = join(DIR, "statusline.mjs");
-const SOURCE = join(dirname(fileURLToPath(import.meta.url)), "statusline.mjs");
+const ADVICE_TARGET = join(DIR, "context-advice.mjs");
+const SCRIPTS = dirname(fileURLToPath(import.meta.url));
+const SOURCE = join(SCRIPTS, "statusline.mjs");
+const ADVICE_SOURCE = join(SCRIPTS, "context-advice.mjs");
 
 function readSettings() {
   if (!existsSync(SETTINGS)) return {};
@@ -50,7 +53,10 @@ function writeSettings(settings) {
 function removeState() {
   rmSync(STATE, { force: true });
   rmSync(TARGET, { force: true });
+  rmSync(ADVICE_TARGET, { force: true });
   rmSync(join(DIR, "limits.json"), { force: true });
+  rmSync(join(DIR, "limits-history.jsonl"), { force: true });
+  rmSync(join(DIR, "live"), { recursive: true, force: true });
 }
 
 const isOurs = (statusLine) => typeof statusLine?.command === "string" && statusLine.command.includes(TARGET);
@@ -58,6 +64,7 @@ const isOurs = (statusLine) => typeof statusLine?.command === "string" && status
 function install() {
   mkdirSync(DIR, { recursive: true });
   copyFileSync(SOURCE, TARGET);
+  copyFileSync(ADVICE_SOURCE, ADVICE_TARGET);
 
   const settings = readSettings();
   if (isOurs(settings.statusLine)) {

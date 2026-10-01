@@ -3,7 +3,7 @@ description: Connect ccblackbox to your real Claude usage limits (5h / 7d) via t
 argument-hint: "[--uninstall]"
 ---
 
-Install the ccblackbox status line wrapper so the dashboard can show the real 5-hour and 7-day usage limits (the same numbers as `/usage`).
+Install the ccblackbox status line wrapper so the dashboard can show the real 5-hour and 7-day usage limits (the same numbers as `/usage`), plus the context fill and prompt-cache state of live sessions (a keep going / compact / clear verdict). Re-run it after updating ccblackbox to refresh the wrapper.
 
 Execute this command:
 

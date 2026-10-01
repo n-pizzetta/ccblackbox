@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import { promises as fsp, watch, existsSync, statSync, createReadStream } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { parseAllSessions, readLimits, summarizeSession } from "./parse-sessions.mjs";
+import { parseAllSessions, readLimits, readLiveContext, summarizeSession } from "./parse-sessions.mjs";
 
 // Honors CLAUDE_CONFIG_DIR, like Claude Code.
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
@@ -273,6 +273,11 @@ async function handleApi(req, res) {
   if (url === "/api/limits") {
     res.setHeader("cache-control", "no-store");
     return sendJson(res, 200, await readLimits());
+  }
+
+  if (url === "/api/live-context") {
+    res.setHeader("cache-control", "no-store");
+    return sendJson(res, 200, await readLiveContext());
   }
 
   if (url === "/api/report-status") {

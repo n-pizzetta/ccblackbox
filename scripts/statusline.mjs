@@ -5,20 +5,38 @@
  * Claude Code pipes a JSON payload to the status line command on every
  * refresh. It is the only place the real usage limits (`rate_limits`: 5-hour
  * and 7-day windows, as shown by `/usage`) are exposed, so this wrapper:
- *   1. records `rate_limits` to ~/.claude/ccblackbox/limits.json,
- *   2. hands the untouched payload to the user's previous status line command
- *      (saved by install-statusline.mjs), or prints a minimal line if none.
+ *   1. records `rate_limits` to ~/.claude/ccblackbox/limits.json (and, when they
+ *      change, appends them to limits-history.jsonl, used to calibrate "% of window"),
+ *   2. writes a sanitized per-session snapshot (context size, prompt-cache state) to
+ *      ~/.claude/ccblackbox/live/<session_id>.json for the dashboard,
+ *   3. hands the untouched payload to the user's previous status line command
+ *      (saved by install-statusline.mjs), or prints a minimal line if none, and appends
+ *      a short context / cache segment with a "compact? clear?" hint. Turn that segment
+ *      off with {"verdict": false} in ~/.claude/ccblackbox/statusline.json.
  *
  * Installed to ~/.claude/ccblackbox/statusline.mjs by install-statusline.mjs.
  * Must stay fast and never fail: the status line renders on every turn.
  */
-import { readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 // Honors CLAUDE_CONFIG_DIR, like Claude Code.
 const DIR = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "ccblackbox");
+const LIMITS = join(DIR, "limits.json");
+const HISTORY = join(DIR, "limits-history.jsonl");
+const LIVE = join(DIR, "live");
+const HISTORY_MAX_BYTES = 512 * 1024;
+
+// Shared with the dashboard. Installed next to this file; if it is missing (older install),
+// the context features are skipped and the rest keeps working.
+let advice = null;
+try {
+  advice = await import("./context-advice.mjs");
+} catch {
+  /* no context advice */
+}
 
 function readStdin() {
   try {
@@ -28,25 +46,69 @@ function readStdin() {
   }
 }
 
+const win = (w) => (w && typeof w.used_percentage === "number" ? { p: w.used_percentage, r: w.resets_at ?? null } : null);
+
+/** One line per change of either window (not per refresh), so the file stays small. */
+function appendHistory(rl) {
+  const cur = { five: win(rl.five_hour), seven: win(rl.seven_day) };
+  try {
+    const old = JSON.parse(readFileSync(LIMITS, "utf8")).rate_limits ?? {};
+    if (JSON.stringify({ five: win(old.five_hour), seven: win(old.seven_day) }) === JSON.stringify(cur)) return;
+  } catch {
+    /* no previous capture: first line */
+  }
+  appendFileSync(HISTORY, JSON.stringify({ t: Date.now(), ...cur }) + "\n");
+  if (statSync(HISTORY).size > HISTORY_MAX_BYTES) {
+    const lines = readFileSync(HISTORY, "utf8").split("\n").filter(Boolean);
+    writeFileSync(HISTORY, lines.slice(Math.floor(lines.length / 2)).join("\n") + "\n");
+  }
+}
+
 function record(payload) {
   if (!payload?.rate_limits) return;
   try {
     mkdirSync(DIR, { recursive: true });
+    appendHistory(payload.rate_limits);
     const tmp = join(DIR, `limits.json.${process.pid}.tmp`);
     writeFileSync(tmp, JSON.stringify({ capturedAt: Date.now(), rate_limits: payload.rate_limits }));
-    renameSync(tmp, join(DIR, "limits.json"));
+    renameSync(tmp, LIMITS);
   } catch {
     /* never break the status line */
   }
 }
 
-function previousCommand() {
+function writeSnapshot(snap) {
+  if (!snap) return;
   try {
-    const cfg = JSON.parse(readFileSync(join(DIR, "statusline.json"), "utf8"));
-    return typeof cfg.previous?.command === "string" ? cfg.previous.command : null;
+    mkdirSync(LIVE, { recursive: true });
+    const tmp = join(LIVE, `${snap.sessionId}.json.${process.pid}.tmp`);
+    writeFileSync(tmp, JSON.stringify(snap));
+    renameSync(tmp, join(LIVE, `${snap.sessionId}.json`));
   } catch {
-    return null;
+    /* never break the status line */
   }
+}
+
+function readConfig() {
+  try {
+    return JSON.parse(readFileSync(join(DIR, "statusline.json"), "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+/** Append the context / cache segment to the last line of what the previous status line printed. */
+function withVerdict(out, snap) {
+  if (!advice || !snap || readConfig().verdict === false) return out;
+  const seg = advice.statusSegment(snap);
+  if (!seg) return out;
+  const body = out.replace(/\n+$/, "");
+  return body ? `${body} ${seg}${out.endsWith("\n") ? "\n" : ""}` : seg;
+}
+
+function previousCommand() {
+  const cmd = readConfig().previous?.command;
+  return typeof cmd === "string" ? cmd : null;
 }
 
 function fallbackLine(payload) {
@@ -68,6 +130,8 @@ try {
   /* pass through untouched */
 }
 record(payload);
+const snap = advice ? advice.toSnapshot(payload) : null;
+writeSnapshot(snap);
 
 // The previous command can break (e.g. a plugin update moves its versioned
 // path): if it fails or prints nothing, show our own line instead of a blank one.
@@ -79,7 +143,7 @@ if (next) {
   const finish = (ok) => {
     if (done) return;
     done = true;
-    process.stdout.write(ok && out.trim() ? out : fallbackLine(payload));
+    process.stdout.write(withVerdict(ok && out.trim() ? out : fallbackLine(payload), snap));
     process.exit(0);
   };
   child.stdout.on("data", (c) => { out += c; });
@@ -88,5 +152,5 @@ if (next) {
   child.stdin.on("error", () => {});
   child.stdin.end(input);
 } else {
-  process.stdout.write(fallbackLine(payload));
+  process.stdout.write(withVerdict(fallbackLine(payload), snap));
 }

@@ -6,7 +6,7 @@
  * facets only enrich goal, summary, outcome and frictions. Read-only toward
  * Claude Code's files. See ARCHITECTURE.md.
  */
-import { readdir, readFile, writeFile, mkdir, stat as fspStat } from "node:fs/promises";
+import { readdir, readFile, writeFile, mkdir, rm, stat as fspStat } from "node:fs/promises";
 import { existsSync, createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 import { homedir } from "node:os";
@@ -860,6 +860,39 @@ export async function readLimits(now = Date.now()) {
   } catch {
     return null;
   }
+}
+
+const LIVE_CONTEXT_DIR = join(CLAUDE, "ccblackbox", "live");
+const LIVE_CONTEXT_KEEP_MS = 3 * 86_400_000;
+
+/**
+ * Per-session context / prompt-cache snapshots written by the status line wrapper
+ * (scripts/statusline.mjs), newest first. Snapshots older than 3 days are removed.
+ */
+export async function readLiveContext(now = Date.now()) {
+  let names;
+  try {
+    names = await readdir(LIVE_CONTEXT_DIR);
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const name of names) {
+    if (!/^[a-f0-9-]{36}\.json$/i.test(name)) continue;
+    const file = join(LIVE_CONTEXT_DIR, name);
+    try {
+      const snap = JSON.parse(await readFile(file, "utf8"));
+      if (snap?.v !== 1 || typeof snap.capturedAt !== "number") continue;
+      if (now - snap.capturedAt > LIVE_CONTEXT_KEEP_MS) {
+        await rm(file, { force: true });
+        continue;
+      }
+      out.push(snap);
+    } catch {
+      /* half-written or unreadable: skip */
+    }
+  }
+  return out.sort((a, b) => b.capturedAt - a.capturedAt);
 }
 
 const MODEL_OVERRIDES_FILE = join(CLAUDE, "ccblackbox", "models.json");
