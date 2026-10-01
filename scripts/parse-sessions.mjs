@@ -35,6 +35,8 @@ const toolKey = (name) => (name.startsWith("mcp__") ? `mcp:${name.split("__")[1]
 
 /** Gaps longer than this between two transcript events count as idle, not active time. */
 const IDLE_CAP_MS = 5 * 60_000;
+/** A pause up to this long doesn't end a continuous work stretch (same as RUN_GAP_MS in badges.mjs). */
+const RUN_GAP_MS = 15 * 60_000;
 
 /** User-role lines that are not prompts the user typed. */
 const NON_PROMPT_RE = /^\s*(<(command-|local-command-|task-notification|system-reminder)|\[Request interrupted|Caveat:)/;
@@ -487,6 +489,7 @@ async function parseTranscriptFile(path, sidechain) {
 
   const tokens = turns.reduce((acc, tu) => addTokens(acc, tu.tokens), emptyTokens());
   return {
+    longestRunMs: sidechain ? 0 : longestRun([...turns.map((tu) => tu.tsMs), ...absEvents.filter((e) => e.kind === "prompt").map((e) => e.tsMs)]),
     tokens,
     toolCounts,
     absEvents,
@@ -509,6 +512,18 @@ async function parseTranscriptFile(path, sidechain) {
     version,
     quality: quality?.finish(turns) ?? null,
   };
+}
+
+/** Longest stretch of activity where no pause exceeds RUN_GAP_MS. */
+function longestRun(timestamps) {
+  const ts = timestamps.filter(Boolean).sort((a, b) => a - b);
+  let best = 0;
+  let from = ts[0];
+  for (let i = 1; i < ts.length; i++) {
+    if (ts[i] - ts[i - 1] > RUN_GAP_MS) from = ts[i];
+    else best = Math.max(best, ts[i] - from);
+  }
+  return best;
 }
 
 function relativizeEvents(absEvents, startedAt) {
@@ -733,6 +748,7 @@ async function buildSession(id, { entry, meta, facet, live, dead, history, now }
     // Active time: gaps over IDLE_CAP_MS between transcript events are idle.
     durationMs: t ? Math.max(1, t.activeMs) : Math.max(1, (meta?.duration_minutes ?? 0) * 60_000),
     wallMs: Math.max(1, (isLive ? now : lastTs ?? startedAtMs) - startedAtMs),
+    longestRunMs: t?.longestRunMs ?? 0,
     model,
     outcome,
     satisfaction: satisfactionOf(facet),
@@ -990,6 +1006,7 @@ export function summarizeSession(s) {
     cwd: s.cwd,
     startedAt: s.startedAt,
     durationMs: s.durationMs,
+    longestRunMs: s.longestRunMs,
     model: s.model,
     outcome: s.outcome,
     satisfaction: s.satisfaction,

@@ -53,6 +53,8 @@ export interface Session {
   startedAt: string;
   /** Active time: each gap between transcript events counts for at most 5 min. */
   durationMs: number;
+  /** Longest stretch of main-thread activity with no pause over 15 min: how long someone worked in one go. */
+  longestRunMs?: number;
   /** Wall-clock span from the first to the last event (or now, while live). */
   wallMs?: number;
   /** Normalized id, e.g. `opus-5.5` (see scripts/models.mjs). */

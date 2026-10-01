@@ -14,7 +14,7 @@ export const CATEGORIES: Array<{ id: Category; label: string; title: string }> =
   { id: "tokens", label: "Hungriest", title: "Most fresh tokens (input + output + cache writes)" },
   { id: "cost", label: "Heaviest", title: "Highest API value: the closest proxy for weight on your quota" },
   { id: "efficiency", label: "Most efficient", title: "Best cache hit (≥ 10k input)" },
-  { id: "duration", label: "Longest", title: "Longest active time" },
+  { id: "duration", label: "Longest", title: "Longest continuous stretch: no pause over 15 min" },
 ];
 
 /** cacheRead / (cacheRead + input), or null when there is too little input to mean anything. */
@@ -29,7 +29,7 @@ export function categoryValue(s: Session, c: Category): number | null {
     case "tokens": return freshTokens(s.tokens);
     case "cost": return s.costUsd;
     case "efficiency": return cacheHit(s.tokens);
-    case "duration": return s.durationMs;
+    case "duration": return s.longestRunMs ?? null;
   }
 }
 

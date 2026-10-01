@@ -19,7 +19,7 @@ const CAPTIONS: Record<Category, string> = {
   tokens: "fresh tokens",
   cost: "API value",
   efficiency: "cache hit",
-  duration: "active time",
+  duration: "longest stretch",
 };
 
 function formatValue(c: Category, v: number): string {
