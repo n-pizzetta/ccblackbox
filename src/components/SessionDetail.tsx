@@ -370,7 +370,6 @@ export function SessionDetail({
 
       <div className="detail-footer">
         <span className="mono">
-          {modelLabel(session.model)} ·{" "}
           <button
             className="footer-id-copy"
             onClick={copyResume}
@@ -378,10 +377,9 @@ export function SessionDetail({
             aria-label="Copy claude --resume command"
           >
             {resumeCopied ? "✓ copied" : session.id}
-          </button>{" "}
-          · {new Date(session.startedAt).toLocaleString()}
+          </button>
         </span>
-        <span className="cost tabular">{formatCost(session.costUsd)}</span>
+        <span className="cost tabular" title="API value: what this would cost at API prices">API value {formatCost(session.costUsd)}</span>
       </div>
     </div>
   );
