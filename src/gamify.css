@@ -5,6 +5,7 @@
   --medal-gold: #f5c451;
   --medal-silver: #c9d3de;
   --medal-bronze: #d98e5a;
+  --medal-platinum: #8fe3f0;
 }
 
 /* ---- Tabs ---- */
@@ -260,10 +261,17 @@
 .badge-state { font-size: var(--fs-xs); color: var(--c-text-faint); }
 .badge-track { width: 70%; height: 4px; margin: 2px 0; }
 .badge.unlocked {
-  border-color: color-mix(in srgb, var(--c-amber) 40%, var(--c-hairline));
-  background: linear-gradient(180deg, color-mix(in srgb, var(--c-amber) 9%, var(--c-bg-panel)), var(--c-bg));
+  border-color: color-mix(in srgb, var(--tier) 40%, var(--c-hairline));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 9%, var(--c-bg-panel)), var(--c-bg));
 }
-.badge.unlocked .badge-state { color: var(--c-amber); }
+.badge.unlocked .badge-name { color: var(--c-text); }
+.tier-bronze, .pip-bronze { --tier: var(--medal-bronze); }
+.tier-silver, .pip-silver { --tier: var(--medal-silver); }
+.tier-gold, .pip-gold { --tier: var(--medal-gold); }
+.tier-platinum, .pip-platinum { --tier: var(--medal-platinum); }
+.badge-pips { display: flex; gap: 4px; }
+.badge-pip { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--c-text-ghost); }
+.badge-pip.on { background: var(--tier); border-color: var(--tier); }
 .badge.locked .badge-icon { filter: grayscale(1); opacity: 0.4; }
 .badge.locked .badge-name { color: var(--c-text-dim); }
 

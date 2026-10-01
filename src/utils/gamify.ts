@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { Session } from "../types";
 import type { Range } from "./range";
 import { costOfTokens, rangeBoundsMs, sumTokens } from "./fleetStats";
@@ -110,41 +111,36 @@ export function projectLeague(sessions: Session[], allSessions: Session[], range
     });
 }
 
-/* ---- Badges ---- */
+/* ---- Badges (computed server-side by scripts/badges.mjs) ---- */
 
-export type Badge = {
+export type Tier = "bronze" | "silver" | "gold" | "platinum";
+
+export type BadgeFamily = {
   id: string;
   name: string;
-  hint: string;
   icon: string;
-  progress: number;
-  target: number;
-  unlocked: boolean;
+  hint: string;
+  unit: string | null;
+  window: "ever" | "30d";
+  /** False when the family needs data this user doesn't have (/insights, token-optimizer). */
+  available: boolean;
+  tiers: Array<{ tier: Tier; target: number; progress: number; unlockedAt: string | null }>;
 };
 
-function badge(id: string, name: string, icon: string, hint: string, progress: number, target: number): Badge {
-  return { id, name, icon, hint, progress: Math.min(progress, target), target, unlocked: progress >= target };
-}
+export type BadgesPayload = { startedAt: string | null; total: number; families: BadgeFamily[] };
 
-export function computeBadges(sessions: Session[]): Badge[] {
-  const real = sessions.filter((s) => !s.ghost && sumTokens(s.tokens) > 0);
-  const cacheMasters = real.filter((s) => (cacheHit(s.tokens) ?? 0) > 0.9).length;
-  const snipers = real.filter((s) => s.outcome === "fully_achieved" && s.frictions.length < 2).length;
-  const clean = real.filter((s) => s.frictions.length === 0 && s.messages > 0).length;
-  const commits = real.reduce((a, s) => a + s.commits, 0);
-  const maxAgents = real.reduce((a, s) => Math.max(a, s.subAgents), 0);
-  const marathons = real.filter((s) => s.durationMs >= 2 * 3_600_000).length;
-  const quality = real.filter((s) => (s.quality?.score ?? 0) >= 80).length;
-
-  return [
-    badge("cache", "Cache master", "🧊", "Cache hit above 90% on 5 sessions", cacheMasters, 5),
-    badge("sniper", "Sniper", "🎯", "3 fully achieved sessions with fewer than 2 frictions", snipers, 3),
-    badge("clean", "Clean run", "🧹", "5 sessions without a single friction", clean, 5),
-    badge("shipper", "Shipper", "🚢", "10 commits in the period", commits, 10),
-    badge("orchestrator", "Orchestrator", "🐝", "A session with 5+ sub-agents", maxAgents, 5),
-    badge("marathon", "Marathon", "🏃", "A session with 2h+ of active time", marathons, 1),
-    badge("quality", "High quality", "💎", "5 sessions with a quality score of 80+", quality, 5),
-  ];
+/** Fetches /api/badges whenever `version` changes (pass the session list); null without the API. */
+export function useBadges(version: unknown): BadgesPayload | null {
+  const [data, setData] = useState<BadgesPayload | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/badges", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled) setData(d && Array.isArray(d.families) ? d : null); })
+      .catch(() => { /* static export or mock data: no API */ });
+    return () => { cancelled = true; };
+  }, [version]);
+  return data;
 }
 
 /* ---- Hero: health score, streak, level ---- */

@@ -125,7 +125,7 @@ export function FleetDashboard({
           </div>
           <HeroBanner sessions={sessions} allSessions={allSessions} />
           <TopSessions sessions={sessions} onSelectSession={onSelectSession} />
-          <Badges sessions={sessions} />
+          <Badges allSessions={allSessions} />
           <ProjectRollup sessions={sessions} allSessions={allSessions} range={range} />
         </>
       )}
