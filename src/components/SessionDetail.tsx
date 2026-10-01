@@ -357,7 +357,7 @@ export function SessionDetail({
         </div>
       </div>
 
-      <div className="detail-body scrollbar">
+      <div className={`detail-body scrollbar tab-${tab}`}>
         {tab === "overview" && (
           <OverviewTab session={session} onFocusTools={focusToolsForPrompt} onOpenTab={setTab} />
         )}
@@ -658,9 +658,9 @@ function OverviewTab({
 
   return (
     <>
-      <SessionKpis session={session} />
       <div className="overview-grid">
         <div className="overview-main">
+          <SessionKpis session={session} />
 {summaryAddsInfo && (
       <div className="d-panel">
         <div className="section-title">

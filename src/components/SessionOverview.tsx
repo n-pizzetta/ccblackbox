@@ -2,12 +2,13 @@ import type { Session } from "../types";
 import { costOf } from "../../scripts/models.mjs";
 import { formatCost, formatDuration, formatTokens } from "../utils/format";
 import { freshTokens, formatUsage, useUnit } from "../utils/units";
+import { SmokeBubble, type Accent } from "./SmokeBubble";
 
 export type DetailTab = "overview" | "tools" | "tokens" | "files";
 
 type Tile = { label: string; value: string; sub?: string; title?: string };
 
-/** Headline figures of a session, above the prompts. Zero-valued optional tiles are left out. */
+/** Headline figures of a session as round bubbles (they go up in smoke on hover). Zero-valued optional tiles are left out. */
 export function SessionKpis({ session }: { session: Session }) {
   const unit = useUnit();
   const toolCalls = Object.values(session.toolCounts ?? {}).reduce((a, n) => a + n, 0);
@@ -39,14 +40,14 @@ export function SessionKpis({ session }: { session: Session }) {
   if (session.commits > 0) tiles.push({ label: "Commits", value: String(session.commits) });
   if (session.subAgents > 0) tiles.push({ label: "Sub-agents", value: String(session.subAgents) });
 
+  const accents: Accent[] = ["cyan", "violet", "green", "amber", "pink", "periwinkle", "teal"];
   return (
-    <div className="overview-kpis">
-      {tiles.map((t) => (
-        <div key={t.label} className="kpi-tile" title={t.title}>
+    <div className="kpi-bubbles">
+      {tiles.map((t, i) => (
+        <SmokeBubble key={t.label} accent={accents[i % accents.length]} title={[t.sub, t.title].filter(Boolean).join("\n") || undefined}>
           <span className="kpi-value tabular">{t.value}</span>
           <span className="kpi-label">{t.label}</span>
-          {t.sub && <span className="kpi-sub mono">{t.sub}</span>}
-        </div>
+        </SmokeBubble>
       ))}
     </div>
   );

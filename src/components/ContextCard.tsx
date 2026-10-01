@@ -92,9 +92,11 @@ export function ContextCard({ snap }: { snap: ContextSnapshot }) {
           )}
           {idleMs > 60_000 && <span className="dim">updated {fmtLeft(idleMs / 1000)} ago</span>}
         </div>
-        <ul className="ctx-reasons">
-          {a.reasons.map((r) => <li key={r}>{r}</li>)}
-        </ul>
+        <p className="ctx-reasons">
+          {a.reasons.map((r, i) => (
+            <span key={r}>{i > 0 && <span className="ctx-sep"> · </span>}{r}</span>
+          ))}
+        </p>
       </div>
       <div className="ctx-verdict" style={{ "--vc": LEVEL_COLOR[a.level] } as React.CSSProperties}>
         <span className="ctx-verdict-dot" />
