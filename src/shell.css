@@ -33,12 +33,13 @@
 .topline .brand-title {
   font-family: var(--f-display);
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: -0.03em;
 }
 /* the "cc" carries the mark's cyan → violet gradient */
 .brand-cc {
+  font-weight: 900;
   background: linear-gradient(90deg, var(--c-cyan), var(--c-violet));
   -webkit-background-clip: text;
   background-clip: text;
