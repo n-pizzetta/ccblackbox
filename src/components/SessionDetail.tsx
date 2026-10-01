@@ -1,4 +1,5 @@
 import { LimitsPill } from "./LimitsGauge";
+import { SessionContext } from "./ContextCard";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createPatch } from "diff";
 import type { Session, SessionQuality, ToolName } from "../types";
@@ -324,6 +325,7 @@ export function SessionDetail({
         </div>
 
         {session.live && <LiveStatus session={session} />}
+        <SessionContext sessionId={session.id} />
         {(session.clearedFrom || session.clearedInto) && (
           <ClearedBanner session={session} />
         )}

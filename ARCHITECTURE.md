@@ -157,7 +157,7 @@ Claude Code exposes the real limits (`rate_limits.five_hour` / `seven_day`, as i
 
 The same payload carries `context_window` (size, % used, last-turn usage) and `prompt_cache` (`warm`, `ttl`, `expires_at`, hit ratio, misses, `recache_tokens_if_cold`). [`scripts/context-advice.mjs`](scripts/context-advice.mjs) (pure, shared by the wrapper and the dashboard like `models.mjs`) turns it into a snapshot (`toSnapshot`) and a verdict (`adviseContext`): *keep going*, *wrap up before pausing*, *compact at the next break*, *compact now*, or *clear if the task is done*, each with its reasons. Thresholds are heuristics (`THRESHOLDS`): context ≥ 70% / 85% of the window; a cold cache matters from 40% of the window or 100k tokens to re-cache; a warm cache is "expiring" under 10 min. A cold cache is the case where `/compact` is no cheaper than a normal message (it re-reads everything at full price), so `/clear` is advised.
 
-The wrapper appends a short segment to the status line (`ctx 33% · cache 59m`, plus a hint when it matters). The dashboard polls `/api/live-context` (`useLiveContext`) and shows one `ContextCards` entry per live session in the Today tab, with a countdown computed from `expires_at`.
+The wrapper appends a short segment to the status line (`ctx 33% · cache 59m`, plus a hint when it matters). The dashboard polls `/api/live-context` once (`useLiveContext`, a shared store) and shows the result where the session is: a third line on session rows in the list (`ContextLine`: fill bar, cache countdown computed from `expires_at`, the verdict when it is not "keep going"; rows with it are taller, which the virtualized list accounts for) and a banner in the session view (`ContextCard`: ring, cold-start cost, verdict, reasons on click).
 
 The 5h window in the UI (`fleet/FiveHourSession.tsx`, `utils/fleetStats.ts`):
 
@@ -240,7 +240,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 | `SessionDetail` | Full-screen overlay: header (outcome, cost, resume command, export), live / cleared-chain / ghost banners (reveal, delete), and four tabs: **Overview** (summary, prompts, frictions; friction badge), **Tools** (tool counts and sequence with results, can be focused on one prompt), **Tokens** (per-prompt and per-turn cost breakdown), **Files** (file-history versions with diffs via `diff`). |
 | `HelpOverlay` | Keyboard shortcuts. |
 
-`fleet/`: `LiveTicker` (live burn and limits), `FiveHourSession` (current 5h window, 7d bar, per-session/prompt share), `LiveSessions` (running sessions with sparklines), `ContextCards` (context fill, prompt-cache countdown and compact / clear verdict per live session), `TopSessions`, `AnomalyFlags`, `ProjectRollup`, `ModelMix`, `ToolsHeatmap`, `HeavyPrompts`, `TokenTimeSeries` (in the selected range), `BurnSpikeBanner` + `SpikeAnalysisOverlay` + `SpikeHeuristics`.
+`fleet/`: `LiveTicker` (live burn and limits), `FiveHourSession` (current 5h window, 7d bar, per-session/prompt share), `LiveSessions` (running sessions with sparklines), `TopSessions`, `AnomalyFlags`, `ProjectRollup`, `ModelMix`, `ToolsHeatmap`, `HeavyPrompts`, `TokenTimeSeries` (in the selected range), `BurnSpikeBanner` + `SpikeAnalysisOverlay` + `SpikeHeuristics`.
 
 `utils/`: `fleetStats` (window/bucket aggregations, costs via `models.mjs`), `aggregateByPrompt`, `classifyPrompt`, `burnTracker`, `rateLimits`, `windowState`, `range`, `format`, `exportSession` (standalone HTML export of a session).
 

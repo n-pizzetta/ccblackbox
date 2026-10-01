@@ -23,8 +23,9 @@ versioning follows [SemVer](https://semver.org/) once published.
 
 - Context and prompt-cache advice for live sessions: the status line wrapper
   records a sanitized per-session snapshot and appends a short
-  `ctx 33% · cache 59m` segment to the status line; the Today tab shows a
-  keep going / compact / clear verdict with its reasons and a cache countdown.
+  `ctx 33% · cache 59m` segment to the status line; session rows show the context
+  fill and a cache countdown, and the session view a keep going / compact /
+  clear verdict with its reasons.
   The wrapper also keeps a small history of the 5h / 7d limits. Re-run
   `/ccblackbox:limits` to refresh an installed wrapper.
 - Rankings tab with podium, badges, health / streak / level banner and project

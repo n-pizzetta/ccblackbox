@@ -3,6 +3,10 @@ import type { Session } from "../types";
 import { formatCost, formatDuration, formatRelative, formatTokens, outcomeColor } from "../utils/format";
 import { projectColor } from "../utils/fleetStats";
 import { freshTokens, formatUsage, formatUsageAlt, useUnit } from "../utils/units";
+import { ContextLine } from "./ContextCard";
+import { useSnapshotMap } from "../utils/liveContext";
+import { useNow } from "../utils/useNow";
+import type { ContextSnapshot } from "../../scripts/context-advice.mjs";
 
 interface Props {
   sessions: Session[];
@@ -23,14 +27,16 @@ interface Props {
 }
 
 const ROW_HEIGHT = 62;
+/** Rows with a context / cache line are taller. */
+const ROW_HEIGHT_CTX = 84;
 const HEAD_HEIGHT = 34;
 const OVERSCAN_PX = 8 * ROW_HEIGHT;
 
 type Item =
-  | { kind: "head"; key: string; label: string; count: number; cost: number; fresh: number; top: number }
-  | { kind: "row"; s: Session; top: number };
+  | { kind: "head"; key: string; label: string; count: number; cost: number; fresh: number; top: number; h: number }
+  | { kind: "row"; s: Session; top: number; h: number };
 
-const itemHeight = (it: Item) => (it.kind === "head" ? HEAD_HEIGHT : ROW_HEIGHT);
+const itemHeight = (it: Item) => it.h;
 
 function dayLabel(iso: string, now: Date): string {
   const d = new Date(iso);
@@ -42,7 +48,7 @@ function dayLabel(iso: string, now: Date): string {
 }
 
 /** Flat, virtualizable list: a day header whenever the day changes, then that day's rows. */
-function buildItems(sessions: Session[]): { items: Item[]; total: number } {
+function buildItems(sessions: Session[], snaps: Map<string, ContextSnapshot>): { items: Item[]; total: number } {
   const now = new Date();
   const groups: Array<{ label: string; rows: Session[] }> = [];
   for (const s of sessions) {
@@ -54,11 +60,12 @@ function buildItems(sessions: Session[]): { items: Item[]; total: number } {
   const items: Item[] = [];
   let top = 0;
   for (const g of groups) {
-    items.push({ kind: "head", key: `h-${g.label}-${top}`, label: g.label, count: g.rows.length, cost: g.rows.reduce((a, s) => a + s.costUsd, 0), fresh: g.rows.reduce((a, s) => a + freshTokens(s.tokens), 0), top });
+    items.push({ kind: "head", key: `h-${g.label}-${top}`, label: g.label, count: g.rows.length, cost: g.rows.reduce((a, s) => a + s.costUsd, 0), fresh: g.rows.reduce((a, s) => a + freshTokens(s.tokens), 0), top, h: HEAD_HEIGHT });
     top += HEAD_HEIGHT;
     for (const s of g.rows) {
-      items.push({ kind: "row", s, top });
-      top += ROW_HEIGHT;
+      const h = snaps.has(s.id) ? ROW_HEIGHT_CTX : ROW_HEIGHT;
+      items.push({ kind: "row", s, top, h });
+      top += h;
     }
   }
   return { items, total: top };
@@ -111,7 +118,9 @@ export function SessionList({
     };
   }, []);
 
-  const { items, total } = useMemo(() => buildItems(sessions), [sessions]);
+  const snapshots = useSnapshotMap();
+  const now = useNow(30_000);
+  const { items, total } = useMemo(() => buildItems(sessions, snapshots), [sessions, snapshots]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -119,7 +128,7 @@ export function SessionList({
     const item = items.find((it) => it.kind === "row" && it.s.id === selectedId);
     if (!item) return;
     const rowTop = item.top;
-    const rowBottom = rowTop + ROW_HEIGHT;
+    const rowBottom = rowTop + item.h;
     if (rowTop < el.scrollTop || rowBottom > el.scrollTop + el.clientHeight) {
       el.scrollTo({ top: rowTop - el.clientHeight / 3, behavior: "smooth" });
     }
@@ -189,7 +198,7 @@ export function SessionList({
                     className={`session-row ${s.live ? "is-live" : ""} ${selectedId === s.id ? "selected" : ""} ${compareMode ? "compare-mode" : ""} ${compareMode && checked ? "compare-checked" : ""}`}
                     style={{
                       "--outcome-c": c,
-                      height: ROW_HEIGHT,
+                      height: it.h,
                       animationDelay: `${Math.min(absoluteIdx, 15) * 20}ms`,
                     } as React.CSSProperties}
                     role="button"
@@ -242,6 +251,7 @@ export function SessionList({
                         <span>{formatDuration(s.durationMs)}</span>
                         <span>{formatRelative(s.startedAt)}</span>
                       </div>
+                      {snapshots.get(s.id) && <ContextLine snap={snapshots.get(s.id)!} now={now} />}
                     </div>
                     <div className="row-side">
                       <span className={`row-primary mono tabular ${unit === "usd" ? "is-usd" : ""}`}>{formatUsage(unit, s.tokens, s.costUsd)}</span>
