@@ -323,6 +323,7 @@ a:focus-visible,
 }
 .live-card-project { color: var(--c-text); font-weight: 600; }
 .live-card-uptime { margin-left: auto; font-size: 10.5px; }
+.live-card-uptime.forgotten { color: var(--c-amber); }
 .live-card-goal {
   font-size: 12.5px;
   color: var(--c-text);

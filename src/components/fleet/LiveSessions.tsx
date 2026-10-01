@@ -73,7 +73,9 @@ export function LiveSessions({ sessions, onSelectSession }: Props) {
       </div>
       <div className="live-cards">
           {visible.map((s) => {
-          const uptime = now - new Date(s.startedAt).getTime();
+          // The process can be older than the transcript (resumed or /clear-ed sessions).
+          const uptime = now - new Date(s.processStartedAt ?? s.startedAt).getTime();
+          const forgotten = uptime > 24 * 3_600_000;
           const lastEvt = s.lastEventAt ? now - new Date(s.lastEventAt).getTime() : null;
           const stale = lastEvt !== null && lastEvt > 30 * 60_000;
           const burn = recentBurn(s, now);
@@ -87,7 +89,12 @@ export function LiveSessions({ sessions, onSelectSession }: Props) {
                     🔥 {formatTokens(burn)}/{BURN_WINDOW_MS / 1000}s
                   </span>
                 )}
-                <span className="mono dim live-card-uptime tabular">{formatDuration(uptime)}</span>
+                <span
+                  className={`mono live-card-uptime tabular ${forgotten ? "forgotten" : "dim"}`}
+                  title={`Process running for ${formatDuration(uptime)}${s.version ? ` · Claude Code ${s.version}` : ""}${forgotten ? " · over 24h: forgotten?" : ""}`}
+                >
+                  {formatDuration(uptime)}
+                </span>
               </div>
               <div className="live-card-goal">{s.goal || "session"}</div>
               {s.runningTool && (
