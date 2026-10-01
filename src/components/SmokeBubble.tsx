@@ -1,152 +1,172 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 /**
- * A round bubble that, on hover, goes up in smoke and then re-forms. The smoke is a small canvas
- * particle system (soft puffs that rise, drift, swell and fade); it is a stylised effect, not a
- * fluid simulation. Without hover support or with prefers-reduced-motion nothing happens.
+ * A round bubble the pointer burns a path through: wherever the cursor passes, the bubble dissolves
+ * (a soft mask hole) and leaves a wisp of smoke; the holes then heal, oldest first, so the bubble
+ * re-forms behind the cursor. The smoke is a small canvas particle system, a stylised effect rather
+ * than a fluid simulation. With prefers-reduced-motion nothing happens.
  */
 
-export type Accent = "cyan" | "violet" | "green" | "amber" | "pink" | "periwinkle" | "teal";
-const RGB: Record<Accent, [number, number, number]> = {
-  cyan: [76, 194, 255],
-  violet: [176, 132, 255],
-  green: [0, 217, 126],
-  amber: [255, 176, 32],
-  pink: [255, 126, 182],
-  periwinkle: [139, 156, 255],
-  teal: [94, 234, 212],
-};
+const HOLE_R = 20; // px, fully erased radius
+const HOLE_SOFT = 14; // px, soft edge
+const HOLD_MS = 550; // a hole stays open this long...
+const HEAL_MS = 1200; // ...then closes over this long
+const STEP = 6; // px between holes along the path
+const PAD = 50; // canvas margin around the bubble, so smoke can drift out of it
 
-const REFORM_AT_MS = 1300;
-const REFORM_MS = 800;
-const SPAWN_MS = 500;
-const RATE = 260; // puffs / second while spawning
-const PAD_X = 50; // canvas margins around the bubble: smoke rises above it
-const PAD_TOP = 90;
-const PAD_BOTTOM = 20;
-
+type Hole = { x: number; y: number; t: number };
 type Puff = { x: number; y: number; vx: number; vy: number; age: number; life: number; r0: number; r1: number; phase: number; freq: number; amp: number };
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
-function makeSprite(accent: Accent): HTMLCanvasElement {
-  const [r, g, b] = RGB[accent];
-  // gray smoke with a tint of the bubble's accent
-  const mix = (c: number) => Math.round(c * 0.25 + 175 * 0.75);
+function makeSprite(): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = c.height = 64;
   const ctx = c.getContext("2d")!;
   const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, `rgba(${mix(r)},${mix(g)},${mix(b)},0.6)`);
-  grad.addColorStop(0.5, `rgba(${mix(r)},${mix(g)},${mix(b)},0.25)`);
-  grad.addColorStop(1, `rgba(${mix(r)},${mix(g)},${mix(b)},0)`);
+  grad.addColorStop(0, "rgba(176,184,196,0.6)");
+  grad.addColorStop(0.5, "rgba(176,184,196,0.25)");
+  grad.addColorStop(1, "rgba(176,184,196,0)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 64, 64);
   return c;
 }
 
-export function SmokeBubble({ accent, size = 128, title, children }: { accent: Accent; size?: number; title?: string; children: ReactNode }) {
+/** 0 right after the hole opens, 1 once it has healed. */
+function heal(age: number): number {
+  if (age <= HOLD_MS) return 0;
+  const k = Math.min(1, (age - HOLD_MS) / HEAL_MS);
+  return k * k * (3 - 2 * k);
+}
+
+export function SmokeBubble({ size = 128, title, children }: { size?: number; title?: string; children: ReactNode }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [phase, setPhase] = useState<"idle" | "vanish" | "reform">("idle");
-  const busy = useRef(false);
-  const timers = useRef<number[]>([]);
+  const holes = useRef<Hole[]>([]);
+  const puffs = useRef<Puff[]>([]);
+  const last = useRef<{ x: number; y: number } | null>(null);
   const raf = useRef(0);
+  const running = useRef(false);
+  const sprite = useRef<HTMLCanvasElement | null>(null);
 
-  useEffect(() => () => {
-    timers.current.forEach(clearTimeout);
-    cancelAnimationFrame(raf.current);
-  }, []);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
-  const burst = () => {
-    if (busy.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const w = size + PAD * 2;
+  const h = size + PAD * 2;
+
+  const frame = (now: number, prev: number) => {
+    const bubble = bubbleRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    busy.current = true;
+    if (!bubble || !canvas || !ctx) return;
+    const dt = Math.min(0.05, (now - prev) / 1000);
 
-    const w = size + PAD_X * 2;
-    const h = size + PAD_TOP + PAD_BOTTOM;
+    holes.current = holes.current.filter((o) => now - o.t < HOLD_MS + HEAL_MS);
+    for (const p of puffs.current) {
+      p.age += dt / p.life;
+      p.x += (p.vx + Math.cos(now / 1000 * p.freq + p.phase) * p.amp) * dt;
+      p.y += p.vy * dt;
+      p.vy *= 1 - 0.2 * dt;
+    }
+    puffs.current = puffs.current.filter((p) => p.age < 1);
+
+    // mask: every hole is a radial gradient (transparent in the middle), intersected together
+    if (holes.current.length > 0) {
+      const layers = holes.current.map((o) => {
+        const a = heal(now - o.t).toFixed(3);
+        return `radial-gradient(circle at ${o.x.toFixed(1)}px ${o.y.toFixed(1)}px, rgba(0,0,0,${a}) 0, rgba(0,0,0,${a}) ${HOLE_R}px, #000 ${HOLE_R + HOLE_SOFT}px)`;
+      }).join(",");
+      bubble.style.maskImage = layers;
+      bubble.style.setProperty("-webkit-mask-image", layers);
+      bubble.style.maskComposite = "intersect";
+      bubble.style.setProperty("-webkit-mask-composite", "source-in");
+    } else {
+      bubble.style.maskImage = "";
+      bubble.style.setProperty("-webkit-mask-image", "");
+    }
+
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    const sprite = makeSprite(accent);
-    const cx = w / 2;
-    const cy = PAD_TOP + size / 2;
-    let puffs: Puff[] = [];
-    let acc = 0;
-    let t = 0;
-    let last = performance.now();
+    if (canvas.width !== w * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    for (const p of puffs.current) {
+      const r = p.r0 + (p.r1 - p.r0) * Math.pow(p.age, 0.6);
+      ctx.globalAlpha = Math.pow(Math.sin(Math.PI * Math.min(1, p.age)), 1.3) * 0.26;
+      ctx.drawImage(sprite.current!, p.x + PAD - r, p.y + PAD - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
 
-    setPhase("vanish");
-    timers.current.push(window.setTimeout(() => setPhase("reform"), REFORM_AT_MS));
-    timers.current.push(window.setTimeout(() => setPhase("idle"), REFORM_AT_MS + REFORM_MS));
-
-    const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      t += dt;
-      if (t * 1000 < SPAWN_MS) {
-        acc += dt * RATE;
-        while (acc >= 1) {
-          acc -= 1;
-          const a = rand(0, Math.PI * 2);
-          const d = Math.sqrt(Math.random()) * (size / 2) * 0.85;
-          puffs.push({
-            x: cx + Math.cos(a) * d,
-            y: cy + Math.sin(a) * d,
-            vx: rand(-10, 10),
-            vy: -rand(18, 52),
-            age: 0,
-            life: rand(0.8, 1.5),
-            r0: rand(6, 12),
-            r1: rand(20, 38),
-            phase: rand(0, 6.28),
-            freq: rand(1.2, 3),
-            amp: rand(6, 16),
-          });
-        }
-      }
-      for (const p of puffs) {
-        p.age += dt / p.life;
-        // two layered sways give the plume some curl
-        p.x += (p.vx + Math.cos(t * p.freq + p.phase) * p.amp + Math.sin(t * p.freq * 2.3 + p.phase * 1.7) * p.amp * 0.5) * dt;
-        p.y += p.vy * dt;
-        p.vy *= 1 - 0.25 * dt; // smoke slows as it spreads
-      }
-      puffs = puffs.filter((p) => p.age < 1);
-
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (holes.current.length > 0 || puffs.current.length > 0) {
+      raf.current = requestAnimationFrame((t) => frame(t, now));
+    } else {
+      running.current = false;
       ctx.clearRect(0, 0, w, h);
-      for (const p of puffs) {
-        const k = p.age;
-        const r = p.r0 + (p.r1 - p.r0) * Math.pow(k, 0.6);
-        ctx.globalAlpha = Math.pow(Math.sin(Math.PI * Math.min(1, k)), 1.3) * 0.24;
-        ctx.drawImage(sprite, p.x - r, p.y - r, r * 2, r * 2);
-      }
-      ctx.globalAlpha = 1;
+    }
+  };
 
-      if (puffs.length > 0 || t * 1000 < SPAWN_MS) {
-        raf.current = requestAnimationFrame(tick);
-      } else {
-        ctx.clearRect(0, 0, w, h);
-        busy.current = false;
+  const ensureRunning = () => {
+    if (running.current) return;
+    running.current = true;
+    const start = performance.now();
+    raf.current = requestAnimationFrame((t) => frame(t, start));
+  };
+
+  const onMove = (e: React.MouseEvent) => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    sprite.current ??= makeSprite();
+    const r = wrap.getBoundingClientRect();
+    const to = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const from = last.current ?? to;
+    last.current = to;
+    const now = performance.now();
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    const n = Math.max(1, Math.round(dist / STEP));
+    for (let i = 1; i <= n; i++) {
+      const x = from.x + ((to.x - from.x) * i) / n;
+      const y = from.y + ((to.y - from.y) * i) / n;
+      holes.current.push({ x, y, t: now });
+      // a wisp of smoke at the cursor, stronger while moving fast
+      const wisps = dist > 14 ? 2 : 1;
+      for (let k = 0; k < wisps; k++) {
+        puffs.current.push({
+          x: x + rand(-6, 6),
+          y: y + rand(-6, 6),
+          vx: rand(-8, 8),
+          vy: -rand(10, 34),
+          age: 0,
+          life: rand(0.9, 1.6),
+          r0: rand(6, 10),
+          r1: rand(18, 32),
+          phase: rand(0, 6.28),
+          freq: rand(1.2, 3),
+          amp: rand(5, 14),
+        });
       }
-    };
-    raf.current = requestAnimationFrame(tick);
+    }
+    if (holes.current.length > 400) holes.current.splice(0, holes.current.length - 400);
+    ensureRunning();
   };
 
   return (
     <div
+      ref={wrapRef}
       className="smoke-wrap"
-      style={{ width: size, height: size, "--bs": `${size}px` } as React.CSSProperties}
-      onMouseEnter={burst}
+      style={{ width: size, height: size }}
+      onMouseMove={onMove}
+      onMouseLeave={() => { last.current = null; }}
       title={title}
     >
-      <div className={`smoke-bubble accent-${accent} ${phase}`}>{children}</div>
+      <div ref={bubbleRef} className="smoke-bubble">{children}</div>
       <canvas
         ref={canvasRef}
         className="smoke-canvas"
-        style={{ left: -PAD_X, top: -PAD_TOP, width: size + PAD_X * 2, height: size + PAD_TOP + PAD_BOTTOM }}
+        style={{ left: -PAD, top: -PAD, width: w, height: h }}
         aria-hidden="true"
       />
     </div>
