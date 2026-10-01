@@ -107,7 +107,7 @@ The dev server and `scripts/serve.mjs` mount the same API (`scripts/api.mjs`): i
                   │
                   ▼ fetch
    React 19 SPA (hash routing)
-   ├─ Sidebar / StatsStrip / SessionList
+   ├─ StatsStrip / SessionList / SessionFilters
    ├─ SessionDetail (Overview / Tools / Tokens / Files)
    ├─ SessionCompare
    └─ FleetDashboard (src/components/fleet/)

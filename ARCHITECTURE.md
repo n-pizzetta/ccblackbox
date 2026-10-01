@@ -38,7 +38,7 @@ There is no database, no network access beyond loopback, and no runtime dependen
       src/utils/rateLimits.ts   (/api/limits)
                          │
                          ▼
-      src/App.tsx ─┬─ Sidebar · TopBar/StatsRow · SessionList
+      src/App.tsx ─┬─ TopBar/StatsRow · SessionList (+ SessionFilters)
                    ├─ FleetDashboard (fleet/*)  or  SessionCompare
                    └─ SessionDetail overlay (Overview · Tools · Tokens · Files)
 ```
@@ -90,7 +90,7 @@ Used as a library by `scripts/api.mjs`, and as a CLI (`pnpm parse`) that writes 
 3. `readHistoryBySession()` groups `history.jsonl` by session id.
 4. `indexTranscripts()` maps every `projects/*/<id>.jsonl` by session id. Project directory names are lossy (`.`, `_`, `/` all become `-`), so lookups are by id only, never by reconstructed path.
 5. `collectLive()` expands each alive pid file to its `/clear` chain (sibling transcripts in the same project dir with the same `custom-title`, modified later); only the newest in the chain is marked live.
-6. Meta files are read; one without `session_id` or `start_time` is reported in `errors` (surfaced in the sidebar with a Trash action).
+6. Meta files are read; one without `session_id` or `start_time` is reported in `errors` (surfaced as a badge in the top bar with a Trash action).
 7. `buildSession()` runs for the union of transcript ids, meta ids and live ids.
 8. Post-passes: `linkClearedChains()` sets `clearedFrom` / `clearedInto` (same `cwd` + `customTitle`), `reassignLiveToChainTail()` moves the live flag to the chain tail, `markUnpriced()` lists models without a pricing row.
 
@@ -213,7 +213,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 
 ### State and routing (`App.tsx`)
 
-- Selected session, range (`today` / `7d` / `30d` / `all`), sidebar filter (`all`, `live`, `ghost`, `friction`, `failed`, `lowquality`), project and search are mirrored to the URL hash (`#session/<id>?range=…&filter=…&project=…&q=…`) and to `localStorage` (`ccblackbox:state`).
+- Selected session, range (`today` / `7d` / `30d` / `all`), list filter (`all`, `live`, `ghost`, `friction`, `failed`, `lowquality`), project and search are mirrored to the URL hash (`#session/<id>?range=…&filter=…&project=…&q=…`) and to `localStorage` (`ccblackbox:state`).
 - The detail view merges the list summary with the fetched full session.
 - Keyboard: `j`/`k` or arrows (next/previous), `Esc` (close / exit zoom), `Cmd/Ctrl+F` (zoom dashboard), `?` (help).
 
@@ -221,8 +221,11 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 
 | Component | Role |
 |---|---|
-| `Sidebar` | Filters with counts (ghosts split by crashed / empty), project list, parse errors with Trash action, `SettingsButton` (opens a popover with the `LimitsSection` connection status; its hint shows the 5h limit). |
-| `StatsStrip` (`TopBar`, `StatsRow`) | Range picker, data source + freshness, link to `/usage-report.html`, headline stats for the filtered set. |
+| `SessionFilters` | Filters button + popover (status filters with counts, ghosts split by crashed / empty; project list; outcome-bar legend) and the removable chips of the active filters. Clicking a project pill on a session row filters on that project. |
+| `LimitsPill` | The 5h and 7-day usage windows (fill, elapsed-time tick, reset countdown); rendered in the top bar and in the session view so they are always on screen. |
+| `units` (`utils/units.ts`, `UnitSetting`) | Display unit for usage: **tokens** (fresh = input + output + cache writes; cached reads are shown apart) or **API value** ($ at API prices, read as a relative weight, since a subscription is limited by the 5h / 7d windows rather than dollars). Persisted in `localStorage` (`ccblackbox:unit`), set from the settings popover. Rankings by weight (podium "Heaviest", project league) use API value. |
+| `ParseErrors` / `SettingsButton` | Top-bar badge listing unreadable session-meta files with a Trash action; gear that opens the settings popover (`LimitsSection` connection status). |
+| `StatsStrip` (`TopBar`, `StatsRow`) | Brand, usage limits, range picker, data source + freshness, link to `/usage-report.html`, headline stats for the filtered set. |
 | `SessionList` | Filtered list, search, compare-mode selection, bulk ghost delete bar. |
 | `FleetDashboard` | Right pane when not comparing; composes `fleet/*`. |
 | `SessionCompare` | Side-by-side metrics for selected sessions. |
