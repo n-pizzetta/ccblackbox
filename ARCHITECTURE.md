@@ -19,7 +19,6 @@ There is no database, no network access beyond loopback, and no runtime dependen
  ├── usage-data/report.html
  ├── file-history/<id>/<hash>@v<n>
  ├── history.jsonl
- ├── token-optimizer/quality-cache-<id>.json
                     │
                     ▼
       scripts/parse-sessions.mjs  ── parseAllSessions() / summarizeSession()
@@ -62,7 +61,6 @@ All paths are relative to the Claude config dir: `~/.claude`, or `$CLAUDE_CONFIG
 | `usage-data/report.html` | The `/insights` report, proxied at `/usage-report.html`. |
 | `file-history/<id>/<hash>@v<n>` | File snapshots for the Files tab and diffs. |
 | `history.jsonl` | Fallback first prompt when neither transcript nor meta has one. |
-| `token-optimizer/quality-cache-<id>.json` | Optional context-quality score from the token-optimizer plugin. |
 
 ### Written
 
@@ -177,8 +175,28 @@ Computed server-side after every parse (`updateBadges` in the API), because they
 - **Calibration**: per-session records (Marathon, Orchestrator, File surgeon, Toolbox, Juggler) by rarity across real sessions; cumulative counters by time for a heavy user: bronze on day 1, silver in 1–2 weeks, gold in ~3 months, platinum in ~1 year.
 - **Continuous work**: Marathon, Juggler and Hours use stretches of main-thread activity (turns and prompts) where no pause exceeds 15 minutes (`RUN_GAP_MS`), not `durationMs`, which accumulates capped gaps over sessions left open for days. Hours counts the union of stretches, so parallel sessions count once.
 - **Streak** skips quiet Saturdays and Sundays.
-- `sniper` and `comeback` need `/insights` facets; `hygiene` needs the token-optimizer quality score. They are hidden (`available: false`) when no session has that data.
+- `sniper` and `comeback` need `/insights` facets; `hygiene` needs scored sessions (5+ turns). They are hidden (`available: false`) when no session has that data.
 - The shell-based families only see commands run by Claude, not ones typed in another terminal.
+
+### Context quality (`scripts/quality.mjs`)
+
+Measured while parsing each main-thread transcript (sub-agents are not scored), so it needs no other plugin. Sessions under 5 assistant turns get no score. Five signals, each 0–100 (100 = no waste), weighted into the score; waste tokens are estimated as characters / 4:
+
+| Signal | Weight | Measure |
+|---|---|---|
+| Context fill | 0.3 | Peak context (`input + cacheRead + cacheWrite` of a turn) vs the window: 100 up to 50%, 0 at 95%. The window isn't in the transcript: a peak over 200k implies 1M. |
+| Stale reads | 0.2 | `Read` of the same file and range with no edit to that file in between (−10 each). |
+| Bloated results | 0.2 | Tool results over 25k characters (−15 each). |
+| Compaction depth | 0.2 | `isCompactSummary` lines: 0 → 100, 1 → 70, 2 → 40, more → 10. |
+| Duplicates | 0.1 | Same command, pattern, URL or query repeated with no edit in between (−10 each). |
+
+Grades: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, else F. The list payload keeps the score, grade, fill, band, waste and compaction count; signal details are in the session payload.
+
+### Health check (`src/utils/healthRules.ts`)
+
+The **Health** tab is a checklist of rules over the sessions in the selected range (ghosts excluded, except for the housekeeping rule). Each rule passes, warns or fails against a threshold written next to it, explains why it matters and what to do, and links up to 5 sessions behind a miss. Rules without data (for example outcomes before `/insights` ran) show as n/a and don't count. The Rankings hero shows the result (`passed / total`).
+
+Rules: context quality, context headroom, compactions, prompt cache, startup cost (median first-turn context: system prompt, CLAUDE.md, memory, skills and MCP tools), outcomes, friction, forgotten sessions (process running over 24h, from the pid file's `startedAt`) and housekeeping (ghosts). Adding one means appending a function to `RULES`.
 
 ---
 
