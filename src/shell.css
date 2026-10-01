@@ -280,3 +280,13 @@
 .unit-opt { padding: 3px 12px; font-size: var(--fs-md); color: var(--c-text-dim); border-radius: 999px; }
 .unit-opt:hover { color: var(--c-text); }
 .unit-opt.active { background: var(--c-bg-elevated); color: var(--c-text); }
+
+/* ---- Analysis tab: two balanced columns, and rows that survive a half-width card ---- */
+.fleet-stack { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.model-mix { container-type: inline-size; }
+@container (max-width: 520px) {
+  /* drop the session count and the cost share; keep name, tokens, volume share and cost */
+  .model-mix-row { grid-template-columns: 10px minmax(0, 1fr) 62px 76px 64px; }
+  .model-mix-row > :nth-child(3),
+  .model-mix-row > :nth-child(7) { display: none; }
+}

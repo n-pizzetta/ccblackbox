@@ -138,9 +138,11 @@ export function FleetDashboard({
           </div>
           <div className="fleet-history-host">
             <div className="fleet-history">
-              <AnomalyFlags sessions={sessions} onSelectSession={onSelectSession} />
+              <div className="fleet-stack">
+                <AnomalyFlags sessions={sessions} onSelectSession={onSelectSession} />
+                <ModelMix sessions={sessions} />
+              </div>
               <ToolsHeatmap sessions={sessions} />
-              <ModelMix sessions={sessions} />
               <div className="fleet-span-all">
                 <HeavyPrompts sessions={sessions} onSelectSession={onSelectSession} />
               </div>
