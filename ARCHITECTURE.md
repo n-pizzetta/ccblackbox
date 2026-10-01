@@ -14,7 +14,8 @@ There is no database, no network access beyond loopback, and no runtime dependen
  ├── projects/<slug>/<id>/subagents/*.jsonl      ├── limits.json           ◀── statusline.mjs
  ├── sessions/<pid>.json                         ├── models.json           (user, optional)
  ├── usage-data/session-meta/<id>.json           ├── statusline.mjs/.json  ◀── install-statusline.mjs
- ├── usage-data/facets/<id>.json                 └── sessions.json         ◀── `pnpm parse` only
+ ├── usage-data/facets/<id>.json                 ├── badges.json           ◀── api.mjs
+ │                                               └── sessions.json         ◀── `pnpm parse` only
  ├── usage-data/report.html
  ├── file-history/<id>/<hash>@v<n>
  ├── history.jsonl
@@ -68,6 +69,7 @@ All paths are relative to the Claude config dir: `~/.claude`, or `$CLAUDE_CONFIG
 - Everything ccblackbox writes by itself lives under `~/.claude/ccblackbox/`:
   - `cache/<id>.jsonl`: one line per tool call / stop, appended by the plugin hook (mode `0600`).
   - `limits.json`: latest `rate_limits` payload, written atomically by the status line wrapper. `limits-history.jsonl`: one line per change of either window (`{t, five:{p,r}, seven:{p,r}}`, trimmed at 512 KB), kept to calibrate "% of window" later.
+  - `badges.json`: `{ startedAt, unlocked }`. `startedAt` is written on the API's first parse (first launch); `unlocked` maps `<family>:<tier>` to the unlock date. See §5.
   - `live/<session_id>.json`: sanitized per-session snapshot (context size, prompt-cache state; no paths or prompts) written on every refresh; the API removes ones older than 3 days.
   - `statusline.mjs`, `context-advice.mjs`, `statusline.json`: installed wrapper, its shared helper, and the saved previous `statusLine` setting (plus `"verdict": false` to hide the terminal segment).
   - `sessions.json`: full parse dump, only when `pnpm parse` is run by hand. The app never reads it.
@@ -102,7 +104,7 @@ Sessions are returned sorted by `startedAt` descending.
 - Claude Code writes one line per content block (thinking / text / tool_use), each repeating the message id and the full `usage`. Lines are merged into one **turn per API message** (`message.id`, else `requestId`); the last line's `usage` wins. Summing lines would double-count.
 - `<synthetic>` assistant messages are skipped. Each turn keeps its own normalized model, so sessions that switch models are priced per turn.
 - Token fields per turn: `input`, `output`, `cacheRead`, `cacheWrite`, and the `cacheWrite5m` / `cacheWrite1h` split from `usage.cache_creation`.
-- `tool_use` blocks are deduplicated by id. MCP tools are counted per server (`mcp__github__x` → `mcp:github`). `Agent` / `Task` calls produce `agent` timeline events; Bash commands matching `git commit` count as commits.
+- `tool_use` blocks are deduplicated by id. MCP tools are counted per server (`mcp__github__x` → `mcp:github`). `Agent` / `Task` calls produce `agent` timeline events; Bash commands matching `git commit` count as commits. Each Bash command is also split on `&& ; |` and newlines, and segment heads are classified into `shell: { prs, tests, lints, infra }` (`gh pr create`, test runners, lint / typecheck / build, docker / kubectl / terraform / gcloud…), counted once per command; `echo "npm test"` does not count.
 - User lines: `tool_result` blocks attach a truncated result (text, bytes, `isError`) to their tool call; `isMeta`, compact summaries and command / system-reminder / interruption lines are not counted as prompts.
 - Active time sums gaps between events, capping each gap at 5 minutes (`IDLE_CAP_MS`); `wallMs` is wall-clock.
 - `runningTool` is the last `tool_use` without a result (shown only for live sessions).
@@ -165,6 +167,19 @@ The 5h window in the UI (`fleet/FiveHourSession.tsx`, `utils/fleetStats.ts`):
 - Without: the window is inferred locally. The first turn after the previous window expired anchors a new window, persisted in `localStorage` (`ccblackbox:window-start`, `utils/windowState.ts`); shares are by tokens.
 - `utils/burnTracker.ts` samples the real 5h % every 5 s (1 h buffer) and raises a spike banner when it climbs 4+ points within 5 minutes (critical at 10). It is inactive until limits are connected. `SpikeAnalysisOverlay` + `SpikeHeuristics` explain the spike from sessions, prompts and tools in that interval.
 
+### Badges (`scripts/badges.mjs`)
+
+Computed server-side after every parse (`updateBadges` in the API), because they need full sessions (`shell`, `timeline`, `turns`) that the list payload omits. `fleet/Badges.tsx` fetches `/api/badges` whenever the session list changes.
+
+- **Only sessions started after the first launch count** (`badges.json` `startedAt`). History stays in every other view; badges start from zero so they feel earned and don't depend on how much transcript history Claude Code kept (`cleanupPeriodDays`).
+- **Unlocks are permanent**: stored with their date, so they survive transcript cleanup and 30-day windows sliding past them.
+- **Families**: one metric per family, tiers only raise the target, so a lower tier can never be harder than a higher one. Some families have 2 or 3 tiers; `oneshot` starts at gold.
+- **Calibration**: per-session records (Marathon, Orchestrator, File surgeon, Toolbox, Juggler) by rarity across real sessions; cumulative counters by time for a heavy user: bronze on day 1, silver in 1–2 weeks, gold in ~3 months, platinum in ~1 year.
+- **Continuous work**: Marathon, Juggler and Hours use stretches of main-thread activity (turns and prompts) where no pause exceeds 15 minutes (`RUN_GAP_MS`), not `durationMs`, which accumulates capped gaps over sessions left open for days. Hours counts the union of stretches, so parallel sessions count once.
+- **Streak** skips quiet Saturdays and Sundays.
+- `sniper` and `comeback` need `/insights` facets; `hygiene` needs the token-optimizer quality score. They are hidden (`available: false`) when no session has that data.
+- The shell-based families only see commands run by Claude, not ones typed in another terminal.
+
 ---
 
 ## 6. API (`scripts/api.mjs`)
@@ -182,6 +197,7 @@ Shared by the production server and the Vite dev server, so both expose the same
 | GET | `/api/sessions` | Session summaries + `errors` + `models` overrides + `generatedAt`. | `ETag` / `If-None-Match` → 304; `cache-control: no-cache`. |
 | GET | `/api/sessions/:id` | Full session from the cache. | id must be a 36-char UUID; 404 if unknown. |
 | GET | `/api/file-history/:id/:hash@v:n` | Raw snapshot from `file-history/`. | id and file name regex-validated (no path traversal). |
+| GET | `/api/badges` | Badge families with per-tier progress and unlock dates (§5). | `no-store`. |
 | GET | `/api/limits` | `readLimits()` or `null`. | `no-store`. |
 | GET | `/api/live-context` | `readLiveContext()`: context / prompt-cache snapshots per session, newest first. | `no-store`. |
 | GET | `/api/report-status` | Whether `usage-data/report.html` exists, and its mtime. | `no-store`. |
