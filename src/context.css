@@ -26,7 +26,6 @@
   align-items: start;
   margin: 0 0 12px;
   padding: 10px 14px;
-  background: var(--c-bg);
   border: 1px solid var(--c-hairline);
   border-radius: var(--radius-lg);
 }

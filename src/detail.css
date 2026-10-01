@@ -8,7 +8,7 @@
   max-height: none;
   padding: 0;
   border-radius: 0;
-  background: var(--c-bg);
+  background: var(--c-bg-panel);
 }
 .session-overlay-host .detail-toolbar { padding: 8px 24px; }
 .session-overlay-host .detail-sticky { background: var(--c-bg-panel); }
@@ -17,11 +17,11 @@
 .session-overlay-host .tabs { padding-inline: calc(var(--detail-pad) - 14px); }
 .session-overlay-host .detail-footer { padding-inline: var(--detail-pad); background: var(--c-bg-panel); }
 
-/* page darker than the panels, like the dashboard */
-.detail-body { background: var(--c-bg); gap: 18px; padding: 20px var(--detail-pad, 24px) 28px; }
+/* one flat background for every tab (same as the header); cards are outlined, not filled */
+.detail-body { background: var(--c-bg-panel); gap: 18px; padding: 20px var(--detail-pad, 24px) 28px; }
 .d-panel,
 .detail-body > div:not(.overview-grid):not(.overview-kpis):not(.live-empty):not(.clean-row):not(.placeholder) {
-  background: var(--c-bg-panel);
+  background: transparent;
   border: 1px solid var(--c-hairline);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
@@ -54,29 +54,19 @@
 }
 .resume-btn:hover { color: var(--c-cyan); border-color: var(--c-cyan); }
 
-/* ---- Headline bubbles (the pointer burns a smoky path through them, see SmokeBubble) ---- */
-.kpi-bubbles { display: flex; flex-wrap: wrap; gap: 20px; padding: 8px 4px 2px; }
-.smoke-wrap { position: relative; flex: none; }
-.smoke-canvas { position: absolute; z-index: 2; pointer-events: none; }
-.smoke-bubble {
-  position: absolute;
-  inset: 0;
+/* ---- Headline tiles ---- */
+.overview-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 210px)); gap: 10px; }
+.kpi-tile {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: 2px;
-  text-align: center;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.05), transparent 55%),
-    var(--c-bg-panel);
+  padding: 12px 14px;
   border: 1px solid var(--c-hairline);
-  mask-composite: intersect;
-  -webkit-mask-composite: source-in;
+  border-radius: var(--radius-lg);
 }
 .kpi-value { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--c-text); }
 .kpi-label { font-size: var(--fs-md); color: var(--c-text-dim); }
+.kpi-sub { font-size: var(--fs-xs); color: var(--c-text-faint); }
 
 /* ---- Two columns on wide screens ---- */
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: stretch; }
@@ -113,7 +103,3 @@
 .preview-files { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-sm); }
 .preview-files li { display: flex; justify-content: space-between; gap: 12px; }
 .preview-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-text-soft); }
-
-/* ---- Other tabs: same background as the header, flat cards (no darker page) ---- */
-.detail-body:not(.tab-overview) { background: var(--c-bg-panel); }
-.detail-body:not(.tab-overview) > div:not(.live-empty):not(.clean-row):not(.placeholder) { background: transparent; }

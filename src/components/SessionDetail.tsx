@@ -357,7 +357,7 @@ export function SessionDetail({
         </div>
       </div>
 
-      <div className={`detail-body scrollbar tab-${tab}`}>
+      <div className="detail-body scrollbar">
         {tab === "overview" && (
           <OverviewTab session={session} onFocusTools={focusToolsForPrompt} onOpenTab={setTab} />
         )}
