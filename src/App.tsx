@@ -24,6 +24,8 @@ const STORAGE_KEY = "ccblackbox:state";
 
 const FILTER_IDS: FilterId[] = ["all", "live", "ghost", "friction", "failed", "lowquality"];
 const RANGE_IDS: Range[] = ["today", "7d", "30d", "all"];
+/** Sessions that can be compared side by side. Not applied to the ghost bulk-delete selection. */
+const MAX_COMPARE = 3;
 
 interface PersistedState {
   id: string | null;
@@ -101,6 +103,12 @@ function App() {
     writeHash(state);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
   }, [selectedId, range, filter, projectFilter, search]);
+
+  /** Leaving the ghost filter with a bigger selection than a comparison can hold trims it. */
+  const changeFilter = (f: FilterId) => {
+    setFilter(f);
+    if (f !== "ghost") setCompareIds((prev) => (prev.size > MAX_COMPARE ? new Set([...prev].slice(0, MAX_COMPARE)) : prev));
+  };
 
   const toggleDashboardZoom = () => {
     const next = !dashboardZoomed;
@@ -280,7 +288,7 @@ function App() {
             (search ? 1 : 0)
           }
           onClearFilters={() => {
-            setFilter("all");
+            changeFilter("all");
             setProjectFilter(null);
             setSearch("");
           }}
@@ -313,20 +321,25 @@ function App() {
               });
             }}
             compareIds={compareIds}
-            onToggleCompare={(id) =>
+            onToggleCompare={(id) => {
+              if (!compareIds.has(id) && filter !== "ghost" && compareIds.size >= MAX_COMPARE) {
+                toastError(`You can compare up to ${MAX_COMPARE} sessions. Deselect one first.`);
+                return;
+              }
               setCompareIds((prev) => {
                 const next = new Set(prev);
                 if (next.has(id)) next.delete(id);
                 else next.add(id);
                 return next;
-              })
-            }
+              });
+            }}
+            compareLimit={filter === "ghost" ? undefined : MAX_COMPARE}
             ghostsFocused={filter === "ghost"}
             onProjectClick={(p) => setProjectFilter((cur) => (cur === p ? null : p))}
             filters={
               <SessionFilters
                 filter={filter}
-                onFilterChange={setFilter}
+                onFilterChange={changeFilter}
                 projectFilter={projectFilter}
                 onProjectFilterChange={setProjectFilter}
                 sessions={inRange}

@@ -29,7 +29,10 @@ versioning follows [SemVer](https://semver.org/) once published.
   The wrapper also keeps a small history of the 5h / 7d limits. Re-run
   `/ccblackbox:limits` to refresh an installed wrapper.
 - Rankings tab with podium, badges, health / streak / level banner and project
-  league; usage unit selector (fresh tokens or API value) in settings.
+  league; usage unit selector (fresh tokens or API value) in settings. The
+  dashboard has two tabs (Rankings, Analysis): the current 5h window and a live
+  burn line moved to Analysis, and the Live sessions block is gone (the session
+  list shows live sessions with their context and cache state).
 - Session view: panels on a darker page, headline tiles (time, tokens, messages,
   tools, files, commits, sub-agents), a two-column overview with previews of
   the Tools, Tokens and Files tabs, prompts in the chosen usage unit, and a

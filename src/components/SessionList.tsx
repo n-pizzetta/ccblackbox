@@ -18,6 +18,8 @@ interface Props {
   onToggleCompareMode: () => void;
   compareIds: Set<string>;
   onToggleCompare: (id: string) => void;
+  /** Max sessions selectable for a comparison; unlimited when undefined (ghost bulk delete). */
+  compareLimit?: number;
   onBulkDelete?: (ids: string[]) => Promise<void>;
   ghostsFocused?: boolean;
   /** Filter controls, rendered under the header. */
@@ -93,6 +95,7 @@ export function SessionList({
   onToggleCompareMode,
   compareIds,
   onToggleCompare,
+  compareLimit,
   onBulkDelete,
   ghostsFocused,
   filters,
@@ -149,7 +152,7 @@ export function SessionList({
             onClick={onToggleCompareMode}
             title={compareMode ? "Exit compare mode" : "Compare / select multiple sessions"}
           >
-            {compareMode ? `select (${compareIds.size})` : "select"}
+            {compareMode ? `select (${compareIds.size}${compareLimit ? `/${compareLimit}` : ""})` : "select"}
           </button>
           <input
             className="list-search mono"
@@ -192,10 +195,11 @@ export function SessionList({
                 const absoluteIdx = startIdx + i;
                 const c = s.live ? "var(--c-green)" : s.ghost ? "var(--c-text-ghost)" : outcomeColor(s.outcome);
                 const checked = compareIds.has(s.id);
+                const full = compareMode && !checked && !!compareLimit && compareIds.size >= compareLimit;
                 return (
                   <div
                     key={s.id}
-                    className={`session-row ${s.live ? "is-live" : ""} ${selectedId === s.id ? "selected" : ""} ${compareMode ? "compare-mode" : ""} ${compareMode && checked ? "compare-checked" : ""}`}
+                    className={`session-row ${s.live ? "is-live" : ""} ${selectedId === s.id ? "selected" : ""} ${compareMode ? "compare-mode" : ""} ${compareMode && checked ? "compare-checked" : ""} ${full ? "compare-full" : ""}`}
                     style={{
                       "--outcome-c": c,
                       height: it.h,
@@ -204,6 +208,7 @@ export function SessionList({
                     role="button"
                     tabIndex={0}
                     aria-pressed={compareMode ? checked : undefined}
+                    aria-disabled={full || undefined}
                     aria-current={!compareMode && selectedId === s.id ? "true" : undefined}
                     onClick={() => compareMode ? onToggleCompare(s.id) : onSelect(s.id)}
                     onKeyDown={(e) => {

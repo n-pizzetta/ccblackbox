@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Session } from "../../types";
 import { freshTokens } from "../../utils/units";
-import { CATEGORIES, cacheHit, rankSessions, type Category } from "../../utils/gamify";
+import { CATEGORIES, rankSessions, type Category } from "../../utils/gamify";
 import { formatCost, formatDuration, formatTokens } from "../../utils/format";
 import { FireCanvas, HeatFilter } from "./FireCanvas";
 
@@ -27,33 +27,6 @@ function formatValue(c: Category, v: number): string {
     case "cost": return formatCost(v);
     case "duration": return formatDuration(v);
   }
-}
-
-function hitColor(hit: number): string {
-  if (hit >= 0.9) return "var(--c-green)";
-  if (hit >= 0.7) return "var(--c-amber)";
-  return "var(--c-red)";
-}
-
-function HitRing({ hit }: { hit: number | null }) {
-  const r = 11;
-  const c = 2 * Math.PI * r;
-  return (
-    <svg className="hit-ring" width="22" height="22" viewBox="0 0 28 28" aria-hidden="true">
-      <circle cx="14" cy="14" r={r} fill="none" stroke="var(--c-hairline-strong)" strokeWidth="3" />
-      {hit !== null && (
-        <circle
-          cx="14" cy="14" r={r} fill="none" stroke={hitColor(hit)} strokeWidth="3" strokeLinecap="round"
-          strokeDasharray={`${c * hit} ${c}`} transform="rotate(-90 14 14)"
-        />
-      )}
-    </svg>
-  );
-}
-
-function details(s: Session): string {
-  const hit = cacheHit(s.tokens);
-  return `${formatTokens(freshTokens(s.tokens))} fresh tokens · ${formatCost(s.costUsd)} API value · ${formatDuration(s.durationMs)} · cache hit ${hit !== null ? `${(hit * 100).toFixed(0)}%` : "—"}`;
 }
 
 export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
@@ -92,13 +65,11 @@ export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
             <HeatFilter />
             {PODIUM_ORDER.filter((i) => podium[i]).map((i) => {
               const { s, value } = podium[i];
-              const hit = cacheHit(s.tokens);
               return (
                 <button
                   key={s.id}
                   className={`podium-card place-${PLACE_CLASS[i]}`}
                   onClick={() => onSelectSession(s.id)}
-                  title={details(s)}
                 >
                   {i === 0 && <FireCanvas />}
                   <span className="mono podium-project">{s.project}</span>
@@ -109,12 +80,6 @@ export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
                     {category !== "tokens" && <span>{formatTokens(freshTokens(s.tokens))}</span>}
                     {category !== "cost" && <span style={{ color: "var(--c-amber)" }}>{formatCost(s.costUsd)}</span>}
                     {category !== "duration" && <span>{formatDuration(s.durationMs)}</span>}
-                    {hit !== null && (
-                      <span className="podium-cache" title="Cache hit: share of input tokens served from the prompt cache">
-                        <HitRing hit={hit} />
-                        <span>cache {(hit * 100).toFixed(0)}%</span>
-                      </span>
-                    )}
                   </span>
                   <span className="podium-pedestal" aria-hidden="true">{i + 1}</span>
                 </button>
@@ -125,7 +90,7 @@ export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
           {rest.length > 0 && (
             <div className="podium-rest" key={`rest-${category}`}>
               {rest.map(({ s, value }, i) => (
-                <button key={s.id} className="podium-rest-row" onClick={() => onSelectSession(s.id)} title={details(s)}>
+                <button key={s.id} className="podium-rest-row" onClick={() => onSelectSession(s.id)}>
                   <span className="mono dim tabular podium-rest-rank">{i + 4}</span>
                   <span className="podium-rest-main">
                     <span className="podium-rest-goal">{s.goal || "—"}</span>

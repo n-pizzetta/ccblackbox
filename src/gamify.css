@@ -156,8 +156,6 @@
   font-size: var(--fs-sm);
   color: var(--c-text-dim);
 }
-.hit-ring { flex: none; }
-.podium-cache { display: inline-flex; align-items: center; gap: 6px; }
 
 .podium-pedestal {
   align-self: stretch;

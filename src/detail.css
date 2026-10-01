@@ -8,7 +8,7 @@
   max-height: none;
   padding: 0;
   border-radius: 0;
-  background: var(--c-bg);
+  background: var(--c-bg-panel);
 }
 .session-overlay-host .detail-toolbar { padding: 8px 24px; }
 .session-overlay-host .detail-sticky { background: var(--c-bg-panel); }
@@ -17,11 +17,11 @@
 .session-overlay-host .tabs { padding-inline: calc(var(--detail-pad) - 14px); }
 .session-overlay-host .detail-footer { padding-inline: var(--detail-pad); background: var(--c-bg-panel); }
 
-/* page darker than the panels, like the dashboard */
-.detail-body { background: var(--c-bg); gap: 18px; padding: 20px var(--detail-pad, 24px) 28px; }
+/* one flat background for every tab (same as the header); cards are outlined, not filled */
+.detail-body { background: var(--c-bg-panel); gap: 18px; padding: 20px var(--detail-pad, 24px) 28px; }
 .d-panel,
 .detail-body > div:not(.overview-grid):not(.overview-kpis):not(.live-empty):not(.clean-row):not(.placeholder) {
-  background: var(--c-bg-panel);
+  background: transparent;
   border: 1px solid var(--c-hairline);
   border-radius: var(--radius-lg);
   padding: 14px 16px;
@@ -61,7 +61,6 @@
   flex-direction: column;
   gap: 2px;
   padding: 12px 14px;
-  background: var(--c-bg-panel);
   border: 1px solid var(--c-hairline);
   border-radius: var(--radius-lg);
 }
@@ -70,7 +69,7 @@
 .kpi-sub { font-size: var(--fs-xs); color: var(--c-text-faint); }
 
 /* ---- Two columns on wide screens ---- */
-.overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+.overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: stretch; }
 .overview-main, .overview-rail { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 @media (max-width: 1100px) {
   .overview-grid { grid-template-columns: minmax(0, 1fr); }
@@ -79,6 +78,9 @@
 .overview-rail > .friction-panel { order: -1; }
 .overview-rail > .clean-row { order: 2; }
 .prompt-chart-wrap { grid-template-rows: 130px auto; }
+/* the prompts panel takes the height left by the rail, so both columns end on the same line */
+.overview-main > .d-panel:last-child { flex: 1; display: flex; flex-direction: column; }
+.overview-main > .d-panel:last-child .prompt-chart-wrap { flex: 1; grid-template-rows: minmax(130px, 1fr) auto; }
 .summary { margin: 0; }
 
 /* ---- Tab previews ---- */

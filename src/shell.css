@@ -290,3 +290,15 @@
   .model-mix-row > :nth-child(3),
   .model-mix-row > :nth-child(7) { display: none; }
 }
+
+/* ---- Live burn line (Analysis tab, next to "Right now") ---- */
+.live-burn { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin-left: auto; font-size: var(--fs-md); color: var(--c-text-dim); }
+.live-burn.on { color: var(--c-text-soft); }
+.live-burn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-text-ghost); }
+.live-burn.on .live-burn-dot { background: var(--c-green); box-shadow: 0 0 8px var(--c-green); }
+.fleet-group-label { flex-wrap: wrap; }
+
+/* ---- Compare: the selection is full (3 sessions) ---- */
+/* a filter, because the row entrance animation keeps opacity at 1 */
+.session-row.compare-full { filter: opacity(0.45); cursor: not-allowed; }
+.session-row.compare-full:hover { background: transparent; }
