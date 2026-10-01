@@ -1,7 +1,24 @@
 /* Session view: panels, headline tiles, two-column overview. Loaded after App.css. */
 
+/* ---- Frame: the session view is a true full-screen page, content centered on very wide screens ---- */
+.session-overlay-host { --detail-pad: max(24px, calc((100vw - 1640px) / 2)); }
+.session-overlay-host .detail,
+.session-overlay-host .detail.fullscreen {
+  height: 100%;
+  max-height: none;
+  padding: 0;
+  border-radius: 0;
+  background: var(--c-bg);
+}
+.session-overlay-host .detail-toolbar { padding: 8px 24px; }
+.session-overlay-host .detail-sticky { background: var(--c-bg-panel); }
+.session-overlay-host .detail-header { padding-inline: var(--detail-pad); }
+.session-overlay-host .detail-sticky > :not(.detail-toolbar):not(.detail-header):not(.tabs) { margin-inline: var(--detail-pad); }
+.session-overlay-host .tabs { padding-inline: calc(var(--detail-pad) - 14px); }
+.session-overlay-host .detail-footer { padding-inline: var(--detail-pad); background: var(--c-bg-panel); }
+
 /* page darker than the panels, like the dashboard */
-.detail-body { background: var(--c-bg); gap: 18px; padding: 20px 24px 28px; }
+.detail-body { background: var(--c-bg); gap: 18px; padding: 20px var(--detail-pad, 24px) 28px; }
 .d-panel,
 .detail-body > div:not(.overview-grid):not(.overview-kpis):not(.live-empty):not(.clean-row):not(.placeholder) {
   background: var(--c-bg-panel);

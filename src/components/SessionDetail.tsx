@@ -3,7 +3,6 @@ import { SessionContext } from "./ContextCard";
 import { SessionKpis, TabPreviews } from "./SessionOverview";
 import { freshTokens, useUnit } from "../utils/units";
 import { projectColor } from "../utils/fleetStats";
-import "../detail.css";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createPatch } from "diff";
 import type { Session, SessionQuality, ToolName } from "../types";

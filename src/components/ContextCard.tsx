@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { adviseContext, fmtLeft, THRESHOLDS, type ContextAdvice, type ContextSnapshot } from "../../scripts/context-advice.mjs";
 import { formatTokens } from "../utils/format";
 import { useSnapshotMap } from "../utils/liveContext";
@@ -65,11 +64,10 @@ function Ring({ pct }: { pct: number | null }) {
   );
 }
 
-/** Full detail for one session: fill, cache state and countdown, cold-start cost, verdict and its reasons. */
+/** Full detail for one session: fill, cache state and countdown, cold-start cost, verdict and its reasons (always shown). */
 export function ContextCard({ snap }: { snap: ContextSnapshot }) {
   const now = useNow(15_000);
   const a = adviseContext(snap, now);
-  const [open, setOpen] = useState(false);
   const idleMs = now - snap.capturedAt;
   const text = cacheText(a);
   return (
@@ -94,17 +92,14 @@ export function ContextCard({ snap }: { snap: ContextSnapshot }) {
           )}
           {idleMs > 60_000 && <span className="dim">updated {fmtLeft(idleMs / 1000)} ago</span>}
         </div>
-        {open && (
-          <ul className="ctx-reasons">
-            {a.reasons.map((r) => <li key={r}>{r}</li>)}
-          </ul>
-        )}
+        <ul className="ctx-reasons">
+          {a.reasons.map((r) => <li key={r}>{r}</li>)}
+        </ul>
       </div>
-      <button className="ctx-verdict" style={{ "--vc": LEVEL_COLOR[a.level] } as React.CSSProperties} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+      <div className="ctx-verdict" style={{ "--vc": LEVEL_COLOR[a.level] } as React.CSSProperties}>
         <span className="ctx-verdict-dot" />
         <span className="ctx-verdict-label">{a.label}</span>
-        <span className="ctx-verdict-chevron" aria-hidden="true">{open ? "▴" : "▾"}</span>
-      </button>
+      </div>
     </div>
   );
 }

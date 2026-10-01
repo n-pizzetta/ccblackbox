@@ -53,7 +53,6 @@
   border-radius: var(--radius-lg);
 }
 .ctx-verdict-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--vc); }
-.ctx-verdict-chevron { margin-left: auto; font-size: var(--fs-xs); opacity: 0.7; }
 @media (max-width: 720px) {
   .ctx-card { grid-template-columns: auto minmax(0, 1fr); }
   .ctx-verdict { grid-column: 1 / -1; max-width: none; }

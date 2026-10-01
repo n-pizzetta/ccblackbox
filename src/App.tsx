@@ -14,6 +14,7 @@ import { filterByRange, scopeToRange } from "./utils/range";
 import { registerProjects } from "./utils/fleetStats";
 import "./App.css";
 import "./shell.css";
+import "./detail.css";
 import { Toaster } from "./components/Toaster";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { toastError } from "./utils/toast";
