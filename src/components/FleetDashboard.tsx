@@ -15,6 +15,27 @@ import { AnomalyFlags } from "./fleet/AnomalyFlags";
 import { ProjectRollup } from "./fleet/ProjectRollup";
 import { ModelMix } from "./fleet/ModelMix";
 import { ToolsHeatmap } from "./fleet/ToolsHeatmap";
+import { HeroBanner } from "./fleet/HeroBanner";
+import { Badges } from "./fleet/Badges";
+import "../gamify.css";
+
+type Tab = "today" | "rankings" | "analysis";
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: "today", label: "Today" },
+  { id: "rankings", label: "Rankings" },
+  { id: "analysis", label: "Analysis" },
+];
+const TAB_KEY = "ccblackbox:fleet-tab";
+
+function loadTab(): Tab {
+  try {
+    const v = localStorage.getItem(TAB_KEY);
+    if (v === "today" || v === "rankings" || v === "analysis") return v;
+  } catch {
+    /* ignore */
+  }
+  return "today";
+}
 
 interface Props {
   sessions: Session[];
@@ -36,6 +57,21 @@ export function FleetDashboard({
   const limits = useRateLimits();
   const burn = useBurnTracker(allSessions, limits);
   const [analysisSpike, setAnalysisSpike] = useState<Spike | null>(null);
+  const [tab, setTab] = useState<Tab>(loadTab);
+
+  const selectTab = (t: Tab) => {
+    setTab(t);
+    try {
+      localStorage.setItem(TAB_KEY, t);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const rangeNote =
+    sessions.length === allSessions.length
+      ? "All sessions"
+      : `${sessions.length} of ${allSessions.length} sessions · filters applied`;
 
   return (
     <div className={`fleet-dashboard ${zoomed ? "zoomed" : ""}`}>
@@ -47,9 +83,18 @@ export function FleetDashboard({
         />
       )}
 
-      <div className="fleet-group-label fleet-group-first">
-        <span className="fleet-group-name">Right now</span>
-        <span className="fleet-group-note">All sessions · ignores filters and range</span>
+      <div className="fleet-tabs" role="tablist" aria-label="Dashboard sections">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`fleet-tab ${tab === t.id ? "active" : ""}`}
+            onClick={() => selectTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
         <button
           className="fleet-zoom-toggle"
           onClick={onToggleZoom}
@@ -60,38 +105,52 @@ export function FleetDashboard({
         </button>
       </div>
 
-      <LiveTicker sessions={allSessions} limits={limits} />
+      {tab === "today" && (
+        <>
+          <div className="fleet-group-label fleet-group-first">
+            <span className="fleet-group-name">Right now</span>
+            <span className="fleet-group-note">All sessions · ignores filters and range</span>
+          </div>
+          <LiveTicker sessions={allSessions} />
+          <FiveHourSession sessions={allSessions} limits={limits} onSelectSession={onSelectSession} />
+          <LiveSessions sessions={sessions} onSelectSession={onSelectSession} />
+        </>
+      )}
 
-      <FiveHourSession sessions={allSessions} limits={limits} onSelectSession={onSelectSession} />
-
-      <LiveSessions sessions={sessions} onSelectSession={onSelectSession} />
-
-      <div className="fleet-group-label">
-        <span className="fleet-group-name">In the selected range</span>
-        <span className="fleet-group-note">
-          {sessions.length === allSessions.length
-            ? "All sessions"
-            : `${sessions.length} of ${allSessions.length} sessions · filters applied`}
-        </span>
-      </div>
-
-      <div className="fleet-history-host">
-      <div className="fleet-history">
-        <div className="fleet-span-all">
+      {tab === "rankings" && (
+        <>
+          <div className="fleet-group-label fleet-group-first">
+            <span className="fleet-group-name">In the selected range</span>
+            <span className="fleet-group-note">{rangeNote}</span>
+          </div>
+          <HeroBanner sessions={sessions} allSessions={allSessions} />
           <TopSessions sessions={sessions} onSelectSession={onSelectSession} />
-        </div>
-        <AnomalyFlags sessions={sessions} onSelectSession={onSelectSession} />
-        <ToolsHeatmap sessions={sessions} />
-        <ProjectRollup sessions={sessions} />
-        <ModelMix sessions={sessions} />
-        <div className="fleet-span-all">
-          <HeavyPrompts sessions={sessions} onSelectSession={onSelectSession} />
-        </div>
-        <div className="fleet-span-all">
-          <TokenTimeSeries sessions={sessions} range={range} />
-        </div>
-      </div>
-      </div>
+          <Badges sessions={sessions} />
+          <ProjectRollup sessions={sessions} allSessions={allSessions} range={range} />
+        </>
+      )}
+
+      {tab === "analysis" && (
+        <>
+          <div className="fleet-group-label fleet-group-first">
+            <span className="fleet-group-name">In the selected range</span>
+            <span className="fleet-group-note">{rangeNote}</span>
+          </div>
+          <div className="fleet-history-host">
+            <div className="fleet-history">
+              <AnomalyFlags sessions={sessions} onSelectSession={onSelectSession} />
+              <ToolsHeatmap sessions={sessions} />
+              <ModelMix sessions={sessions} />
+              <div className="fleet-span-all">
+                <HeavyPrompts sessions={sessions} onSelectSession={onSelectSession} />
+              </div>
+              <div className="fleet-span-all">
+                <TokenTimeSeries sessions={sessions} range={range} />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {analysisSpike && (
         <SpikeAnalysisOverlay

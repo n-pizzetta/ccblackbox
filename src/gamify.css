@@ -1,0 +1,322 @@
+/* Gamified dashboard: tabs, hero, podium, badges, project league.
+   Kept out of App.css on purpose; delete this file + its import to revert the look. */
+
+:root {
+  --medal-gold: #f5c451;
+  --medal-silver: #c9d3de;
+  --medal-bronze: #d98e5a;
+}
+
+/* ---- Tabs ---- */
+.fleet-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--c-hairline);
+}
+.fleet-tab {
+  padding: 8px 14px;
+  margin-bottom: -1px;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  color: var(--c-text-dim);
+  border-bottom: 2px solid transparent;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.fleet-tab:hover { color: var(--c-text); }
+.fleet-tab.active { color: var(--c-text); border-bottom-color: var(--c-cyan); }
+.fleet-tabs .fleet-zoom-toggle { margin-left: auto; }
+
+/* ---- Hero banner ---- */
+.hero {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 12px;
+}
+.hero-cell {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  background: var(--c-bg-panel);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--radius-lg);
+}
+.hero-score { position: relative; }
+.hero-score-num {
+  position: absolute;
+  left: 20px;
+  width: 76px;
+  text-align: center;
+  font-size: var(--fs-xl);
+  font-weight: 600;
+}
+.hero-score svg { flex: none; }
+.hero-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.hero-label { font-size: var(--fs-md); color: var(--c-text-dim); }
+.hero-sub { font-size: var(--fs-sm); color: var(--c-text-faint); }
+.hero-big { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; }
+.hero-big small { margin-left: 6px; font-size: var(--fs-md); font-weight: 500; color: var(--c-text-dim); letter-spacing: 0; }
+.hero-flame { font-size: 28px; }
+.hero-track, .badge-track {
+  display: block;
+  height: 6px;
+  margin: 4px 0;
+  background: var(--c-hairline-strong);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.hero-track > span, .badge-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--c-cyan), var(--c-violet));
+  animation: grow-x 700ms var(--t-slow) both;
+  transform-origin: left;
+}
+
+/* ---- Podium ---- */
+.fleet-dashboard .podium-block .section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.podium-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--c-bg);
+  border: 1px solid var(--c-hairline);
+  border-radius: 999px;
+}
+.podium-tab {
+  padding: 3px 11px;
+  font-size: var(--fs-md);
+  color: var(--c-text-dim);
+  border-radius: 999px;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.podium-tab:hover { color: var(--c-text); }
+.podium-tab.active { background: var(--c-bg-elevated); color: var(--c-text); }
+
+.podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  padding-top: 12px;
+}
+.podium-card {
+  --medal: var(--medal-gold);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 22px 14px 0;
+  text-align: center;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--medal) 9%, var(--c-bg-elevated)), var(--c-bg-panel));
+  border: 1px solid color-mix(in srgb, var(--medal) 28%, var(--c-hairline));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  transition: transform var(--t-fast), border-color var(--t-fast);
+  animation: rise 520ms var(--t-slow) both;
+}
+.podium-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--medal) 60%, var(--c-hairline)); }
+.podium-card.place-first { --medal: var(--medal-gold); padding-top: 28px; }
+.podium-card.place-second { --medal: var(--medal-silver); animation-delay: 80ms; }
+.podium-card.place-third { --medal: var(--medal-bronze); animation-delay: 160ms; }
+.podium-card.place-first { animation-delay: 0ms; }
+
+.place-first .podium-project { max-width: 100%; font-size: var(--fs-sm); color: var(--c-text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.podium-goal {
+  max-width: 100%;
+  min-height: 2.6em;
+  font-size: var(--fs-md);
+  color: var(--c-text-soft);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.podium-value { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; color: var(--medal); }
+.place-first .podium-value { font-size: 34px; }
+.podium-caption { margin-top: -4px; font-size: var(--fs-xs); color: var(--c-text-faint); }
+.place-first .podium-caption { color: #e8c9a0; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9); }
+.podium-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: var(--fs-sm);
+  color: var(--c-text-dim);
+}
+.hit-ring { flex: none; }
+.podium-cache { display: inline-flex; align-items: center; gap: 6px; }
+
+.podium-pedestal {
+  align-self: stretch;
+  margin: 8px -14px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--medal) 75%, var(--c-bg));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--medal) 22%, var(--c-bg-panel)), color-mix(in srgb, var(--medal) 6%, var(--c-bg-panel)));
+  border-top: 1px solid color-mix(in srgb, var(--medal) 35%, transparent);
+}
+.place-first .podium-pedestal { height: 56px; }
+.place-second .podium-pedestal { height: 38px; }
+.place-third .podium-pedestal { height: 24px; }
+
+.podium-rest { display: flex; flex-direction: column; margin-top: 10px; }
+.podium-rest-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1.4fr) minmax(60px, 1fr) 72px;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  transition: background var(--t-fast);
+}
+.podium-rest-row:hover { background: var(--c-bg-elevated); }
+.podium-rest-main { display: flex; flex-direction: column; min-width: 0; }
+.podium-rest-goal, .podium-rest-project { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.podium-rest-goal { font-size: var(--fs-md); color: var(--c-text-soft); }
+.podium-rest-project { font-size: var(--fs-xs); }
+.podium-rest-bar { height: 4px; background: var(--c-hairline); border-radius: 999px; overflow: hidden; }
+.podium-rest-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--c-text-faint);
+  border-radius: inherit;
+  transform-origin: left;
+  animation: grow-x 600ms var(--t-slow) both;
+}
+.podium-rest-row:hover .podium-rest-bar > span { background: var(--c-cyan); }
+.podium-rest-value { text-align: right; font-size: var(--fs-md); }
+
+/* ---- Fire on the #1 card: canvas particles behind the text, heat haze on the text ---- */
+.podium-card.place-first {
+  overflow: hidden; /* the fire stays inside the card */
+  animation: rise 520ms var(--t-slow) both, first-glow 2.4s ease-in-out 520ms infinite alternate;
+}
+@keyframes first-glow {
+  from { box-shadow: 0 -4px 22px rgba(255, 120, 30, 0.16); }
+  to { box-shadow: 0 -8px 38px rgba(255, 90, 20, 0.36); }
+}
+.heat-defs { position: absolute; width: 0; height: 0; pointer-events: none; }
+.fire-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.place-first > :not(.fire-canvas) { position: relative; z-index: 1; }
+.place-first .podium-project {
+  color: #ffe9c9;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+.place-first .podium-goal {
+  color: #fff3df;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.7);
+  filter: url(#podium-heat);
+}
+.place-first .podium-value {
+  background: linear-gradient(180deg, #fff6c8 0%, #ffcf5a 45%, #ff8a2a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: url(#podium-heat) drop-shadow(0 0 10px rgba(255, 110, 20, 0.65));
+}
+.place-first .podium-stats > span { color: #f7e3c4 !important; } /* beats the inline amber on the fire */
+.place-first .podium-stats {
+  color: #f7e3c4;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.95), 0 1px 8px rgba(0, 0, 0, 0.9);
+}
+
+/* ---- Badges ---- */
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px 10px;
+  text-align: center;
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+}
+.badge-icon { font-size: 26px; line-height: 1; }
+.badge-name { font-size: var(--fs-md); font-weight: 500; color: var(--c-text-soft); }
+.badge-state { font-size: var(--fs-xs); color: var(--c-text-faint); }
+.badge-track { width: 70%; height: 4px; margin: 2px 0; }
+.badge.unlocked {
+  border-color: color-mix(in srgb, var(--c-amber) 40%, var(--c-hairline));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c-amber) 9%, var(--c-bg-panel)), var(--c-bg));
+}
+.badge.unlocked .badge-state { color: var(--c-amber); }
+.badge.locked .badge-icon { filter: grayscale(1); opacity: 0.4; }
+.badge.locked .badge-name { color: var(--c-text-dim); }
+
+/* ---- Project league ---- */
+.league { display: flex; flex-direction: column; gap: 4px; }
+.league-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 6px;
+  border-radius: var(--radius-md);
+}
+.league-row.leader { background: color-mix(in srgb, var(--medal-gold) 7%, transparent); }
+.league-rank { text-align: center; font-size: var(--fs-lg); color: var(--c-text-dim); }
+.league-main { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.league-line { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.league-name { font-size: var(--fs-base); color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.league-count { font-size: var(--fs-xs); white-space: nowrap; }
+.league-move { margin-left: auto; font-size: var(--fs-sm); font-family: var(--f-mono); white-space: nowrap; }
+.league-move.up { color: var(--c-green); }
+.league-move.down { color: var(--c-red); }
+.league-move.flat { color: var(--c-text-ghost); }
+.league-move.new { color: var(--c-cyan); }
+.league-bar { height: 6px; background: var(--c-hairline); border-radius: 999px; overflow: hidden; }
+.league-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transform-origin: left;
+  animation: grow-x 650ms var(--t-slow) both;
+}
+.league-nums { display: flex; flex-direction: column; align-items: flex-end; font-size: var(--fs-md); }
+
+/* ---- Motion ---- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(18px) scaleY(0.92); transform-origin: bottom; }
+  to { opacity: 1; transform: none; }
+}
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .podium-card.place-first { animation: none; box-shadow: 0 -8px 30px rgba(255, 100, 25, 0.28); }
+  .place-first .podium-goal, .place-first .podium-value { filter: none; }
+  .podium-card, .hero-track > span, .badge-track > span, .podium-rest-bar > span, .league-bar > span { animation: none; }
+}
+
+@media (max-width: 720px) {
+  .hero { grid-template-columns: minmax(0, 1fr); }
+  .podium { gap: 6px; }
+  .podium-card { padding-inline: 8px; }
+  .podium-value { font-size: 20px; }
+  .place-first .podium-value { font-size: 24px; }
+}
