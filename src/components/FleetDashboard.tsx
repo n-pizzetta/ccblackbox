@@ -6,6 +6,7 @@ import { useRateLimits } from "../utils/rateLimits";
 import { BurnSpikeBanner } from "./fleet/BurnSpikeBanner";
 import { SpikeAnalysisOverlay } from "./fleet/SpikeAnalysisOverlay";
 import { LiveTicker } from "./fleet/LiveTicker";
+import { ContextCards } from "./fleet/ContextCards";
 import { FiveHourSession } from "./fleet/FiveHourSession";
 import { LiveSessions } from "./fleet/LiveSessions";
 import { TopSessions } from "./fleet/TopSessions";
@@ -112,6 +113,7 @@ export function FleetDashboard({
             <span className="fleet-group-note">All sessions · ignores filters and range</span>
           </div>
           <LiveTicker sessions={allSessions} />
+          <ContextCards sessions={allSessions} onSelectSession={onSelectSession} />
           <FiveHourSession sessions={allSessions} limits={limits} onSelectSession={onSelectSession} />
           <LiveSessions sessions={sessions} onSelectSession={onSelectSession} />
         </>
