@@ -30,6 +30,10 @@ versioning follows [SemVer](https://semver.org/) once published.
   `/ccblackbox:limits` to refresh an installed wrapper.
 - Rankings tab with podium, badges, health / streak / level banner and project
   league; usage unit selector (fresh tokens or API value) in settings.
+- Session view: panels on a darker page, headline tiles (time, tokens, messages,
+  tools, files, commits, sub-agents), a two-column overview with previews of
+  the Tools, Tokens and Files tabs, prompts in the chosen usage unit, and a
+  "Copy resume command" button in the header.
 - Sticky top bar with the usage limits, in-list filters with removable chips,
   day-grouped session cards. The sidebar is gone.
 - `CLAUDE_CONFIG_DIR` support: parser, API, hook and status line read the
