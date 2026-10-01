@@ -302,3 +302,64 @@
 /* a filter, because the row entrance animation keeps opacity at 1 */
 .session-row.compare-full { filter: opacity(0.45); cursor: not-allowed; }
 .session-row.compare-full:hover { background: transparent; }
+
+/* ---- Profile chip + menu (ProfileMenu) ---- */
+.profile { position: relative; align-self: center; }
+.profile-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--c-bg-panel);
+  border: 1px solid var(--c-hairline);
+  border-radius: 999px;
+  color: var(--c-text);
+  font-family: inherit;
+  cursor: pointer;
+}
+.profile-trigger:hover,
+.profile-trigger.open { border-color: var(--c-hairline-strong); background: var(--c-bg-elevated); }
+.profile-trigger:focus-visible { outline: 2px solid var(--c-cyan); outline-offset: 2px; }
+.profile-status { width: 8px; height: 8px; border-radius: 50%; background: var(--c-green); }
+.profile-status.mock { background: var(--c-amber); }
+.profile-level { font-size: 12px; font-weight: 600; }
+.profile-streak { font-size: 12px; color: var(--c-text-dim); }
+
+.profile-popover { width: 300px; gap: 12px; }
+.profile-head { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; border-bottom: 1px solid var(--c-hairline); }
+.profile-head-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; }
+.profile-head-level { font-weight: 600; font-size: 14px; }
+.profile-xp { font-size: 10.5px; }
+
+.profile-links,
+.profile-foot { display: flex; flex-direction: column; gap: 2px; }
+.profile-foot { padding-top: 8px; border-top: 1px solid var(--c-hairline); }
+.profile-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  box-sizing: content-box;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--c-text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.profile-link:hover,
+.profile-link:focus-visible { background: var(--c-bg-elevated); outline: none; }
+.profile-link kbd {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border: 1px solid var(--c-hairline-strong);
+  border-radius: 4px;
+  color: var(--c-text-dim);
+}
+.profile-local { font-size: 10.5px; padding-top: 4px; }

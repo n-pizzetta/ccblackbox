@@ -4,7 +4,7 @@ import { API_VALUE_HINT, freshTokens } from "../utils/units";
 import { LimitsPill } from "./LimitsGauge";
 import { BrandMark } from "./BrandMark";
 import { ParseErrors } from "./ParseErrors";
-import { SettingsButton } from "./SettingsButton";
+import { ProfileMenu } from "./ProfileMenu";
 import { RANGE_OPTIONS, rangeLabel, type Range } from "../utils/range";
 
 export interface ReportStatus {
@@ -13,6 +13,7 @@ export interface ReportStatus {
 }
 
 interface TopBarProps {
+  allSessions: Session[];
   range: Range;
   onRangeChange: (r: Range) => void;
   source: "real" | "mock";
@@ -50,6 +51,7 @@ function formatAge(iso?: string): string {
 }
 
 export function TopBar({
+  allSessions,
   range,
   onRangeChange,
   source,
@@ -72,36 +74,6 @@ export function TopBar({
       <div className="topline-right">
         <LimitsPill />
         {parseErrors && parseErrors.length > 0 && <ParseErrors errors={parseErrors} />}
-        <div className={`source-chip ${source}`} title={generatedAt ? `parsed ${formatAge(generatedAt)}` : undefined}>
-          <span className="source-dot" />
-          <span className="mono">
-            {source === "real" ? "live data" : "mock data"}
-          </span>
-          {generatedAt && (
-            <span className="mono source-age">· {formatAge(generatedAt)}</span>
-          )}
-        </div>
-        {reportStatus.exists ? (
-          <a
-            className="topline-chip report-link"
-            href="/usage-report.html"
-            target="_blank"
-            rel="noreferrer"
-            title={`Insights report · generated ${formatAge(reportStatus.mtime)}`}
-          >
-            insights report ↗
-          </a>
-        ) : (
-          <a
-            className="topline-chip report-link disabled"
-            href="/usage-report.html"
-            target="_blank"
-            rel="noreferrer"
-            title="Run /insights in Claude Code to generate it"
-          >
-            insights report
-          </a>
-        )}
         {activeFilterCount >= 2 && (
           <button
             className="clear-filters topline-chip"
@@ -124,15 +96,13 @@ export function TopBar({
             </button>
           ))}
         </div>
-        <button
-          className="topline-help"
-          onClick={onHelp}
-          title="Help (?)"
-          aria-label="Open help"
-        >
-          ?
-        </button>
-        <SettingsButton />
+        <ProfileMenu
+          allSessions={allSessions}
+          source={source}
+          parsedAgo={formatAge(generatedAt)}
+          reportStatus={reportStatus}
+          onHelp={onHelp}
+        />
       </div>
     </div>
   );

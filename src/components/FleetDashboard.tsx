@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Session } from "../types";
 import type { Range } from "../utils/range";
 import { useBurnTracker, type Spike } from "../utils/burnTracker";
@@ -17,9 +17,10 @@ import { ToolsHeatmap } from "./fleet/ToolsHeatmap";
 import { HeroBanner } from "./fleet/HeroBanner";
 import { Badges } from "./fleet/Badges";
 import { HealthCheck } from "./fleet/HealthCheck";
+import { OPEN_TAB_EVENT, type DashboardTab } from "../utils/openTab";
 import "../gamify.css";
 
-type Tab = "rankings" | "health" | "analysis";
+type Tab = DashboardTab;
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "rankings", label: "Rankings" },
   { id: "health", label: "Health" },
@@ -67,6 +68,12 @@ export function FleetDashboard({
       /* ignore */
     }
   };
+
+  useEffect(() => {
+    const onOpen = (e: Event) => selectTab((e as CustomEvent<Tab>).detail);
+    window.addEventListener(OPEN_TAB_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_TAB_EVENT, onOpen);
+  }, []);
 
   const rangeNote =
     sessions.length === allSessions.length

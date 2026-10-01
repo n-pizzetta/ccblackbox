@@ -278,6 +278,7 @@ function App() {
     <div className={`app ${sessionOpen ? "session-overlay" : ""} ${dashboardZoomed && !sessionOpen ? "dashboard-zoomed" : ""}`}>
       <main className="main scrollbar">
         <TopBar
+          allSessions={allSessions}
           range={range}
           onRangeChange={setRange}
           source={source}
