@@ -1,0 +1,25 @@
+name: Feature request
+description: An idea for ccblackbox or a change to how it works
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    label: What you would like
+    description: "Describe the feature or change and the problem it solves."
+    required: true
+  - type: textarea
+    id: why
+    label: Why it matters
+    description: "The concrete workflow or view this would improve."
+    required: false
+  - type: textarea
+    id: alt
+    label: Alternatives considered
+    description: "Other approaches or workarounds you have tried or rejected."
+    required: false
+  - type: textarea
+    id: privacy
+    label: Privacy note
+    description: "ccblackbox keeps data local and makes no network calls. Note any new field that would read from `~/.claude/` so it can be reviewed against the privacy rules."
+    required: false

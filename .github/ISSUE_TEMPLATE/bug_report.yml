@@ -1,0 +1,35 @@
+name: Bug report
+description: Something is not working or a Claude Code format change broke a parse
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    label: What happened
+    description: "What you expected, what actually happened, and the command you ran."
+    required: true
+  - type: input
+    id: cc-version
+    label: Claude Code version
+    description: "Output of `claude --version`."
+    required: true
+  - type: input
+    id: os
+    label: Operating system
+    description: "e.g. macOS 15, Ubuntu 24.04, Windows 11."
+    required: true
+  - type: input
+    id: node
+    label: Node version
+    description: "Output of `node --version`."
+    required: true
+  - type: input
+    id: version
+    label: ccblackbox version
+    description: "The version or commit you are running."
+    required: true
+  - type: textarea
+    id: transcript
+    label: Redacted sample
+    description: "If a parse is breaking, paste a **redacted** sample of the relevant lines: keep the structure (`type`, `message.usage`, `content[].type`…) and replace prompts, paths and outputs with placeholders. See the “Claude Code format changes” section of CONTRIBUTING.md."
+    required: false
