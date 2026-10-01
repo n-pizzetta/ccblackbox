@@ -17,7 +17,7 @@ const GLYPHS: Array<{ glyph: React.ReactNode; label: string; kind: string }> = [
   { glyph: <span className="glyph glyph-ghost" />, label: "Ghost", kind: "Empty session, or its Claude Code process died" },
   { glyph: <span className="glyph glyph-friction">△</span>, label: "Friction", kind: "Friction points flagged by /insights" },
   { glyph: <span className="glyph glyph-failed" />, label: "Low outcome", kind: "Rated partially / not achieved by /insights" },
-  { glyph: <span className="glyph glyph-lowquality">◐</span>, label: "Low quality", kind: "Quality score < 70 (token-optimizer)" },
+  { glyph: <span className="glyph glyph-lowquality">◐</span>, label: "Low quality", kind: "Context quality score < 70" },
 ];
 
 const GLOSSARY: Array<[string, string]> = [
@@ -33,7 +33,7 @@ const GLOSSARY: Array<[string, string]> = [
 const DATA_SOURCES: Array<{ tag: string; label: string; examples: string }> = [
   { tag: "real", label: "Hard data", examples: "sessions count, duration, tokens, cost, tool sequence, prompts" },
   { tag: "llm", label: "LLM-assessed", examples: "outcome, summary, frictions (from /insights: ~/.claude/usage-data/facets/)" },
-  { tag: "measured", label: "Measured quality", examples: "grade, score, waste signals (from ~/.claude/token-optimizer/)" },
+  { tag: "measured", label: "Measured quality", examples: "grade, score, waste signals (measured from the transcript)" },
 ];
 
 export function HelpOverlay({ onClose }: Props) {

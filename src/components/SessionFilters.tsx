@@ -50,7 +50,7 @@ function statusItems(sessions: Session[]): Item[] {
           id: "lowquality" as FilterId,
           label: "Low quality",
           count: sessions.filter((s) => s.quality && s.quality.score < 70).length,
-          tip: "Quality score < 70 (token-optimizer: stale reads, bloated results, duplicates, etc.)",
+          tip: "Context quality score < 70 (context fill, stale reads, bloated results, compactions, duplicates)",
         }]
       : []),
   ];

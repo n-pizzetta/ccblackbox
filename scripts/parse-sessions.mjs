@@ -14,6 +14,7 @@ import { dirname, join, basename } from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { createQualityTracker } from "./quality.mjs";
 import { costOf, DEFAULT_MODEL, isKnownModel, normalizeModel, priceFor, setModelOverrides } from "./models.mjs";
 
 // `pnpm parse` dump. Never under public/ or dist/: it holds real prompts and paths.
@@ -26,7 +27,6 @@ const LIVE_DIR = join(CLAUDE, "sessions");
 const STALE_DIR = join(LIVE_DIR, ".stale");
 const HISTORY = join(CLAUDE, "history.jsonl");
 const PROJECTS_DIR = join(CLAUDE, "projects");
-const TOKEN_OPT_DIR = join(CLAUDE, "token-optimizer");
 const FILE_HISTORY_DIR = join(CLAUDE, "file-history");
 const PLUGIN_CACHE_DIR = join(CLAUDE, "ccblackbox", "cache");
 
@@ -152,16 +152,6 @@ async function readJsonSafe(p) {
   try { return JSON.parse(await readFile(p, "utf8")); } catch { return null; }
 }
 
-const QUALITY_SIGNAL_LABELS = {
-  context_fill_degradation: "Context fill",
-  stale_reads: "Stale file reads",
-  bloated_results: "Bloated tool results",
-  duplicates: "Duplicate reads",
-  compaction_depth: "Compaction depth",
-  decision_density: "Decision density",
-  agent_efficiency: "Agent efficiency",
-};
-
 async function readFileHistory(sessionId, pathByHash) {
   const dir = join(FILE_HISTORY_DIR, sessionId);
   const files = await readDirSafe(dir);
@@ -252,31 +242,6 @@ function mergeToolSequences(transcriptSeq, pluginSeq) {
   });
 }
 
-async function readQualityCache(sessionId) {
-  const p = join(TOKEN_OPT_DIR, `quality-cache-${sessionId}.json`);
-  const data = await readJsonSafe(p);
-  if (!data || typeof data.score !== "number") return null;
-  const breakdown = data.breakdown ?? {};
-  const signals = Object.entries(data.signals ?? {}).map(([kind, score]) => {
-    const bd = breakdown[kind] ?? {};
-    return {
-      kind,
-      label: QUALITY_SIGNAL_LABELS[kind] ?? kind,
-      score: Math.round(score),
-      detail: bd.detail ?? "",
-      wasteTokens: bd.estimated_waste_tokens ?? 0,
-    };
-  });
-  return {
-    score: data.score,
-    grade: data.grade ?? "?",
-    fillPct: data.fill_pct ?? null,
-    band: data.degradation_band ?? null,
-    wasteTokens: breakdown.total_estimated_waste_tokens ?? signals.reduce((a, s) => a + s.wasteTokens, 0),
-    signals,
-  };
-}
-
 /** Read history.jsonl line-by-line, group user messages by sessionId. */
 async function readHistoryBySession() {
   const bySession = new Map();
@@ -356,6 +321,9 @@ async function parseTranscriptFile(path, sidechain) {
   let customTitle = null;
   let pendingInBytes = 0;
   let pendingInPreview = "";
+  let version = null;
+  // Sub-agent transcripts are scored as part of nothing: quality is about the main context.
+  const quality = sidechain ? null : createQualityTracker();
 
   const rl = createInterface({ input: createReadStream(path, "utf8"), crlfDelay: Infinity });
   for await (const line of rl) {
@@ -363,6 +331,7 @@ async function parseTranscriptFile(path, sidechain) {
     let j;
     try { j = JSON.parse(line); } catch { continue; }
     if (!cwd && j.cwd) cwd = j.cwd;
+    if (typeof j.version === "string") version = j.version;
     if (!customTitle && j.type === "custom-title" && typeof j.customTitle === "string") {
       customTitle = j.customTitle;
     }
@@ -422,6 +391,7 @@ async function parseTranscriptFile(path, sidechain) {
         }
         const name = toolKey(c.name);
         const input = c.input ?? {};
+        quality?.onToolUse(c.name, input, c.id);
         toolCounts[name] = (toolCounts[name] ?? 0) + 1;
         turn.tools.push(name);
         absEvents.push({ tsMs, kind: SUBAGENT_TOOLS.has(c.name) ? "agent" : "tool", tool: name, label: name });
@@ -448,6 +418,7 @@ async function parseTranscriptFile(path, sidechain) {
         }
       }
     } else if (msg.role === "user") {
+      if (j.isCompactSummary) quality?.onCompaction();
       if (j.isMeta || j.isCompactSummary) continue;
       const content = msg.content;
       let text = null;
@@ -466,6 +437,7 @@ async function parseTranscriptFile(path, sidechain) {
                 .join("\n");
             }
             if (!body) continue;
+            quality?.onToolResult(tr.tool_use_id, body.length);
             resultById.set(tr.tool_use_id, {
               text: body.slice(0, 240),
               truncated: body.length > 240,
@@ -534,6 +506,8 @@ async function parseTranscriptFile(path, sidechain) {
     pathByHash,
     runningTool,
     customTitle,
+    version,
+    quality: quality?.finish(turns) ?? null,
   };
 }
 
@@ -777,10 +751,11 @@ async function buildSession(id, { entry, meta, facet, live, dead, history, now }
     commits: t ? t.commits : meta?.git_commits ?? 0,
     ...(t ? { shell: t.shell } : {}),
     live: isLive,
-    ...(live ? { pid: live.pid } : {}),
+    ...(live ? { pid: live.pid, processStartedAt: new Date(live.startedAt).toISOString() } : {}),
     ...(ghostKind ? { ghost: true, ghostKind } : {}),
     ...(!t ? { transcriptMissing: true } : {}),
-    quality: await readQualityCache(id),
+    quality: t?.quality ?? null,
+    ...(t?.version ? { version: t.version } : {}),
     fileHistory,
     prompts: relativizePrompts(t?.prompts ?? [], startedAtMs),
     toolSequence: mergeToolSequences(relativizeToolSequence(t?.toolSequence ?? [], startedAtMs), pluginCache.entries),
@@ -1038,8 +1013,10 @@ export function summarizeSession(s) {
     clearedInto: s.clearedInto,
     lastEventAt: s.lastEventAt,
     runningTool: s.runningTool ?? null,
+    version: s.version,
+    processStartedAt: s.processStartedAt,
     quality: s.quality
-      ? { score: s.quality.score, grade: s.quality.grade, fillPct: s.quality.fillPct, band: s.quality.band, wasteTokens: s.quality.wasteTokens, signals: [] }
+      ? { score: s.quality.score, grade: s.quality.grade, fillPct: s.quality.fillPct, band: s.quality.band, wasteTokens: s.quality.wasteTokens, compactions: s.quality.compactions, signals: [] }
       : null,
     pluginCapture: s.pluginCapture ?? null,
     // Lightweight time-series fields needed by fleet aggregations

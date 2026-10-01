@@ -140,10 +140,10 @@ const FAMILIES = [
   { id: "hours", name: "Hours", icon: "⏳", unit: "h", hint: "Hours of continuous work; parallel sessions count once", targets: [10, 100, 300, 1000], metric: (c) => Math.floor(unionMs(c.runs) / 3_600_000) },
   { id: "editor", name: "Editor", icon: "✍️", hint: "Edit and Write calls", targets: [100, 1000, 10_000, 40_000], metric: (c) => sum(c.sessions, (s) => (s.toolCounts?.Edit ?? 0) + (s.toolCounts?.Write ?? 0) + (s.toolCounts?.MultiEdit ?? 0)) },
 
-  // Need /insights facets or the token-optimizer plugin; hidden without them.
+  // Need /insights facets or scored sessions; hidden without them.
   { id: "sniper", name: "Sniper", icon: "🎯", requires: "insights", hint: "Fully achieved sessions: any (bronze), with under 2 frictions (silver), with none (gold). Needs /insights", targets: [1, 5, 10], metric: (c) => [count(c.sessions, (s) => s.outcome === "fully_achieved"), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length < 2), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length === 0)] },
   { id: "comeback", name: "Comeback", icon: "🧗", requires: "insights", hint: "Sessions that hit friction and still got (mostly) done. Needs /insights", targets: [1, 10, 75, 200], metric: (c) => count(c.sessions, (s) => s.frictions.length > 0 && succeeded(s)) },
-  { id: "hygiene", name: "Context hygiene", icon: "🫧", requires: "quality", hint: "Sessions with a context quality score of 90+. Needs token-optimizer", targets: [1, 25, 100, 300], metric: (c) => count(c.sessions, (s) => (s.quality?.score ?? 0) >= 90) },
+  { id: "hygiene", name: "Context hygiene", icon: "🫧", requires: "quality", hint: "Sessions with a context quality score of 90+", targets: [1, 25, 100, 300], metric: (c) => count(c.sessions, (s) => (s.quality?.score ?? 0) >= 90) },
 ];
 
 function count(arr, fn) { let n = 0; for (const x of arr) if (fn(x)) n++; return n; }

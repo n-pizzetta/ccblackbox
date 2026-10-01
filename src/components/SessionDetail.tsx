@@ -136,7 +136,7 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
           style={{ top: pos.top, left: pos.left }}
         >
           <div className="quality-pop-head">
-            <span className="mono dim">Measured by token-optimizer</span>
+            <span className="mono dim">Measured from the transcript</span>
           </div>
           <div className="quality-pop-top">
             <div>

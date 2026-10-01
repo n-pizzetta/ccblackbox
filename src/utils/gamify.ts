@@ -122,7 +122,7 @@ export type BadgeFamily = {
   hint: string;
   unit: string | null;
   window: "ever" | "30d";
-  /** False when the family needs data this user doesn't have (/insights, token-optimizer). */
+  /** False when the family needs data this user doesn't have (/insights, scored sessions). */
   available: boolean;
   tiers: Array<{ tier: Tier; target: number; progress: number; unlockedAt: string | null }>;
 };
@@ -144,12 +144,6 @@ export function useBadges(version: unknown): BadgesPayload | null {
 }
 
 /* ---- Hero: health score, streak, level ---- */
-
-export function healthScore(sessions: Session[]): number | null {
-  const scores = sessions.map((s) => s.quality?.score).filter((v): v is number => typeof v === "number");
-  if (scores.length === 0) return null;
-  return scores.reduce((a, v) => a + v, 0) / scores.length;
-}
 
 function dayKey(ms: number): string {
   const d = new Date(ms);

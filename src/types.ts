@@ -41,6 +41,8 @@ export interface SessionQuality {
   fillPct: number | null;
   band: string | null;
   wasteTokens: number;
+  /** Number of /compact (manual or auto) in the session. */
+  compactions?: number;
   signals: QualitySignal[];
 }
 
@@ -88,6 +90,10 @@ export interface Session {
   /** The transcript is gone: numbers come from /insights session-meta (no cache tokens). */
   transcriptMissing?: boolean;
   lastEventAt?: string;
+  /** Claude Code version from the transcript (last seen). */
+  version?: string;
+  /** Running sessions: when the Claude Code process started (pid file). */
+  processStartedAt?: string;
   runningTool?: { tool: string; preview: string; t: number } | null;
   clearedFrom?: string;
   clearedInto?: string;
