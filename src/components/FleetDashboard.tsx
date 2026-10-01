@@ -7,7 +7,6 @@ import { BurnSpikeBanner } from "./fleet/BurnSpikeBanner";
 import { SpikeAnalysisOverlay } from "./fleet/SpikeAnalysisOverlay";
 import { LiveTicker } from "./fleet/LiveTicker";
 import { FiveHourSession } from "./fleet/FiveHourSession";
-import { LiveSessions } from "./fleet/LiveSessions";
 import { TopSessions } from "./fleet/TopSessions";
 import { TokenTimeSeries } from "./fleet/TokenTimeSeries";
 import { HeavyPrompts } from "./fleet/HeavyPrompts";
@@ -19,9 +18,8 @@ import { HeroBanner } from "./fleet/HeroBanner";
 import { Badges } from "./fleet/Badges";
 import "../gamify.css";
 
-type Tab = "today" | "rankings" | "analysis";
+type Tab = "rankings" | "analysis";
 const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "today", label: "Today" },
   { id: "rankings", label: "Rankings" },
   { id: "analysis", label: "Analysis" },
 ];
@@ -30,11 +28,11 @@ const TAB_KEY = "ccblackbox:fleet-tab";
 function loadTab(): Tab {
   try {
     const v = localStorage.getItem(TAB_KEY);
-    if (v === "today" || v === "rankings" || v === "analysis") return v;
+    if (v === "rankings" || v === "analysis") return v; // a stored "today" (removed tab) falls through
   } catch {
     /* ignore */
   }
-  return "today";
+  return "rankings";
 }
 
 interface Props {
@@ -105,18 +103,6 @@ export function FleetDashboard({
         </button>
       </div>
 
-      {tab === "today" && (
-        <>
-          <div className="fleet-group-label fleet-group-first">
-            <span className="fleet-group-name">Right now</span>
-            <span className="fleet-group-note">All sessions · ignores filters and range</span>
-          </div>
-          <LiveTicker sessions={allSessions} />
-          <FiveHourSession sessions={allSessions} limits={limits} onSelectSession={onSelectSession} />
-          <LiveSessions sessions={sessions} onSelectSession={onSelectSession} />
-        </>
-      )}
-
       {tab === "rankings" && (
         <>
           <div className="fleet-group-label fleet-group-first">
@@ -133,6 +119,12 @@ export function FleetDashboard({
       {tab === "analysis" && (
         <>
           <div className="fleet-group-label fleet-group-first">
+            <span className="fleet-group-name">Right now</span>
+            <span className="fleet-group-note">All sessions · ignores filters and range</span>
+            <LiveTicker sessions={allSessions} />
+          </div>
+          <FiveHourSession sessions={allSessions} limits={limits} onSelectSession={onSelectSession} />
+          <div className="fleet-group-label">
             <span className="fleet-group-name">In the selected range</span>
             <span className="fleet-group-note">{rangeNote}</span>
           </div>
