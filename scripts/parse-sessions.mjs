@@ -41,6 +41,39 @@ const NON_PROMPT_RE = /^\s*(<(command-|local-command-|task-notification|system-r
 
 const SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
 
+/**
+ * Bash command kinds counted for badges. Matched on the head of each segment
+ * (split on && ; | and newlines), so `echo "npm test"` is not a test run.
+ */
+const RUNNER = String.raw`((npx|bunx|pnpm(\s+(exec|dlx))?|yarn|uv\s+run|poetry\s+run)\s+)?`;
+const SHELL_KINDS = {
+  prs: /^gh\s+pr\s+create\b/,
+  tests: new RegExp(
+    String.raw`^${RUNNER}(vitest|jest|pytest|mocha|playwright\s+test|rspec|phpunit)\b` +
+      String.raw`|^(pnpm|npm|yarn|bun)\s+(run\s+)?test\b|^(cargo|go|deno|bun|mix|dotnet|swift)\s+test\b` +
+      String.raw`|^python3?\s+-m\s+(pytest|unittest)\b|^make\s+test\b`,
+  ),
+  lints: new RegExp(
+    String.raw`^${RUNNER}(eslint|tsc|ruff|biome|oxlint|mypy|pyright|stylelint|prettier\s+--check)\b` +
+      String.raw`|^(pnpm|npm|yarn|bun)\s+(run\s+)?(lint|typecheck|type-check|build|check)\b` +
+      String.raw`|^cargo\s+(clippy|check|build)\b|^go\s+(vet|build)\b`,
+  ),
+  infra: /^(docker|docker-compose|podman|kubectl|helm|terraform|tofu|pulumi|gcloud|aws|az|orb|orbctl|flyctl|vercel|wrangler)\b/,
+};
+
+function countShellKinds(command, into) {
+  const hit = new Set();
+  for (const raw of command.split(/\n|&&|\|\||;|\|/)) {
+    const head = raw
+      .trim()
+      .replace(/^\(+\s*/, "")
+      .replace(/^(\w+=\S*\s+)+/, "")
+      .replace(/^((rtk(\s+proxy)?|time|sudo|command|exec)\s+)+/, "");
+    for (const [kind, re] of Object.entries(SHELL_KINDS)) if (re.test(head)) hit.add(kind);
+  }
+  for (const kind of hit) into[kind] += 1;
+}
+
 const costFor = costOf;
 /** Priced per turn when available, so sessions that switch models cost right. */
 const sessionCost = (model, tokens, turns) =>
@@ -313,6 +346,7 @@ async function parseTranscriptFile(path, sidechain) {
   const resultById = new Map();
   let userMessages = 0;
   let commits = 0;
+  const shell = { prs: 0, tests: 0, lints: 0, infra: 0 };
   let model = null;
   let firstTs = null;
   let lastTs = null;
@@ -395,6 +429,7 @@ async function parseTranscriptFile(path, sidechain) {
           commits++;
           absEvents.push({ tsMs, kind: "commit", label: "git commit" });
         }
+        if (c.name === "Bash" && typeof input.command === "string") countShellKinds(input.command, shell);
         if (typeof input.file_path === "string") {
           const hash = createHash("sha256").update(input.file_path).digest("hex").slice(0, 16);
           if (!pathByHash.has(hash)) pathByHash.set(hash, input.file_path);
@@ -489,6 +524,7 @@ async function parseTranscriptFile(path, sidechain) {
     assistantMessages: turns.length,
     userMessages,
     commits,
+    shell,
     model,
     firstTs,
     lastTs,
@@ -739,6 +775,7 @@ async function buildSession(id, { entry, meta, facet, live, dead, history, now }
     subAgents: subs.length || (toolCounts.Agent ?? 0) + (toolCounts.Task ?? 0),
     filesChanged: fileHistory.length || meta?.files_modified || 0,
     commits: t ? t.commits : meta?.git_commits ?? 0,
+    ...(t ? { shell: t.shell } : {}),
     live: isLive,
     ...(live ? { pid: live.pid } : {}),
     ...(ghostKind ? { ghost: true, ghostKind } : {}),

@@ -49,7 +49,7 @@ export interface Session {
   project: string;
   cwd: string;
   startedAt: string;
-  /** Active time: idle gaps over 5 min between transcript events are excluded. */
+  /** Active time: each gap between transcript events counts for at most 5 min. */
   durationMs: number;
   /** Wall-clock span from the first to the last event (or now, while live). */
   wallMs?: number;
@@ -80,6 +80,8 @@ export interface Session {
   subAgents: number;
   filesChanged: number;
   commits: number;
+  /** Bash commands by kind (main thread only); detail payload only, used for badges. */
+  shell?: { prs: number; tests: number; lints: number; infra: number };
   live?: boolean;
   ghost?: boolean;
   ghostKind?: GhostKind;
