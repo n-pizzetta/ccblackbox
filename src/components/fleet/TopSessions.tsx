@@ -18,7 +18,6 @@ const PODIUM_ORDER = [1, 0, 2];
 const CAPTIONS: Record<Category, string> = {
   tokens: "fresh tokens",
   cost: "API value",
-  efficiency: "cache hit",
   duration: "longest stretch",
 };
 
@@ -26,7 +25,6 @@ function formatValue(c: Category, v: number): string {
   switch (c) {
     case "tokens": return formatTokens(v);
     case "cost": return formatCost(v);
-    case "efficiency": return `${(v * 100).toFixed(0)}%`;
     case "duration": return formatDuration(v);
   }
 }
@@ -111,7 +109,7 @@ export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
                     {category !== "tokens" && <span>{formatTokens(freshTokens(s.tokens))}</span>}
                     {category !== "cost" && <span style={{ color: "var(--c-amber)" }}>{formatCost(s.costUsd)}</span>}
                     {category !== "duration" && <span>{formatDuration(s.durationMs)}</span>}
-                    {category !== "efficiency" && hit !== null && (
+                    {hit !== null && (
                       <span className="podium-cache" title="Cache hit: share of input tokens served from the prompt cache">
                         <HitRing hit={hit} />
                         <span>cache {(hit * 100).toFixed(0)}%</span>

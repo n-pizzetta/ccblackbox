@@ -8,12 +8,11 @@ const DAY_MS = 86_400_000;
 
 /* ---- Podium categories ---- */
 
-export type Category = "tokens" | "cost" | "efficiency" | "duration";
+export type Category = "tokens" | "cost" | "duration";
 
 export const CATEGORIES: Array<{ id: Category; label: string; title: string }> = [
   { id: "tokens", label: "Hungriest", title: "Most fresh tokens (input + output + cache writes)" },
   { id: "cost", label: "Heaviest", title: "Highest API value: the closest proxy for weight on your quota" },
-  { id: "efficiency", label: "Most efficient", title: "Best cache hit (≥ 10k input)" },
   { id: "duration", label: "Longest", title: "Longest continuous stretch: no pause over 15 min" },
 ];
 
@@ -28,7 +27,6 @@ export function categoryValue(s: Session, c: Category): number | null {
   switch (c) {
     case "tokens": return freshTokens(s.tokens);
     case "cost": return s.costUsd;
-    case "efficiency": return cacheHit(s.tokens);
     case "duration": return s.longestRunMs ?? null;
   }
 }
