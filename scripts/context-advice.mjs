@@ -152,16 +152,38 @@ export function adviseContext(snap, now = Date.now()) {
   };
 }
 
-const ANSI = { ok: "\x1b[2m", watch: "\x1b[33m", act: "\x1b[31m", reset: "\x1b[0m" };
+const C = { dim: "\x1b[2m", green: "\x1b[32m", yellow: "\x1b[33m", red: "\x1b[31m", reset: "\x1b[0m" };
+const LEVEL_COLOR = { ok: C.green, watch: C.yellow, act: C.red };
+const paint = (color, s) => `${color}${s}${C.reset}`;
+/** Separator between status line groups, shared with statusline.mjs. */
+export const SEP = paint(C.dim, " │ ");
 
-/** One short segment for the terminal status line, e.g. "ctx 33% · cache 59m", plus a hint when it matters. */
+/** Gauge drawn with box-drawing glyphs (rendered natively by most terminals), e.g. "━━━─────" for 40%. */
+export function gauge(pct, width = 8) {
+  const filled = Math.max(0, Math.min(width, Math.round((pct / 100) * width)));
+  return { filled: "━".repeat(filled), empty: "─".repeat(width - filled) };
+}
+
+/**
+ * Terminal status line segment, e.g. "ctx ━─────── 8% │ cache warm 59m", plus a hint when it matters.
+ * Values are colored by level (green / yellow / red); labels stay in the default color to remain legible.
+ */
 export function statusSegment(snap, now = Date.now()) {
   const a = adviseContext(snap, now);
-  const parts = [];
-  if (a.context.usedPct !== null) parts.push(`ctx ${a.context.usedPct}%`);
-  if (a.cache.state === "warm" && a.cache.secsLeft !== null) parts.push(`cache ${fmtLeft(a.cache.secsLeft)}`);
-  else if (a.cache.state === "cold") parts.push("cache cold");
-  if (SHORT[a.verdict]) parts.push(SHORT[a.verdict]);
-  if (parts.length === 0) return "";
-  return `${ANSI[a.level]}${parts.join(" · ")}${ANSI.reset}`;
+  const groups = [];
+  const used = a.context.usedPct;
+  if (used !== null) {
+    const level = used >= THRESHOLDS.act ? "act" : used >= THRESHOLDS.watch ? "watch" : "ok";
+    const g = gauge(used);
+    groups.push(`ctx ${paint(LEVEL_COLOR[level], g.filled)}${paint(C.dim, g.empty)} ${paint(LEVEL_COLOR[level], `${used}%`)}`);
+  }
+  if (a.cache.state === "warm") {
+    const left = a.cache.secsLeft;
+    const color = left !== null && left < THRESHOLDS.expiringSoon ? C.yellow : C.green;
+    groups.push(`cache ${paint(color, left !== null ? `warm ${fmtLeft(left)}` : "warm")}`);
+  } else if (a.cache.state === "cold") {
+    groups.push(`cache ${paint(a.verdict === "clear" ? C.red : C.yellow, "cold")}`);
+  }
+  if (SHORT[a.verdict]) groups.push(paint(LEVEL_COLOR[a.level], `→ ${SHORT[a.verdict]}`));
+  return groups.join(SEP);
 }

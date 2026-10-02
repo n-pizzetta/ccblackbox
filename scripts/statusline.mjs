@@ -103,7 +103,7 @@ function withVerdict(out, snap) {
   const seg = advice.statusSegment(snap);
   if (!seg) return out;
   const body = out.replace(/\n+$/, "");
-  return body ? `${body} ${seg}${out.endsWith("\n") ? "\n" : ""}` : seg;
+  return body ? `${body}${advice.SEP ?? " "}${seg}${out.endsWith("\n") ? "\n" : ""}` : seg;
 }
 
 function previousCommand() {
@@ -111,15 +111,35 @@ function previousCommand() {
   return typeof cmd === "string" ? cmd : null;
 }
 
+const paint = (color, s) => `\x1b[${color}m${s}\x1b[0m`;
+/** Green under 50%, yellow under 80%, red above. */
+const usageColor = (pct) => (pct >= 80 ? 31 : pct >= 50 ? 33 : 32);
+
+function fmtLeft(secs) {
+  const m = Math.max(1, Math.ceil(secs / 60));
+  if (m < 60) return `${m}m`;
+  if (m < 48 * 60) return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}`;
+  return `${Math.round(m / 1440)}d`;
+}
+
+/** Show the weekly window only when it is close enough to matter. */
+const WEEKLY_FROM = 80;
+
+/** e.g. "Opus 5.5 │ 5h 10% reset 1h20", plus "7d 85% reset 2d" once the weekly window is nearly used. */
 function fallbackLine(payload) {
-  const parts = [];
-  if (payload?.model?.display_name) parts.push(payload.model.display_name);
+  const groups = [];
+  if (payload?.model?.display_name) groups.push(`\x1b[1m${payload.model.display_name}\x1b[0m`);
   const rl = payload?.rate_limits;
+  const now = Date.now() / 1000;
   for (const [key, label] of [["five_hour", "5h"], ["seven_day", "7d"]]) {
-    const pct = rl?.[key]?.used_percentage;
-    if (typeof pct === "number") parts.push(`${label} ${Math.round(pct)}%`);
+    const w = rl?.[key];
+    if (typeof w?.used_percentage !== "number") continue;
+    const pct = Math.round(w.used_percentage);
+    if (key === "seven_day" && pct < WEEKLY_FROM) continue;
+    const reset = typeof w.resets_at === "number" && w.resets_at > now ? ` reset ${fmtLeft(w.resets_at - now)}` : "";
+    groups.push(`${label} ${paint(usageColor(pct), `${pct}%`)}${reset}`);
   }
-  return parts.join(" · ");
+  return groups.join(advice?.SEP ?? " · ");
 }
 
 const input = readStdin();
