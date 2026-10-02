@@ -14,7 +14,7 @@ import { AnomalyFlags } from "./fleet/AnomalyFlags";
 import { ProjectRollup } from "./fleet/ProjectRollup";
 import { ModelMix } from "./fleet/ModelMix";
 import { ToolsHeatmap } from "./fleet/ToolsHeatmap";
-import { HeroBanner } from "./fleet/HeroBanner";
+import { HealthScore } from "./fleet/HealthScore";
 import { Badges } from "./fleet/Badges";
 import { HealthCheck } from "./fleet/HealthCheck";
 import { OPEN_TAB_EVENT, type DashboardTab } from "../utils/openTab";
@@ -118,7 +118,6 @@ export function FleetDashboard({
             <span className="fleet-group-name">In the selected range</span>
             <span className="fleet-group-note">{rangeNote}</span>
           </div>
-          <HeroBanner sessions={sessions} allSessions={allSessions} />
           <TopSessions sessions={sessions} onSelectSession={onSelectSession} />
           <Badges allSessions={allSessions} />
           <ProjectRollup sessions={sessions} allSessions={allSessions} range={range} />
@@ -131,6 +130,7 @@ export function FleetDashboard({
             <span className="fleet-group-name">In the selected range</span>
             <span className="fleet-group-note">{rangeNote}</span>
           </div>
+          <HealthScore sessions={sessions} allSessions={allSessions} />
           <HealthCheck sessions={sessions} allSessions={allSessions} onSelectSession={onSelectSession} />
         </>
       )}
