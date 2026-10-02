@@ -38,4 +38,6 @@ export const THRESHOLDS: { watch: number; act: number; coldMatters: number; cold
 export function toSnapshot(payload: unknown, now?: number): ContextSnapshot | null;
 export function adviseContext(snap: ContextSnapshot, now?: number): ContextAdvice;
 export function fmtLeft(secs: number): string;
+export const SEP: string;
+export function gauge(pct: number, width?: number): { filled: string; empty: string };
 export function statusSegment(snap: ContextSnapshot, now?: number): string;
