@@ -97,6 +97,12 @@ function transcript({ id, cwd, start, prompts, model, sidechain = false }) {
     const turns = int(3, 12);
     for (let i = 0; i < turns; i++) {
       t += int(4, 40) * 1000;
+      // Long main-thread sessions get compacted, like Claude Code's auto-compact.
+      if (!sidechain && ctx > 150_000 && rand() < 0.5) {
+        lines.push({ ...base, type: "user", isCompactSummary: true, timestamp: stamp(), message: { role: "user", content: "This session is being continued from a previous conversation that ran out of context." } });
+        ctx = int(20_000, 35_000);
+        t += int(20, 60) * 1000;
+      }
       const [name, input] = pick(TOOLS);
       const toolId = `toolu_${hex(20)}`;
       const write = int(1_000, 12_000);
@@ -115,7 +121,8 @@ function transcript({ id, cwd, start, prompts, model, sidechain = false }) {
       lines.push({ ...base, type: "assistant", timestamp: stamp(), requestId: `req_${hex(16)}`, message: message([{ type: "text", text: "Let me look at that." }]) });
       lines.push({ ...base, type: "assistant", timestamp: stamp(), message: message([{ type: "tool_use", id: toolId, name, input: input() }]) });
       t += int(1, 20) * 1000;
-      lines.push({ ...base, type: "user", timestamp: stamp(), message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolId, content: "ok" }] } });
+      const failed = rand() < 0.08;
+      lines.push({ ...base, type: "user", timestamp: stamp(), message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolId, content: failed ? "Error: command exited with code 1" : "ok", ...(failed ? { is_error: true } : {}) }] } });
     }
     t += rand() < 0.2 ? int(8, 40) * MIN : int(20, 180) * 1000;
   }
