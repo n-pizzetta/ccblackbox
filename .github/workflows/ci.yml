@@ -23,6 +23,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - run: pnpm test
       - run: pnpm build
       - name: dist/ is up to date
         run: git diff --exit-code -- dist/ || (echo "::error::dist/ is stale, run pnpm build and commit it" && exit 1)
