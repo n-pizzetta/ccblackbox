@@ -20,7 +20,6 @@ export function HealthCheck({ sessions, allSessions, onSelectSession }: Props) {
     <div className="fleet-block">
       <div className="section-title">
         <span>Health check</span>
-        <span className="dim mono tabular">{report.passed}/{report.total} passing</span>
       </div>
       <ul className="health-rules">
         {report.rules.map((r) => (

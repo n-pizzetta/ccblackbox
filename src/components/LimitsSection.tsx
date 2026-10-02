@@ -1,37 +1,37 @@
 import { useRateLimits } from "../utils/rateLimits";
 import { useLiveContext } from "../utils/liveContext";
 
+/** Status row for the usage limits bridge, plus a one-line fix when something is missing. */
 export function LimitsSection() {
   const limits = useRateLimits();
   const connected = !!limits?.fiveHour || !!limits?.sevenDay;
   const contextLive = useLiveContext().length > 0;
   return (
-    <div className="settings-section">
-      <div className="settings-label mono caps dim">Usage limits</div>
-      {connected ? (
-        <div className="mono dim limits-status">
-          <span style={{ color: "var(--c-green)" }}>● connected</span>
-          {limits?.capturedAt && <> · updated {new Date(limits.capturedAt).toLocaleTimeString()}</>}
-        </div>
-      ) : (
-        <div className="mono dim limits-status">
-          Not connected. Run <code>/ccblackbox:limits</code> in Claude Code (or{" "}
-          <code>node scripts/install-statusline.mjs</code> from a clone) to show your real 5h and 7-day limits
-          here.
-        </div>
+    <>
+      <div className="profile-row">
+        <span className="profile-row-label">Usage limits</span>
+        {connected ? (
+          <span className="profile-row-value mono">
+            <span className="profile-dot ok" aria-hidden="true" />
+            {limits?.capturedAt ? "synced " + new Date(limits.capturedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "connected"}
+          </span>
+        ) : (
+          <span className="profile-row-value mono">
+            <span className="profile-dot off" aria-hidden="true" />
+            off
+          </span>
+        )}
+      </div>
+      {!connected && (
+        <p className="profile-hint">
+          Run <code>/ccblackbox:limits</code> in Claude Code to show your real 5h and 7-day limits.
+        </p>
       )}
-      {connected && (
-        <div className="mono dim limits-status">
-          {contextLive ? (
-            <span style={{ color: "var(--c-green)" }}>● context advice active</span>
-          ) : (
-            <>
-              Context advice waits for a snapshot: re-run <code>/ccblackbox:limits</code> to refresh the wrapper, then send a
-              message.
-            </>
-          )}
-        </div>
+      {connected && !contextLive && (
+        <p className="profile-hint">
+          Context advice is waiting: re-run <code>/ccblackbox:limits</code>, then send a message.
+        </p>
       )}
-    </div>
+    </>
   );
 }

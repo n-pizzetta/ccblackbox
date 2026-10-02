@@ -28,10 +28,11 @@
 .fleet-tab.active { color: var(--c-text); border-bottom-color: var(--c-cyan); }
 .fleet-tabs .fleet-zoom-toggle { margin-left: auto; }
 
-/* ---- Hero banner ---- */
+/* ---- Health score ring (HealthScore) ---- */
 .hero {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto;
+  justify-content: start;
   gap: 12px;
 }
 .hero-cell {
@@ -56,9 +57,6 @@
 .hero-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .hero-label { font-size: var(--fs-md); color: var(--c-text-dim); }
 .hero-sub { font-size: var(--fs-sm); color: var(--c-text-faint); }
-.hero-big { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; }
-.hero-big small { margin-left: 6px; font-size: var(--fs-md); font-weight: 500; color: var(--c-text-dim); letter-spacing: 0; }
-.hero-flame { font-size: 28px; }
 .hero-track, .badge-track {
   display: block;
   height: 6px;
