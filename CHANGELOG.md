@@ -62,6 +62,9 @@ versioning follows [SemVer](https://semver.org/) once published.
 
 ### Fixed
 
+- The status line cache countdown no longer freezes while a session is idle:
+  `/ccblackbox:limits` sets `statusLine.refreshInterval` to 30 seconds (an
+  existing value is kept). Re-run it to apply to an installed wrapper.
 - Dev and production servers share one API module (`scripts/api.mjs`): the
   insights report and `/api/report-status` now work under `pnpm dev`, and
   "reveal in file manager" works on Linux and Windows.
