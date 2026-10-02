@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { BrandMark } from "./components/BrandMark";
-import { Sidebar } from "./components/Sidebar";
+import { SessionFilters, type FilterId } from "./components/SessionFilters";
 import { TopBar, StatsRow, type ReportStatus } from "./components/StatsStrip";
 import { SessionList } from "./components/SessionList";
 import { SessionDetail } from "./components/SessionDetail";
@@ -11,7 +11,10 @@ import { loadSessions, loadSessionDetail } from "./data/loadSessions";
 import type { Session } from "./types";
 import type { Range } from "./utils/range";
 import { filterByRange, scopeToRange } from "./utils/range";
+import { registerProjects } from "./utils/fleetStats";
 import "./App.css";
+import "./shell.css";
+import "./detail.css";
 import { Toaster } from "./components/Toaster";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { toastError } from "./utils/toast";
@@ -19,9 +22,10 @@ import { toastError } from "./utils/toast";
 const POLL_MS = 5000;
 const STORAGE_KEY = "ccblackbox:state";
 
-type FilterId = "all" | "live" | "ghost" | "friction" | "failed" | "lowquality";
 const FILTER_IDS: FilterId[] = ["all", "live", "ghost", "friction", "failed", "lowquality"];
 const RANGE_IDS: Range[] = ["today", "7d", "30d", "all"];
+/** Sessions that can be compared side by side. Not applied to the ghost bulk-delete selection. */
+const MAX_COMPARE = 3;
 
 interface PersistedState {
   id: string | null;
@@ -100,6 +104,12 @@ function App() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
   }, [selectedId, range, filter, projectFilter, search]);
 
+  /** Leaving the ghost filter with a bigger selection than a comparison can hold trims it. */
+  const changeFilter = (f: FilterId) => {
+    setFilter(f);
+    if (f !== "ghost") setCompareIds((prev) => (prev.size > MAX_COMPARE ? new Set([...prev].slice(0, MAX_COMPARE)) : prev));
+  };
+
   const toggleDashboardZoom = () => {
     const next = !dashboardZoomed;
     const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
@@ -109,8 +119,6 @@ function App() {
       setDashboardZoomed(next);
     }
   };
-
-  const [navOpen, setNavOpen] = useState(false);
 
   const setSelectedId = (id: string | null) => {
     setSelectedIdInternal(id);
@@ -131,6 +139,7 @@ function App() {
     async function refresh() {
       const r = await loadSessions();
       if (cancelled) return;
+      registerProjects(r.sessions.map((x) => x.project || "unknown"));
       setAllSessions(r.sessions);
       setSource(r.source);
       setGeneratedAt(r.generatedAt);
@@ -235,8 +244,7 @@ function App() {
       }
       else if (e.key === "Escape") {
         if (helpOpen) return;
-        if (navOpen) setNavOpen(false);
-        else if (selectedId) setSelectedId(null);
+        if (selectedId) setSelectedId(null);
         else if (dashboardZoomed) toggleDashboardZoom();
       }
       else if (e.key === "f" && (e.metaKey || e.ctrlKey) && !selectedId) {
@@ -251,7 +259,7 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIdx, filtered.length, dashboardZoomed, selectedId, helpOpen, navOpen]);
+  }, [selectedIdx, filtered.length, dashboardZoomed, selectedId, helpOpen]);
 
   if (source === "loading") {
     return (
@@ -268,26 +276,9 @@ function App() {
 
   return (
     <div className={`app ${sessionOpen ? "session-overlay" : ""} ${dashboardZoomed && !sessionOpen ? "dashboard-zoomed" : ""}`}>
-      {navOpen && <div className="nav-backdrop" onClick={() => setNavOpen(false)} role="presentation" />}
-      <Sidebar
-        open={navOpen}
-        filter={filter}
-        onFilterChange={setFilter}
-        sessions={inRange}
-        projectFilter={projectFilter}
-        onProjectFilterChange={setProjectFilter}
-        parseErrors={parseErrors}
-      />
       <main className="main scrollbar">
-        <button
-          className="nav-toggle"
-          onClick={() => setNavOpen((v) => !v)}
-          aria-expanded={navOpen}
-          aria-label="Toggle filters"
-        >
-          ☰ Filters
-        </button>
         <TopBar
+          allSessions={allSessions}
           range={range}
           onRangeChange={setRange}
           source={source}
@@ -298,12 +289,13 @@ function App() {
             (search ? 1 : 0)
           }
           onClearFilters={() => {
-            setFilter("all");
+            changeFilter("all");
             setProjectFilter(null);
             setSearch("");
           }}
           onHelp={() => setHelpOpen(true)}
           reportStatus={reportStatus}
+          parseErrors={parseErrors}
         />
         <StatsRow
           sessions={scopedFiltered}
@@ -330,15 +322,30 @@ function App() {
               });
             }}
             compareIds={compareIds}
-            onToggleCompare={(id) =>
+            onToggleCompare={(id) => {
+              if (!compareIds.has(id) && filter !== "ghost" && compareIds.size >= MAX_COMPARE) {
+                toastError(`You can compare up to ${MAX_COMPARE} sessions. Deselect one first.`);
+                return;
+              }
               setCompareIds((prev) => {
                 const next = new Set(prev);
                 if (next.has(id)) next.delete(id);
                 else next.add(id);
                 return next;
-              })
-            }
+              });
+            }}
+            compareLimit={filter === "ghost" ? undefined : MAX_COMPARE}
             ghostsFocused={filter === "ghost"}
+            onProjectClick={(p) => setProjectFilter((cur) => (cur === p ? null : p))}
+            filters={
+              <SessionFilters
+                filter={filter}
+                onFilterChange={changeFilter}
+                projectFilter={projectFilter}
+                onProjectFilterChange={setProjectFilter}
+                sessions={inRange}
+              />
+            }
             onBulkDelete={async (ids) => {
               const res = await fetch("/api/ghost/bulk-delete", {
                 method: "POST",

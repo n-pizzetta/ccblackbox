@@ -1,0 +1,84 @@
+.health-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.health-rule {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--c-hairline);
+}
+.health-rule:first-child {
+  border-top: none;
+}
+
+.health-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid currentColor;
+}
+.status-pass .health-mark { color: var(--c-green); }
+.status-warn .health-mark { color: var(--c-amber); }
+.status-fail .health-mark { color: var(--c-red); }
+.status-na .health-mark { color: var(--c-text-faint); }
+.status-na .health-name { color: var(--c-text-dim); }
+
+.health-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.health-name {
+  font-weight: 600;
+}
+.health-value {
+  font-size: 13px;
+}
+.status-warn .health-value { color: var(--c-amber); }
+.status-fail .health-value { color: var(--c-red); }
+.health-target {
+  font-size: 12px;
+}
+
+.health-why,
+.health-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.health-sessions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.health-session {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--c-hairline-strong);
+  background: transparent;
+  color: var(--c-text-dim);
+  cursor: pointer;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.health-session:hover,
+.health-session:focus-visible {
+  color: inherit;
+  border-color: var(--c-text-faint);
+}

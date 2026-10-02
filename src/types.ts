@@ -41,6 +41,8 @@ export interface SessionQuality {
   fillPct: number | null;
   band: string | null;
   wasteTokens: number;
+  /** Number of /compact (manual or auto) in the session. */
+  compactions?: number;
   signals: QualitySignal[];
 }
 
@@ -49,8 +51,10 @@ export interface Session {
   project: string;
   cwd: string;
   startedAt: string;
-  /** Active time: idle gaps over 5 min between transcript events are excluded. */
+  /** Active time: each gap between transcript events counts for at most 5 min. */
   durationMs: number;
+  /** Longest stretch of main-thread activity with no pause over 15 min: how long someone worked in one go. */
+  longestRunMs?: number;
   /** Wall-clock span from the first to the last event (or now, while live). */
   wallMs?: number;
   /** Normalized id, e.g. `opus-5.5` (see scripts/models.mjs). */
@@ -80,12 +84,18 @@ export interface Session {
   subAgents: number;
   filesChanged: number;
   commits: number;
+  /** Bash commands by kind (main thread only); detail payload only, used for badges. */
+  shell?: { prs: number; tests: number; lints: number; infra: number };
   live?: boolean;
   ghost?: boolean;
   ghostKind?: GhostKind;
   /** The transcript is gone: numbers come from /insights session-meta (no cache tokens). */
   transcriptMissing?: boolean;
   lastEventAt?: string;
+  /** Claude Code version from the transcript (last seen). */
+  version?: string;
+  /** Running sessions: when the Claude Code process started (pid file). */
+  processStartedAt?: string;
   runningTool?: { tool: string; preview: string; t: number } | null;
   clearedFrom?: string;
   clearedInto?: string;

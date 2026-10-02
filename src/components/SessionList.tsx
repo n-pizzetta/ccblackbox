@@ -1,6 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Session } from "../types";
-import { formatDuration, formatRelative, outcomeColor } from "../utils/format";
+import { formatCost, formatDuration, formatRelative, formatTokens, outcomeColor } from "../utils/format";
+import { projectColor } from "../utils/fleetStats";
+import { API_VALUE_HINT, freshTokens, formatUsage, useUnit } from "../utils/units";
+import { ContextLine } from "./ContextCard";
+import { useSnapshotMap } from "../utils/liveContext";
+import { useNow } from "../utils/useNow";
+import type { ContextSnapshot } from "../../scripts/context-advice.mjs";
 
 interface Props {
   sessions: Session[];
@@ -12,12 +18,72 @@ interface Props {
   onToggleCompareMode: () => void;
   compareIds: Set<string>;
   onToggleCompare: (id: string) => void;
+  /** Max sessions selectable for a comparison; unlimited when undefined (ghost bulk delete). */
+  compareLimit?: number;
   onBulkDelete?: (ids: string[]) => Promise<void>;
   ghostsFocused?: boolean;
+  /** Filter controls, rendered under the header. */
+  filters?: ReactNode;
+  /** Clicking a row's project pill filters on that project. */
+  onProjectClick?: (project: string) => void;
 }
 
 const ROW_HEIGHT = 62;
-const OVERSCAN = 8;
+/** Rows with a context / cache line are taller. */
+const ROW_HEIGHT_CTX = 84;
+const HEAD_HEIGHT = 34;
+const OVERSCAN_PX = 8 * ROW_HEIGHT;
+
+type Item =
+  | { kind: "head"; key: string; label: string; count: number; cost: number; fresh: number; top: number; h: number }
+  | { kind: "row"; s: Session; top: number; h: number };
+
+const itemHeight = (it: Item) => it.h;
+
+function dayLabel(iso: string, now: Date): string {
+  const d = new Date(iso);
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(d)) / 86_400_000);
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+/** Flat, virtualizable list: a day header whenever the day changes, then that day's rows. */
+function buildItems(sessions: Session[], snaps: Map<string, ContextSnapshot>): { items: Item[]; total: number } {
+  const now = new Date();
+  const groups: Array<{ label: string; rows: Session[] }> = [];
+  for (const s of sessions) {
+    const label = dayLabel(s.startedAt, now);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.rows.push(s);
+    else groups.push({ label, rows: [s] });
+  }
+  const items: Item[] = [];
+  let top = 0;
+  for (const g of groups) {
+    items.push({ kind: "head", key: `h-${g.label}-${top}`, label: g.label, count: g.rows.length, cost: g.rows.reduce((a, s) => a + s.costUsd, 0), fresh: g.rows.reduce((a, s) => a + freshTokens(s.tokens), 0), top, h: HEAD_HEIGHT });
+    top += HEAD_HEIGHT;
+    for (const s of g.rows) {
+      const h = snaps.has(s.id) ? ROW_HEIGHT_CTX : ROW_HEIGHT;
+      items.push({ kind: "row", s, top, h });
+      top += h;
+    }
+  }
+  return { items, total: top };
+}
+
+/** Index of the first item whose bottom edge is below `y`. */
+function firstItemAt(items: Item[], y: number): number {
+  let lo = 0;
+  let hi = items.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (items[mid].top + itemHeight(items[mid]) <= y) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
 
 export function SessionList({
   sessions,
@@ -29,9 +95,13 @@ export function SessionList({
   onToggleCompareMode,
   compareIds,
   onToggleCompare,
+  compareLimit,
   onBulkDelete,
   ghostsFocused,
+  filters,
+  onProjectClick,
 }: Props) {
+  const unit = useUnit();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(600);
@@ -51,23 +121,26 @@ export function SessionList({
     };
   }, []);
 
+  const snapshots = useSnapshotMap();
+  const now = useNow(30_000);
+  const { items, total } = useMemo(() => buildItems(sessions, snapshots), [sessions, snapshots]);
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const idx = sessions.findIndex((s) => s.id === selectedId);
-    if (idx < 0) return;
-    const rowTop = idx * ROW_HEIGHT;
-    const rowBottom = rowTop + ROW_HEIGHT;
+    const item = items.find((it) => it.kind === "row" && it.s.id === selectedId);
+    if (!item) return;
+    const rowTop = item.top;
+    const rowBottom = rowTop + item.h;
     if (rowTop < el.scrollTop || rowBottom > el.scrollTop + el.clientHeight) {
       el.scrollTo({ top: rowTop - el.clientHeight / 3, behavior: "smooth" });
     }
-  }, [selectedId, sessions]);
+  }, [selectedId, items]);
 
-  const total = sessions.length;
-  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-  const endIdx = Math.min(total, Math.ceil((scrollTop + viewport) / ROW_HEIGHT) + OVERSCAN);
-  const offsetTop = startIdx * ROW_HEIGHT;
-  const visible = sessions.slice(startIdx, endIdx);
+  const startIdx = firstItemAt(items, Math.max(0, scrollTop - OVERSCAN_PX));
+  const endIdx = Math.min(items.length, firstItemAt(items, scrollTop + viewport + OVERSCAN_PX) + 1);
+  const offsetTop = items[startIdx]?.top ?? 0;
+  const visible = items.slice(startIdx, endIdx);
 
   return (
     <div className="list">
@@ -79,7 +152,7 @@ export function SessionList({
             onClick={onToggleCompareMode}
             title={compareMode ? "Exit compare mode" : "Compare / select multiple sessions"}
           >
-            {compareMode ? `select (${compareIds.size})` : "select"}
+            {compareMode ? `select (${compareIds.size}${compareLimit ? `/${compareLimit}` : ""})` : "select"}
           </button>
           <input
             className="list-search mono"
@@ -90,6 +163,7 @@ export function SessionList({
           />
         </div>
       </div>
+      {filters}
       {compareMode && ghostsFocused && (
         <BulkGhostBar
           sessions={sessions}
@@ -99,29 +173,42 @@ export function SessionList({
         />
       )}
       <div className="list-scroll scrollbar" ref={scrollRef}>
-        {total === 0 ? (
+        {sessions.length === 0 ? (
           <div className="list-empty mono dim">
             {search ? `No sessions matching "${search}"` : "No sessions in this view"}
           </div>
         ) : (
-          <div className="list-inner" style={{ height: total * ROW_HEIGHT }}>
+          <div className="list-inner" style={{ height: total }}>
             <div style={{ transform: `translateY(${offsetTop}px)` }}>
-              {visible.map((s, i) => {
+              {visible.map((it, i) => {
+                if (it.kind === "head") {
+                  return (
+                    <div key={it.key} className="day-head" style={{ height: HEAD_HEIGHT }}>
+                      <span className="day-head-label">{it.label}</span>
+                      <span className="day-head-meta mono tabular">
+                        {it.count} · {unit === "tokens" ? formatTokens(it.fresh) : formatCost(it.cost)}
+                      </span>
+                    </div>
+                  );
+                }
+                const s = it.s;
                 const absoluteIdx = startIdx + i;
-                const c = outcomeColor(s.outcome);
+                const c = s.live ? "var(--c-green)" : s.ghost ? "var(--c-text-ghost)" : outcomeColor(s.outcome);
                 const checked = compareIds.has(s.id);
+                const full = compareMode && !checked && !!compareLimit && compareIds.size >= compareLimit;
                 return (
                   <div
                     key={s.id}
-                    className={`session-row ${selectedId === s.id ? "selected" : ""} ${compareMode ? "compare-mode" : ""} ${compareMode && checked ? "compare-checked" : ""}`}
+                    className={`session-row ${s.live ? "is-live" : ""} ${selectedId === s.id ? "selected" : ""} ${compareMode ? "compare-mode" : ""} ${compareMode && checked ? "compare-checked" : ""} ${full ? "compare-full" : ""}`}
                     style={{
                       "--outcome-c": c,
-                      height: ROW_HEIGHT,
+                      height: it.h,
                       animationDelay: `${Math.min(absoluteIdx, 15) * 20}ms`,
                     } as React.CSSProperties}
                     role="button"
                     tabIndex={0}
                     aria-pressed={compareMode ? checked : undefined}
+                    aria-disabled={full || undefined}
                     aria-current={!compareMode && selectedId === s.id ? "true" : undefined}
                     onClick={() => compareMode ? onToggleCompare(s.id) : onSelect(s.id)}
                     onKeyDown={(e) => {
@@ -149,20 +236,33 @@ export function SessionList({
                           <span className="row-glyph glyph-cleared" title="Context cleared — continues in next session">⟲</span>
                         ) : s.ghost ? (
                           <span className="row-glyph glyph-ghost" title="Ghost session — recovered from transcript" />
-                        ) : (
-                          <span className="row-glyph outcome-dot" title={s.outcome.replace(/_/g, " ")} />
-                        )}
+                        ) : null}
                         {s.goal}
                       </div>
                       <div className="sub">
-                        <span>{s.project}</span>
-                        <span>·</span>
-                        <span>{formatDuration(s.durationMs)}</span>
-                        <span>·</span>
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          className="proj-pill"
+                          style={{ "--pc": projectColor(s.project) } as React.CSSProperties}
+                          title={`Filter by ${s.project}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onProjectClick?.(s.project);
+                          }}
+                        >
+                          {s.project}
+                        </button>
                         <span>{formatRelative(s.startedAt)}</span>
                       </div>
+                      {snapshots.get(s.id) && <ContextLine snap={snapshots.get(s.id)!} now={now} />}
                     </div>
-                    <div className="row-chips">
+                    <div
+                      className="row-side"
+                      title={`${formatTokens(freshTokens(s.tokens))} fresh tokens · ${formatCost(s.costUsd)} API value\n${API_VALUE_HINT}`}
+                    >
+                      <span className={`row-primary mono tabular ${unit === "usd" ? "is-usd" : ""}`}>{formatUsage(unit, s.tokens, s.costUsd)}</span>
+                      <div className="row-chips">
                       {s.pluginCapture && (
                         <div
                           className="plugin-chip"
@@ -178,6 +278,8 @@ export function SessionList({
                           <span className="tabular">{s.frictions.length}</span>
                         </div>
                       )}
+                        <span className="row-time mono tabular" title="Active time">{formatDuration(s.durationMs)}</span>
+                      </div>
                     </div>
                   </div>
                 );

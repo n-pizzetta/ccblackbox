@@ -53,7 +53,7 @@ Then run `/ccblackbox:replay` (or `/replay`) to open the dashboard. The plugin a
 
 #### Real usage limits (optional)
 
-Claude Code only exposes your 5-hour and 7-day usage limits (the numbers behind `/usage`) to the status line. Run `/ccblackbox:limits` once to install a small wrapper that records them for the dashboard. Your existing status line keeps rendering unchanged, and `settings.json` is backed up first. Undo with `/ccblackbox:limits --uninstall`.
+Claude Code only exposes your 5-hour and 7-day usage limits (the numbers behind `/usage`) to the status line. Run `/ccblackbox:limits` once to install a small wrapper that records them for the dashboard. Your existing status line keeps rendering unchanged, and `settings.json` is backed up first. The same wrapper also records how full each live session's context is and how warm its prompt cache is: session rows show the context fill and the prompt-cache countdown, with a *keep going / compact / clear* verdict (and its reasons) in the session view, and a short `ctx 33% · cache 59m` segment is appended to your status line (set `"verdict": false` in `~/.claude/ccblackbox/statusline.json` to hide it). Re-run `/ccblackbox:limits` after updating ccblackbox to refresh the wrapper. Undo with `/ccblackbox:limits --uninstall`.
 
 Without it, the dashboard still shows tokens and cost for an inferred 5h window, just not the limit percentages.
 
@@ -107,7 +107,7 @@ The dev server and `scripts/serve.mjs` mount the same API (`scripts/api.mjs`): i
                   │
                   ▼ fetch
    React 19 SPA (hash routing)
-   ├─ Sidebar / StatsStrip / SessionList
+   ├─ StatsStrip / SessionList / SessionFilters
    ├─ SessionDetail (Overview / Tools / Tokens / Files)
    ├─ SessionCompare
    └─ FleetDashboard (src/components/fleet/)

@@ -13,7 +13,7 @@ import {
 import { aggregateByPrompt, type PromptStats } from "../../utils/aggregateByPrompt";
 import { loadWindowStart, saveWindowStart } from "../../utils/windowState";
 import { formatCost, formatDuration, formatTokens } from "../../utils/format";
-import { limitColor, type LimitWindow, type RateLimits } from "../../utils/rateLimits";
+import type { RateLimits } from "../../utils/rateLimits";
 
 interface Props {
   sessions: Session[];
@@ -206,8 +206,6 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
           <div className="mono caps dim five-hour-metric-label">cost</div>
           <div className="five-hour-metric-val tabular" style={{ color: "var(--c-amber)" }}>{formatCost(windowBurn.cost)}</div>
         </div>
-        {limits?.fiveHour && <LimitBar label="5h limit" window={limits.fiveHour} />}
-        {limits?.sevenDay && <LimitBar label="7d limit" window={limits.sevenDay} />}
       </div>
 
       <div className="five-hour-grid">
@@ -337,21 +335,6 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
             </>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function LimitBar({ label, window: w }: { label: string; window: LimitWindow }) {
-  const frac = w.usedPct / 100;
-  return (
-    <div className="five-hour-summary-metric grow">
-      <div className="mono caps dim five-hour-metric-label">{label}</div>
-      <div className="five-hour-fill-bar-wrap">
-        <div className="five-hour-fill-bar" style={{ width: `${Math.min(100, w.usedPct)}%`, background: limitColor(frac) }} />
-      </div>
-      <div className="five-hour-fill-txt mono tabular" style={{ color: limitColor(frac) }}>
-        {w.usedPct.toFixed(0)}%
       </div>
     </div>
   );

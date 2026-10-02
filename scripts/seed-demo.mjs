@@ -177,6 +177,9 @@ writeFileSync(join(CLAUDE, "ccblackbox", "limits.json"), JSON.stringify({
   },
 }));
 
+// Badges count from the first launch; backdate it so the demo history counts.
+writeFileSync(join(CLAUDE, "ccblackbox", "badges.json"), JSON.stringify({ version: 1, startedAt: new Date(NOW - 365 * 24 * HOUR).toISOString(), unlocked: {} }));
+
 function mkdirp(dir) {
   mkdirSync(dir, { recursive: true });
   return dir;

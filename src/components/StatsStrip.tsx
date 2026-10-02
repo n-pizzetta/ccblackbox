@@ -1,5 +1,10 @@
 import type { Session } from "../types";
 import { estimateHint, formatCost, formatDuration, formatTokens } from "../utils/format";
+import { API_VALUE_HINT, freshTokens } from "../utils/units";
+import { LimitsPill } from "./LimitsGauge";
+import { BrandMark } from "./BrandMark";
+import { ParseErrors } from "./ParseErrors";
+import { ProfileMenu } from "./ProfileMenu";
 import { RANGE_OPTIONS, rangeLabel, type Range } from "../utils/range";
 
 export interface ReportStatus {
@@ -8,6 +13,7 @@ export interface ReportStatus {
 }
 
 interface TopBarProps {
+  allSessions: Session[];
   range: Range;
   onRangeChange: (r: Range) => void;
   source: "real" | "mock";
@@ -16,6 +22,7 @@ interface TopBarProps {
   onClearFilters: () => void;
   onHelp: () => void;
   reportStatus: ReportStatus;
+  parseErrors?: string[];
 }
 
 interface StatsRowProps {
@@ -44,6 +51,7 @@ function formatAge(iso?: string): string {
 }
 
 export function TopBar({
+  allSessions,
   range,
   onRangeChange,
   source,
@@ -52,51 +60,20 @@ export function TopBar({
   onClearFilters,
   onHelp,
   reportStatus,
+  parseErrors,
 }: TopBarProps) {
   return (
     <div className="topline">
       <div className="topline-title">
-        <h1>Overview</h1>
-        <button
-          className="topline-help"
-          onClick={onHelp}
-          title="Help (?)"
-          aria-label="Open help"
-        >
-          ?
-        </button>
+        <BrandMark size={40} />
+        <div className="brand-words">
+          <h1 className="brand-title"><span className="brand-cc">CC</span>blackbox</h1>
+          <span className="brand-tag">flight recorder for Claude Code</span>
+        </div>
       </div>
       <div className="topline-right">
-        <div className={`source-chip ${source}`} title={generatedAt ? `parsed ${formatAge(generatedAt)}` : undefined}>
-          <span className="source-dot" />
-          <span className="mono">
-            {source === "real" ? "live data" : "mock data"}
-          </span>
-          {generatedAt && (
-            <span className="mono source-age">· {formatAge(generatedAt)}</span>
-          )}
-        </div>
-        {reportStatus.exists ? (
-          <a
-            className="topline-chip report-link"
-            href="/usage-report.html"
-            target="_blank"
-            rel="noreferrer"
-            title={`Insights report · generated ${formatAge(reportStatus.mtime)}`}
-          >
-            insights report ↗
-          </a>
-        ) : (
-          <a
-            className="topline-chip report-link disabled"
-            href="/usage-report.html"
-            target="_blank"
-            rel="noreferrer"
-            title="Run /insights in Claude Code to generate it"
-          >
-            insights report
-          </a>
-        )}
+        <LimitsPill />
+        {parseErrors && parseErrors.length > 0 && <ParseErrors errors={parseErrors} />}
         {activeFilterCount >= 2 && (
           <button
             className="clear-filters topline-chip"
@@ -119,6 +96,13 @@ export function TopBar({
             </button>
           ))}
         </div>
+        <ProfileMenu
+          allSessions={allSessions}
+          source={source}
+          parsedAgo={formatAge(generatedAt)}
+          reportStatus={reportStatus}
+          onHelp={onHelp}
+        />
       </div>
     </div>
   );
@@ -135,11 +119,9 @@ export function StatsRow({ sessions, totalInRange, range, activeFilterCount }: S
   const avgCost = total > 0 ? totalCost / total : 0;
   const unpriced = new Set(sessions.flatMap((s) => s.unpricedModels ?? []));
 
-  const totalTokens = sessions.reduce(
-    (a, s) => a + s.tokens.input + s.tokens.output + s.tokens.cacheRead + s.tokens.cacheWrite,
-    0,
-  );
-  const avgTokens = total > 0 ? totalTokens / total : 0;
+  const totalFresh = sessions.reduce((a, s) => a + freshTokens(s.tokens), 0);
+  const totalCached = sessions.reduce((a, s) => a + s.tokens.cacheRead, 0);
+  const avgFresh = total > 0 ? totalFresh / total : 0;
 
   const spanDays = Math.max(1, rangeSpanDays(sessions, range));
   const perDay = total > 0 ? (total / spanDays).toFixed(1) : "0";
@@ -173,14 +155,14 @@ export function StatsRow({ sessions, totalInRange, range, activeFilterCount }: S
         <span className="stats-num tabular" title={unpriced.size ? estimateHint(unpriced) : undefined}>
           {unpriced.size ? "~" : ""}{formatCost(totalCost)}
         </span>
-        <span className="stats-label">cost</span>
+        <span className="stats-label" title={API_VALUE_HINT}>API value</span>
         <span className="stats-sub mono">{formatCost(avgCost)} avg / session</span>
       </div>
       <div className="stats-sep" />
       <div className="stats-cell">
-        <span className="stats-num tabular">{formatTokens(totalTokens)}</span>
-        <span className="stats-label">tokens</span>
-        <span className="stats-sub mono">{formatTokens(avgTokens)} avg / session</span>
+        <span className="stats-num tabular" title="Input + output + cache writes. Cached reads are counted apart: they weigh far less.">{formatTokens(totalFresh)}</span>
+        <span className="stats-label">fresh tokens</span>
+        <span className="stats-sub mono" title={`${formatTokens(avgFresh)} fresh tokens avg / session`}>+ {formatTokens(totalCached)} cached reads</span>
       </div>
     </div>
   );

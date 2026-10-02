@@ -1,92 +1,82 @@
 import { useMemo } from "react";
 import type { Session } from "../../types";
-import { sumTokens, PROJECT_PALETTE, OTHER_COLOR } from "../../utils/fleetStats";
+import type { Range } from "../../utils/range";
+import { projectColor } from "../../utils/fleetStats";
+import { projectLeague, type ProjectRow } from "../../utils/gamify";
 import { formatCost, formatTokens } from "../../utils/format";
+import { useUnit } from "../../utils/units";
 
 interface Props {
   sessions: Session[];
+  allSessions: Session[];
+  range: Range;
   limit?: number;
 }
 
-export function ProjectRollup({ sessions, limit = 5 }: Props) {
-  const rows = useMemo(() => {
-    const byProj = new Map<string, { tokens: number; cost: number; count: number }>();
-    for (const s of sessions) {
-      const key = s.project || "unknown";
-      const prev = byProj.get(key) ?? { tokens: 0, cost: 0, count: 0 };
-      prev.tokens += sumTokens(s.tokens);
-      prev.cost += s.costUsd;
-      prev.count += 1;
-      byProj.set(key, prev);
-    }
-    const arr = Array.from(byProj.entries())
-      .map(([project, v]) => ({ project, ...v }))
-      .filter((r) => r.tokens > 0)
-      .sort((a, b) => b.tokens - a.tokens);
-    const top = arr.slice(0, limit);
-    const rest = arr.slice(limit);
-    if (rest.length > 0) {
-      top.push({
-        project: `other (${rest.length})`,
-        tokens: rest.reduce((a, r) => a + r.tokens, 0),
-        cost: rest.reduce((a, r) => a + r.cost, 0),
-        count: rest.reduce((a, r) => a + r.count, 0),
-      });
-    }
-    return top;
-  }, [sessions, limit]);
+function Movement({ row }: { row: ProjectRow }) {
+  if (row.isNew) return <span className="league-move new" title="Not in the previous period">new</span>;
+  if (row.delta === null || row.delta === 0) return <span className="league-move flat">–</span>;
+  const up = row.delta > 0;
+  return (
+    <span className={`league-move ${up ? "up" : "down"}`} title="Rank change vs the previous period">
+      {up ? "▲" : "▼"} {Math.abs(row.delta)}
+    </span>
+  );
+}
+
+export function ProjectRollup({ sessions, allSessions, range, limit = 6 }: Props) {
+  const unit = useUnit();
+  const rows = useMemo(() => projectLeague(sessions, allSessions, range).slice(0, limit), [sessions, allSessions, range, limit]);
 
   if (rows.length === 0) {
     return (
       <div className="fleet-block">
-        <div className="section-title"><span>Projects</span></div>
+        <div className="section-title"><span>Project league</span></div>
         <div className="placeholder mono dim">No project data.</div>
       </div>
     );
   }
 
-  const total = rows.reduce((a, r) => a + r.tokens, 0);
-  const totalCost = rows.reduce((a, r) => a + r.cost, 0);
+  const max = rows[0].cost > 0 ? rows[0].cost : rows[0].tokens;
 
   return (
     <div className="fleet-block">
       <div className="section-title">
-        <span>Projects · tokens & cost</span>
-        <span className="dim mono tabular">{rows.length}</span>
+        <span>Project league</span>
+        <span className="dim mono tabular" title="Ranked by API value, a relative weight across token kinds and models">{range === "all" ? "by API value" : "by API value · vs previous period"}</span>
       </div>
-      <div className="project-rollup">
-        <div className="project-rollup-bar">
-          {rows.map((r, i) => {
-            const pct = (r.tokens / total) * 100;
-            const color = i >= PROJECT_PALETTE.length || r.project.startsWith("other") ? OTHER_COLOR : PROJECT_PALETTE[i];
-            return (
-              <div
-                key={r.project}
-                className="project-rollup-seg"
-                style={{ flex: pct, background: color }}
-                title={`${r.project}: ${formatTokens(r.tokens)} (${pct.toFixed(1)}%)`}
-              />
-            );
-          })}
-        </div>
-        <div className="project-rollup-list">
-          {rows.map((r, i) => {
-            const color = i >= PROJECT_PALETTE.length || r.project.startsWith("other") ? OTHER_COLOR : PROJECT_PALETTE[i];
-            const pct = (r.tokens / total) * 100;
-            const costPct = totalCost > 0 ? (r.cost / totalCost) * 100 : 0;
-            return (
-              <div key={r.project} className="project-rollup-row">
-                <span className="project-rollup-swatch" style={{ background: color }} />
-                <span className="mono project-rollup-name">{r.project}</span>
-                <span className="mono dim tabular">{r.count} session{r.count > 1 ? "s" : ""}</span>
-                <span className="mono tabular right">{formatTokens(r.tokens)}</span>
-                <span className="mono dim tabular right">{pct.toFixed(1)}%</span>
-                <span className="mono tabular right" style={{ color: "var(--c-amber)" }}>{formatCost(r.cost)}</span>
-                <span className="mono dim tabular right">{costPct.toFixed(1)}%</span>
+      <div className="league">
+        {rows.map((r, i) => {
+          const color = projectColor(r.project);
+          return (
+            <div key={r.project} className={`league-row ${i === 0 ? "leader" : ""}`}>
+              <span className="league-rank mono tabular">{i === 0 ? "👑" : i + 1}</span>
+              <div className="league-main">
+                <div className="league-line">
+                  <span className="league-name mono">{r.project}</span>
+                  <span className="dim mono tabular league-count">{r.count} session{r.count > 1 ? "s" : ""}</span>
+                  <Movement row={r} />
+                </div>
+                <div className="league-bar" aria-hidden="true">
+                  <span style={{ width: `${Math.max(3, ((rows[0].cost > 0 ? r.cost : r.tokens) / max) * 100)}%`, background: color }} />
+                </div>
               </div>
-            );
-          })}
-        </div>
+              <div className="league-nums mono tabular">
+                {unit === "tokens" ? (
+                  <>
+                    <span>{formatTokens(r.tokens)}</span>
+                    <span style={{ color: "var(--c-amber)" }}>{formatCost(r.cost)}</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ color: "var(--c-amber)" }}>{formatCost(r.cost)}</span>
+                    <span>{formatTokens(r.tokens)}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

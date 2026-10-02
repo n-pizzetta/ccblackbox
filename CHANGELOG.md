@@ -21,6 +21,24 @@ versioning follows [SemVer](https://semver.org/) once published.
 
 ### Added
 
+- Context and prompt-cache advice for live sessions: the status line wrapper
+  records a sanitized per-session snapshot and appends a short
+  `ctx 33% · cache 59m` segment to the status line; session rows show the context
+  fill and a cache countdown, and the session view a keep going / compact /
+  clear verdict with its reasons.
+  The wrapper also keeps a small history of the 5h / 7d limits. Re-run
+  `/ccblackbox:limits` to refresh an installed wrapper.
+- Rankings tab with podium, badges, health / streak / level banner and project
+  league; usage unit selector (fresh tokens or API value) in settings. The
+  dashboard has two tabs (Rankings, Analysis): the current 5h window and a live
+  burn line moved to Analysis, and the Live sessions block is gone (the session
+  list shows live sessions with their context and cache state).
+- Session view: panels on a darker page, headline tiles (time, tokens, messages,
+  tools, files, commits, sub-agents), a two-column overview with previews of
+  the Tools, Tokens and Files tabs, prompts in the chosen usage unit, and a
+  "Copy resume command" button in the header.
+- Sticky top bar with the usage limits, in-list filters with removable chips,
+  day-grouped session cards. The sidebar is gone.
 - `CLAUDE_CONFIG_DIR` support: parser, API, hook and status line read the
   Claude config dir from it when set, like Claude Code does.
 - `pnpm seed:demo` (`scripts/seed-demo.mjs`) generates a synthetic Claude

@@ -6,7 +6,7 @@
  * facets only enrich goal, summary, outcome and frictions. Read-only toward
  * Claude Code's files. See ARCHITECTURE.md.
  */
-import { readdir, readFile, writeFile, mkdir, stat as fspStat } from "node:fs/promises";
+import { readdir, readFile, writeFile, mkdir, rm, stat as fspStat } from "node:fs/promises";
 import { existsSync, createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
 import { homedir } from "node:os";
@@ -14,6 +14,7 @@ import { dirname, join, basename } from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { createQualityTracker } from "./quality.mjs";
 import { costOf, DEFAULT_MODEL, isKnownModel, normalizeModel, priceFor, setModelOverrides } from "./models.mjs";
 
 // `pnpm parse` dump. Never under public/ or dist/: it holds real prompts and paths.
@@ -26,7 +27,6 @@ const LIVE_DIR = join(CLAUDE, "sessions");
 const STALE_DIR = join(LIVE_DIR, ".stale");
 const HISTORY = join(CLAUDE, "history.jsonl");
 const PROJECTS_DIR = join(CLAUDE, "projects");
-const TOKEN_OPT_DIR = join(CLAUDE, "token-optimizer");
 const FILE_HISTORY_DIR = join(CLAUDE, "file-history");
 const PLUGIN_CACHE_DIR = join(CLAUDE, "ccblackbox", "cache");
 
@@ -35,11 +35,46 @@ const toolKey = (name) => (name.startsWith("mcp__") ? `mcp:${name.split("__")[1]
 
 /** Gaps longer than this between two transcript events count as idle, not active time. */
 const IDLE_CAP_MS = 5 * 60_000;
+/** A pause up to this long doesn't end a continuous work stretch (same as RUN_GAP_MS in badges.mjs). */
+const RUN_GAP_MS = 15 * 60_000;
 
 /** User-role lines that are not prompts the user typed. */
 const NON_PROMPT_RE = /^\s*(<(command-|local-command-|task-notification|system-reminder)|\[Request interrupted|Caveat:)/;
 
 const SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
+
+/**
+ * Bash command kinds counted for badges. Matched on the head of each segment
+ * (split on && ; | and newlines), so `echo "npm test"` is not a test run.
+ */
+const RUNNER = String.raw`((npx|bunx|pnpm(\s+(exec|dlx))?|yarn|uv\s+run|poetry\s+run)\s+)?`;
+const SHELL_KINDS = {
+  prs: /^gh\s+pr\s+create\b/,
+  tests: new RegExp(
+    String.raw`^${RUNNER}(vitest|jest|pytest|mocha|playwright\s+test|rspec|phpunit)\b` +
+      String.raw`|^(pnpm|npm|yarn|bun)\s+(run\s+)?test\b|^(cargo|go|deno|bun|mix|dotnet|swift)\s+test\b` +
+      String.raw`|^python3?\s+-m\s+(pytest|unittest)\b|^make\s+test\b`,
+  ),
+  lints: new RegExp(
+    String.raw`^${RUNNER}(eslint|tsc|ruff|biome|oxlint|mypy|pyright|stylelint|prettier\s+--check)\b` +
+      String.raw`|^(pnpm|npm|yarn|bun)\s+(run\s+)?(lint|typecheck|type-check|build|check)\b` +
+      String.raw`|^cargo\s+(clippy|check|build)\b|^go\s+(vet|build)\b`,
+  ),
+  infra: /^(docker|docker-compose|podman|kubectl|helm|terraform|tofu|pulumi|gcloud|aws|az|orb|orbctl|flyctl|vercel|wrangler)\b/,
+};
+
+function countShellKinds(command, into) {
+  const hit = new Set();
+  for (const raw of command.split(/\n|&&|\|\||;|\|/)) {
+    const head = raw
+      .trim()
+      .replace(/^\(+\s*/, "")
+      .replace(/^(\w+=\S*\s+)+/, "")
+      .replace(/^((rtk(\s+proxy)?|time|sudo|command|exec)\s+)+/, "");
+    for (const [kind, re] of Object.entries(SHELL_KINDS)) if (re.test(head)) hit.add(kind);
+  }
+  for (const kind of hit) into[kind] += 1;
+}
 
 const costFor = costOf;
 /** Priced per turn when available, so sessions that switch models cost right. */
@@ -118,16 +153,6 @@ async function readDirSafe(dir) {
 async function readJsonSafe(p) {
   try { return JSON.parse(await readFile(p, "utf8")); } catch { return null; }
 }
-
-const QUALITY_SIGNAL_LABELS = {
-  context_fill_degradation: "Context fill",
-  stale_reads: "Stale file reads",
-  bloated_results: "Bloated tool results",
-  duplicates: "Duplicate reads",
-  compaction_depth: "Compaction depth",
-  decision_density: "Decision density",
-  agent_efficiency: "Agent efficiency",
-};
 
 async function readFileHistory(sessionId, pathByHash) {
   const dir = join(FILE_HISTORY_DIR, sessionId);
@@ -219,31 +244,6 @@ function mergeToolSequences(transcriptSeq, pluginSeq) {
   });
 }
 
-async function readQualityCache(sessionId) {
-  const p = join(TOKEN_OPT_DIR, `quality-cache-${sessionId}.json`);
-  const data = await readJsonSafe(p);
-  if (!data || typeof data.score !== "number") return null;
-  const breakdown = data.breakdown ?? {};
-  const signals = Object.entries(data.signals ?? {}).map(([kind, score]) => {
-    const bd = breakdown[kind] ?? {};
-    return {
-      kind,
-      label: QUALITY_SIGNAL_LABELS[kind] ?? kind,
-      score: Math.round(score),
-      detail: bd.detail ?? "",
-      wasteTokens: bd.estimated_waste_tokens ?? 0,
-    };
-  });
-  return {
-    score: data.score,
-    grade: data.grade ?? "?",
-    fillPct: data.fill_pct ?? null,
-    band: data.degradation_band ?? null,
-    wasteTokens: breakdown.total_estimated_waste_tokens ?? signals.reduce((a, s) => a + s.wasteTokens, 0),
-    signals,
-  };
-}
-
 /** Read history.jsonl line-by-line, group user messages by sessionId. */
 async function readHistoryBySession() {
   const bySession = new Map();
@@ -313,6 +313,7 @@ async function parseTranscriptFile(path, sidechain) {
   const resultById = new Map();
   let userMessages = 0;
   let commits = 0;
+  const shell = { prs: 0, tests: 0, lints: 0, infra: 0 };
   let model = null;
   let firstTs = null;
   let lastTs = null;
@@ -322,6 +323,9 @@ async function parseTranscriptFile(path, sidechain) {
   let customTitle = null;
   let pendingInBytes = 0;
   let pendingInPreview = "";
+  let version = null;
+  // Sub-agent transcripts are scored as part of nothing: quality is about the main context.
+  const quality = sidechain ? null : createQualityTracker();
 
   const rl = createInterface({ input: createReadStream(path, "utf8"), crlfDelay: Infinity });
   for await (const line of rl) {
@@ -329,6 +333,7 @@ async function parseTranscriptFile(path, sidechain) {
     let j;
     try { j = JSON.parse(line); } catch { continue; }
     if (!cwd && j.cwd) cwd = j.cwd;
+    if (typeof j.version === "string") version = j.version;
     if (!customTitle && j.type === "custom-title" && typeof j.customTitle === "string") {
       customTitle = j.customTitle;
     }
@@ -388,6 +393,7 @@ async function parseTranscriptFile(path, sidechain) {
         }
         const name = toolKey(c.name);
         const input = c.input ?? {};
+        quality?.onToolUse(c.name, input, c.id);
         toolCounts[name] = (toolCounts[name] ?? 0) + 1;
         turn.tools.push(name);
         absEvents.push({ tsMs, kind: SUBAGENT_TOOLS.has(c.name) ? "agent" : "tool", tool: name, label: name });
@@ -395,6 +401,7 @@ async function parseTranscriptFile(path, sidechain) {
           commits++;
           absEvents.push({ tsMs, kind: "commit", label: "git commit" });
         }
+        if (c.name === "Bash" && typeof input.command === "string") countShellKinds(input.command, shell);
         if (typeof input.file_path === "string") {
           const hash = createHash("sha256").update(input.file_path).digest("hex").slice(0, 16);
           if (!pathByHash.has(hash)) pathByHash.set(hash, input.file_path);
@@ -413,6 +420,7 @@ async function parseTranscriptFile(path, sidechain) {
         }
       }
     } else if (msg.role === "user") {
+      if (j.isCompactSummary) quality?.onCompaction();
       if (j.isMeta || j.isCompactSummary) continue;
       const content = msg.content;
       let text = null;
@@ -431,6 +439,7 @@ async function parseTranscriptFile(path, sidechain) {
                 .join("\n");
             }
             if (!body) continue;
+            quality?.onToolResult(tr.tool_use_id, body.length);
             resultById.set(tr.tool_use_id, {
               text: body.slice(0, 240),
               truncated: body.length > 240,
@@ -480,6 +489,7 @@ async function parseTranscriptFile(path, sidechain) {
 
   const tokens = turns.reduce((acc, tu) => addTokens(acc, tu.tokens), emptyTokens());
   return {
+    longestRunMs: sidechain ? 0 : longestRun([...turns.map((tu) => tu.tsMs), ...absEvents.filter((e) => e.kind === "prompt").map((e) => e.tsMs)]),
     tokens,
     toolCounts,
     absEvents,
@@ -489,6 +499,7 @@ async function parseTranscriptFile(path, sidechain) {
     assistantMessages: turns.length,
     userMessages,
     commits,
+    shell,
     model,
     firstTs,
     lastTs,
@@ -498,7 +509,21 @@ async function parseTranscriptFile(path, sidechain) {
     pathByHash,
     runningTool,
     customTitle,
+    version,
+    quality: quality?.finish(turns) ?? null,
   };
+}
+
+/** Longest stretch of activity where no pause exceeds RUN_GAP_MS. */
+function longestRun(timestamps) {
+  const ts = timestamps.filter(Boolean).sort((a, b) => a - b);
+  let best = 0;
+  let from = ts[0];
+  for (let i = 1; i < ts.length; i++) {
+    if (ts[i] - ts[i - 1] > RUN_GAP_MS) from = ts[i];
+    else best = Math.max(best, ts[i] - from);
+  }
+  return best;
 }
 
 function relativizeEvents(absEvents, startedAt) {
@@ -723,6 +748,7 @@ async function buildSession(id, { entry, meta, facet, live, dead, history, now }
     // Active time: gaps over IDLE_CAP_MS between transcript events are idle.
     durationMs: t ? Math.max(1, t.activeMs) : Math.max(1, (meta?.duration_minutes ?? 0) * 60_000),
     wallMs: Math.max(1, (isLive ? now : lastTs ?? startedAtMs) - startedAtMs),
+    longestRunMs: t?.longestRunMs ?? 0,
     model,
     outcome,
     satisfaction: satisfactionOf(facet),
@@ -739,11 +765,13 @@ async function buildSession(id, { entry, meta, facet, live, dead, history, now }
     subAgents: subs.length || (toolCounts.Agent ?? 0) + (toolCounts.Task ?? 0),
     filesChanged: fileHistory.length || meta?.files_modified || 0,
     commits: t ? t.commits : meta?.git_commits ?? 0,
+    ...(t ? { shell: t.shell } : {}),
     live: isLive,
-    ...(live ? { pid: live.pid } : {}),
+    ...(live ? { pid: live.pid, processStartedAt: new Date(live.startedAt).toISOString() } : {}),
     ...(ghostKind ? { ghost: true, ghostKind } : {}),
     ...(!t ? { transcriptMissing: true } : {}),
-    quality: await readQualityCache(id),
+    quality: t?.quality ?? null,
+    ...(t?.version ? { version: t.version } : {}),
     fileHistory,
     prompts: relativizePrompts(t?.prompts ?? [], startedAtMs),
     toolSequence: mergeToolSequences(relativizeToolSequence(t?.toolSequence ?? [], startedAtMs), pluginCache.entries),
@@ -862,6 +890,39 @@ export async function readLimits(now = Date.now()) {
   }
 }
 
+const LIVE_CONTEXT_DIR = join(CLAUDE, "ccblackbox", "live");
+const LIVE_CONTEXT_KEEP_MS = 3 * 86_400_000;
+
+/**
+ * Per-session context / prompt-cache snapshots written by the status line wrapper
+ * (scripts/statusline.mjs), newest first. Snapshots older than 3 days are removed.
+ */
+export async function readLiveContext(now = Date.now()) {
+  let names;
+  try {
+    names = await readdir(LIVE_CONTEXT_DIR);
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const name of names) {
+    if (!/^[a-f0-9-]{36}\.json$/i.test(name)) continue;
+    const file = join(LIVE_CONTEXT_DIR, name);
+    try {
+      const snap = JSON.parse(await readFile(file, "utf8"));
+      if (snap?.v !== 1 || typeof snap.capturedAt !== "number") continue;
+      if (now - snap.capturedAt > LIVE_CONTEXT_KEEP_MS) {
+        await rm(file, { force: true });
+        continue;
+      }
+      out.push(snap);
+    } catch {
+      /* half-written or unreadable: skip */
+    }
+  }
+  return out.sort((a, b) => b.capturedAt - a.capturedAt);
+}
+
 const MODEL_OVERRIDES_FILE = join(CLAUDE, "ccblackbox", "models.json");
 
 /** User pricing overrides; see setModelOverrides in models.mjs. */
@@ -945,6 +1006,7 @@ export function summarizeSession(s) {
     cwd: s.cwd,
     startedAt: s.startedAt,
     durationMs: s.durationMs,
+    longestRunMs: s.longestRunMs,
     model: s.model,
     outcome: s.outcome,
     satisfaction: s.satisfaction,
@@ -968,8 +1030,10 @@ export function summarizeSession(s) {
     clearedInto: s.clearedInto,
     lastEventAt: s.lastEventAt,
     runningTool: s.runningTool ?? null,
+    version: s.version,
+    processStartedAt: s.processStartedAt,
     quality: s.quality
-      ? { score: s.quality.score, grade: s.quality.grade, fillPct: s.quality.fillPct, band: s.quality.band, wasteTokens: s.quality.wasteTokens, signals: [] }
+      ? { score: s.quality.score, grade: s.quality.grade, fillPct: s.quality.fillPct, band: s.quality.band, wasteTokens: s.quality.wasteTokens, compactions: s.quality.compactions, signals: [] }
       : null,
     pluginCapture: s.pluginCapture ?? null,
     // Lightweight time-series fields needed by fleet aggregations

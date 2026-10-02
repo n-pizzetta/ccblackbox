@@ -177,3 +177,22 @@ export const PROJECT_PALETTE = [
   "var(--c-periwinkle)",
 ];
 export const OTHER_COLOR = "var(--c-text-faint)";
+
+let projectOrder = new Map<string, number>();
+
+/**
+ * Call when the session list loads: projects get palette slots in alphabetical order, so a
+ * project keeps its color across ranges and filters, with no collision up to the palette size.
+ */
+export function registerProjects(names: Iterable<string>): void {
+  projectOrder = new Map([...new Set(names)].sort().map((p, i) => [p, i]));
+}
+
+export function projectColor(project: string): string {
+  let idx = projectOrder.get(project);
+  if (idx === undefined) {
+    idx = 0;
+    for (let i = 0; i < project.length; i++) idx = (idx * 31 + project.charCodeAt(i)) >>> 0;
+  }
+  return PROJECT_PALETTE[idx % PROJECT_PALETTE.length];
+}

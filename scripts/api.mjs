@@ -13,7 +13,8 @@ import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import { promises as fsp, watch, existsSync, statSync, createReadStream } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { parseAllSessions, readLimits, summarizeSession } from "./parse-sessions.mjs";
+import { parseAllSessions, readLimits, readLiveContext, summarizeSession } from "./parse-sessions.mjs";
+import { badgeStatePath, computeBadges, loadBadgeState, saveBadgeState } from "./badges.mjs";
 
 // Honors CLAUDE_CONFIG_DIR, like Claude Code.
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
@@ -23,6 +24,7 @@ const FILE_HISTORY = join(CLAUDE, "file-history");
 const META_DIR = join(CLAUDE, "usage-data", "session-meta");
 const META_TRASH = join(META_DIR, ".trash");
 const REPORT_HTML = join(CLAUDE, "usage-data", "report.html");
+const BADGES_FILE = badgeStatePath(CLAUDE);
 
 const SESSION_ID_RE = /^[a-f0-9-]{36}$/i;
 const FILE_NAME_RE = /^[a-f0-9]+@v\d+$/;
@@ -40,7 +42,22 @@ const cache = {
   sessions: [],
   byId: new Map(),
   errors: [],
+  badges: null,
 };
+
+let badgeState = null;
+
+/** Recomputes badges after a parse; the first call creates badges.json (first launch). */
+async function updateBadges(sessions) {
+  try {
+    badgeState ??= await loadBadgeState(BADGES_FILE);
+    const { changed, ...badges } = computeBadges(sessions, badgeState);
+    if (changed) await saveBadgeState(BADGES_FILE, badgeState);
+    cache.badges = badges;
+  } catch (err) {
+    console.error("[ccblackbox] badges error:", err);
+  }
+}
 
 async function runParser() {
   if (parsing) {
@@ -56,6 +73,7 @@ async function runParser() {
     cache.sessions = sessions;
     cache.byId = new Map(sessions.map((s) => [s.id, s]));
     cache.errors = errors;
+    await updateBadges(sessions);
     // Serialize the list once per parse; the ETag lets polling clients get a 304.
     const list = JSON.stringify({ sessions: sessions.map(summarizeSession), errors, models: modelOverrides ?? {} });
     cache.listEtag = `"${createHash("sha1").update(list).digest("base64url")}"`;
@@ -270,9 +288,19 @@ async function handleApi(req, res) {
     }
   }
 
+  if (url === "/api/badges") {
+    res.setHeader("cache-control", "no-store");
+    return sendJson(res, 200, cache.badges ?? { startedAt: null, total: 0, families: [] });
+  }
+
   if (url === "/api/limits") {
     res.setHeader("cache-control", "no-store");
     return sendJson(res, 200, await readLimits());
+  }
+
+  if (url === "/api/live-context") {
+    res.setHeader("cache-control", "no-store");
+    return sendJson(res, 200, await readLiveContext());
   }
 
   if (url === "/api/report-status") {

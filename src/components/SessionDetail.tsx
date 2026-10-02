@@ -1,3 +1,8 @@
+import { LimitsPill } from "./LimitsGauge";
+import { SessionContext } from "./ContextCard";
+import { SessionKpis, TabPreviews } from "./SessionOverview";
+import { freshTokens, useUnit } from "../utils/units";
+import { projectColor } from "../utils/fleetStats";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { createPatch } from "diff";
 import type { Session, SessionQuality, ToolName } from "../types";
@@ -131,7 +136,7 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
           style={{ top: pos.top, left: pos.left }}
         >
           <div className="quality-pop-head">
-            <span className="mono dim">Measured by token-optimizer</span>
+            <span className="mono dim">Measured from the transcript</span>
           </div>
           <div className="quality-pop-top">
             <div>
@@ -254,6 +259,7 @@ export function SessionDetail({
             ) : null}
           </div>
           <div className="detail-toolbar-right">
+            <LimitsPill />
             <button
               className="toolbar-btn"
               onClick={() => downloadSessionHtml(session)}
@@ -317,11 +323,19 @@ export function SessionDetail({
               />
             </div>
             {session.quality && <QualityChip quality={session.quality} />}
+            <span className="proj-pill" style={{ "--pc": projectColor(session.project) } as React.CSSProperties}>{session.project}</span>
+            <span className="detail-meta mono">{modelLabel(session.model)} · {new Date(session.startedAt).toLocaleString()}</span>
           </div>
-          <div className="goal">{session.goal}</div>
+          <div className="goal-row">
+            <div className="goal">{session.goal}</div>
+            <button className="resume-btn" onClick={copyResume} title={resumeCmd}>
+              {resumeCopied ? "✓ Copied" : "Copy resume command"}
+            </button>
+          </div>
         </div>
 
         {session.live && <LiveStatus session={session} />}
+        <SessionContext sessionId={session.id} />
         {(session.clearedFrom || session.clearedInto) && (
           <ClearedBanner session={session} />
         )}
@@ -345,7 +359,7 @@ export function SessionDetail({
 
       <div className="detail-body scrollbar">
         {tab === "overview" && (
-          <OverviewTab session={session} onFocusTools={focusToolsForPrompt} />
+          <OverviewTab session={session} onFocusTools={focusToolsForPrompt} onOpenTab={setTab} />
         )}
         {tab === "tools" && (
           <ToolsTab session={session} focus={toolFocus} onClearFocus={() => setToolFocus(null)} />
@@ -356,7 +370,6 @@ export function SessionDetail({
 
       <div className="detail-footer">
         <span className="mono">
-          {modelLabel(session.model)} ·{" "}
           <button
             className="footer-id-copy"
             onClick={copyResume}
@@ -364,10 +377,9 @@ export function SessionDetail({
             aria-label="Copy claude --resume command"
           >
             {resumeCopied ? "✓ copied" : session.id}
-          </button>{" "}
-          · {new Date(session.startedAt).toLocaleString()}
+          </button>
         </span>
-        <span className="cost tabular">{formatCost(session.costUsd)}</span>
+        <span className="cost tabular" title="API value: what this would cost at API prices">API value {formatCost(session.costUsd)}</span>
       </div>
     </div>
   );
@@ -597,10 +609,13 @@ function GhostBanner({ session }: { session: Session }) {
 function OverviewTab({
   session,
   onFocusTools,
+  onOpenTab,
 }: {
   session: Session;
   onFocusTools: (promptIdx: number, start: number, end: number) => void;
+  onOpenTab: (t: Tab) => void;
 }) {
+  const unit = useUnit();
   const liveEmpty = session.live && (session.timeline?.length ?? 0) === 0;
   const [selectedPrompt, setSelectedPrompt] = useState<number | null>(null);
   const [promptView, setPromptView] = useState<"timeline" | "list">("timeline");
@@ -610,6 +625,11 @@ function OverviewTab({
     ? aggregateByPrompt(session.turns, session.model, prompts)
     : [];
   const totalCost = stats.reduce((a, s) => a + s.cost, 0);
+  /** Per-prompt figure in the chosen unit: fresh tokens, or API value. */
+  const val = (s: PromptStats) => (unit === "tokens" ? freshTokens(s.tokens) : s.cost);
+  const fv = (s: PromptStats) => (unit === "tokens" ? formatTokens(freshTokens(s.tokens)) : formatCost(s.cost));
+  const fmtAxis = (n: number) => (unit === "tokens" ? formatTokens(n) : formatCost(n));
+  const totalVal = stats.reduce((a, s) => a + val(s), 0);
   const rewriteFlagged = stats.filter((s) => s.cacheRewriteFlag);
   const rewriteCost = rewriteFlagged.reduce((a, s) => a + (s.cacheRewriteFlag?.cacheWriteCost ?? 0), 0);
   const maxPromptT = prompts.reduce((a, p) => Math.max(a, p.t), 0);
@@ -634,9 +654,15 @@ function OverviewTab({
     );
   }
 
+  const summaryAddsInfo = !!session.summary && session.summary.trim() !== session.goal.trim();
+
   return (
     <>
-      <div>
+      <div className="overview-grid">
+        <div className="overview-main">
+          <SessionKpis session={session} />
+{summaryAddsInfo && (
+      <div className="d-panel">
         <div className="section-title">
           <span>
             Summary <InfoDot title="Short description of what the session was about. Comes from /insights when it has analyzed the session; otherwise the first user prompt." />
@@ -644,8 +670,8 @@ function OverviewTab({
         </div>
         <p className="summary">{session.summary}</p>
       </div>
-
-      <div>
+)}
+      <div className="d-panel">
         <div className="section-title">
           <span>User prompts</span>
           <div className="prompt-view-toggle">
@@ -663,7 +689,7 @@ function OverviewTab({
             </button>
             <span className="dim mono tabular" style={{ marginLeft: 10 }}>
               {prompts.length} prompts
-              {totalCost > 0 && ` · ${formatCost(totalCost)} total`}
+              {totalVal > 0 && ` · ${fmtAxis(totalVal)} total`}
               {rewriteFlagged.length > 0 && (
                 <span style={{ color: "var(--c-amber)" }}>
                   {" · "}
@@ -677,17 +703,17 @@ function OverviewTab({
           stats.length === 0 ? (
             <div className="placeholder">No cost data captured.</div>
           ) : (() => {
-            const maxCost = Math.max(0.0001, ...stats.map((s) => s.cost));
+            const maxCost = Math.max(0.0001, ...stats.map(val));
             return (
               <>
                 <div className="prompt-chart-wrap">
                   <div className="prompt-chart-axis">
-                    <span className="mono dim tabular">{formatCost(maxCost)}</span>
-                    <span className="mono dim tabular">{formatCost(0)}</span>
+                    <span className="mono dim tabular">{fmtAxis(maxCost)}</span>
+                    <span className="mono dim tabular">0</span>
                   </div>
                   <div className="prompt-chart">
                     {stats.map((s, i) => {
-                      const heightPct = (s.cost / maxCost) * 100;
+                      const heightPct = (val(s) / maxCost) * 100;
                       const isSelected = selectedPrompt === i;
                       const showGap = i > 0 && s.gapBeforeMs >= SESSION_IDLE_GAP_MS;
                       const tc = promptTools[i];
@@ -706,7 +732,7 @@ function OverviewTab({
                             onClick={() => setSelectedPrompt((p) => (p === i ? null : i))}
                             aria-label={`Prompt ${i + 1}`}
                             aria-pressed={isSelected}
-                            title={`#${i + 1} · ${formatCost(s.cost)}${showGap ? ` · ${formatDuration(s.gapBeforeMs)} idle before` : ""} · ${tc} tool${tc === 1 ? "" : "s"}`}
+                            title={`#${i + 1} · ${fv(s)}${showGap ? ` · ${formatDuration(s.gapBeforeMs)} idle before` : ""} · ${tc} tool${tc === 1 ? "" : "s"}`}
                           >
                             {tc > 0 && (
                               <span className="prompt-bar-turn-badge tabular">{tc}</span>
@@ -751,7 +777,7 @@ function OverviewTab({
                   {stats[i] && (
                     <>
                       {" · "}
-                      <span style={{ color: "var(--c-amber)" }}>{formatCost(stats[i].cost)}</span>
+                      <span style={{ color: "var(--c-amber)" }}>{fv(stats[i])}</span>
                       {totalCost > 0 && ` · ${((stats[i].cost / totalCost) * 100).toFixed(1)}% of session`}
                     </>
                   )}
@@ -775,7 +801,7 @@ function OverviewTab({
                 <span>t</span>
                 <span>cat</span>
                 <span className="right">tools</span>
-                <span className="right">$</span>
+                <span className="right">{unit === "tokens" ? "tok" : "$"}</span>
                 <span />
                 <span>preview</span>
                 <span className="right">len</span>
@@ -830,7 +856,7 @@ function OverviewTab({
                         color: stats[i] && stats[i].cost >= 0.5 ? "var(--c-amber)" : "var(--c-text-faint)",
                       }}
                     >
-                      {stats[i] ? formatCost(stats[i].cost) : "—"}
+                      {stats[i] ? fv(stats[i]) : "—"}
                     </span>
                     <span
                       className="prompt-row-warn"
@@ -858,7 +884,7 @@ function OverviewTab({
                           {stats[i] && (
                             <>
                               {" · "}
-                              <span style={{ color: "var(--c-amber)" }}>{formatCost(stats[i].cost)}</span>
+                              <span style={{ color: "var(--c-amber)" }}>{fv(stats[i])}</span>
                               {totalCost > 0 && ` · ${((stats[i].cost / totalCost) * 100).toFixed(1)}% of session`}
                             </>
                           )}
@@ -878,9 +904,11 @@ function OverviewTab({
           )
         )}
       </div>
-
+        </div>
+        <div className="overview-rail">
+          <TabPreviews session={session} onOpenTab={onOpenTab} />
       {session.frictions.length > 0 ? (
-        <div>
+        <div className="d-panel friction-panel">
           <div className="section-title">
             <span>Frictions</span>
             <span className="dim mono" title="LLM-flagged friction points. Count is real; on-timeline positions are approximate.">
@@ -909,6 +937,8 @@ function OverviewTab({
           </div>
         )
       )}
+        </div>
+      </div>
     </>
   );
 }
