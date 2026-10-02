@@ -1,5 +1,6 @@
 import { LimitsPill } from "./LimitsGauge";
 import { SessionContext } from "./ContextCard";
+import { TimelineTab } from "./SessionTimeline";
 import { SessionKpis, TabPreviews } from "./SessionOverview";
 import { freshTokens, useUnit } from "../utils/units";
 import { projectColor } from "../utils/fleetStats";
@@ -191,10 +192,11 @@ interface Props {
   total?: number;
 }
 
-type Tab = "overview" | "tools" | "tokens" | "files";
+type Tab = "overview" | "timeline" | "tools" | "tokens" | "files";
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "overview", label: "Overview" },
+  { id: "timeline", label: "Timeline" },
   { id: "tools", label: "Tools" },
   { id: "tokens", label: "Tokens" },
   { id: "files", label: "Files" },
@@ -361,6 +363,7 @@ export function SessionDetail({
         {tab === "overview" && (
           <OverviewTab session={session} onFocusTools={focusToolsForPrompt} onOpenTab={setTab} />
         )}
+        {tab === "timeline" && <TimelineTab session={session} onFocusTools={focusToolsForPrompt} />}
         {tab === "tools" && (
           <ToolsTab session={session} focus={toolFocus} onClearFocus={() => setToolFocus(null)} />
         )}

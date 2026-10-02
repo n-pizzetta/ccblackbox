@@ -6,6 +6,11 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Session **Timeline** tab: context fill, cumulative API value and fresh tokens per turn over time, with compactions, prompts and failed tool calls marked. Updates while a session runs.
+- Demo data (`pnpm seed:demo`) now includes compactions and failed tool calls.
+
 ### Planned
 
 - Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
