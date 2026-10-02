@@ -2,9 +2,24 @@
 
 All notable changes to `ccblackbox` are tracked here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loosely;
-versioning follows [SemVer](https://semver.org/) once published.
+versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
+
+### Planned
+
+- Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
+- Sub-Agent Tree component.
+- Cross-Session Patterns component.
+- Delta vs `~/.claude/usage-data/report.html` view.
+- Tests: parser unit tests around `mapFrictions`, `linkClearedChains`,
+  `reassignLiveToChainTail`, plugin-cache merge.
+- CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
+  macOS/Linux).
+- Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
+  with mtime invalidation, so cold start doesn't re-parse the full set.
+
+## [0.2.0] — 2026-10-02
 
 ### Security
 
@@ -144,19 +159,6 @@ versioning follows [SemVer](https://semver.org/) once published.
   limits Claude Code reports to the status line.
 - Fixed all ESLint errors (React hooks purity / set-state-in-effect rules,
   typed Vite dev middleware).
-
-### Planned
-
-- Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
-- Sub-Agent Tree component.
-- Cross-Session Patterns component.
-- Delta vs `~/.claude/usage-data/report.html` view.
-- Tests: parser unit tests around `mapFrictions`, `linkClearedChains`,
-  `reassignLiveToChainTail`, plugin-cache merge.
-- CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
-  macOS/Linux).
-- Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
-  with mtime invalidation, so cold start doesn't re-parse the full set.
 
 ## [0.1.0] — 2026-04-28
 
