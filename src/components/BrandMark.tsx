@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-/** Black box with a session trace and a recording light. Mirrors public/favicon.svg. */
+/** Black box with a session trace. Mirrors public/favicon.svg. */
 export function BrandMark({ size = 28 }: { size?: number }) {
   const g = useId();
   return (
@@ -14,13 +14,12 @@ export function BrandMark({ size = 28 }: { size?: number }) {
       <rect x="4" y="4" width="56" height="56" rx="15" fill="var(--c-bg)" stroke={`url(#${g})`} strokeWidth="3.5" />
       <path
         className="brand-mark-trace"
-        d="M13 37h8l4.5-14 6 21 4.5-13 3 6h12"
+        d="M13 35.5h8l4.5-14 6 21 4.5-13 3 6h12"
         stroke={`url(#${g})`}
         strokeWidth="4"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle className="brand-mark-rec" cx="47" cy="17" r="4.5" fill="var(--c-red)" />
     </svg>
   );
 }
