@@ -1,0 +1,61 @@
+/* ---- Session timeline tab ---- */
+.tl-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.tl-kpi { border: 1px solid var(--c-hairline); border-radius: var(--radius-lg); padding: 12px 14px; display: grid; gap: 4px; min-width: 0; }
+.tl-kpi-l { font-size: var(--fs-sm); color: var(--c-text-dim); }
+.tl-kpi-v { font-size: 20px; font-weight: 600; color: var(--c-text); line-height: 1.1; }
+.tl-kpi-v.amber { color: var(--c-amber); }
+.tl-kpi-v.red { color: var(--c-red); }
+.tl-kpi-s { font-size: var(--fs-xs); color: var(--c-text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.tl-head { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.tl-live { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 500; color: var(--c-green); }
+.tl-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--c-green); animation: tl-pulse 1.6s ease-in-out infinite; }
+@keyframes tl-pulse { 50% { opacity: .35; } }
+.tl-legend { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-xs); font-weight: 400; color: var(--c-text-faint); }
+.tl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tl-legend .sw { width: 10px; height: 3px; border-radius: 2px; }
+.sw.ctx { background: var(--c-violet); }
+.sw.cost { background: var(--c-green); }
+.sw.fresh { background: var(--c-cyan); height: 8px !important; width: 4px !important; }
+.sw.agent { background: var(--c-violet-dim); height: 8px !important; width: 4px !important; }
+.sw.err { background: var(--c-red); height: 9px !important; width: 2px !important; }
+.sw.compact { background: none; border-left: 2px dashed var(--c-amber); height: 10px !important; width: 0 !important; }
+
+.tl-wrap { position: relative; }
+.tl-svg { display: block; overflow: visible; font-family: var(--f-mono); }
+.tl-lane { font-family: var(--f-ui); font-size: var(--fs-sm); fill: var(--c-text-dim); }
+.tl-y, .tl-x { font-size: var(--fs-xs); fill: var(--c-text-faint); font-variant-numeric: tabular-nums; }
+.tl-y { text-anchor: end; }
+.tl-x { text-anchor: middle; }
+.tl-grid { stroke: var(--c-hairline); stroke-width: 1; }
+.tl-gap rect { fill: var(--c-bg-elevated); opacity: .55; }
+.tl-watch { fill: var(--c-amber); opacity: .05; }
+.tl-watch-line { stroke: var(--c-amber); stroke-dasharray: 3 4; opacity: .55; }
+.tl-watch-label { font-size: var(--fs-xs); fill: var(--c-amber); opacity: .8; text-anchor: end; }
+.tl-ctx { fill: none; stroke: var(--c-violet); stroke-width: 1.75; stroke-linejoin: round; }
+.tl-ctx-area { fill: var(--c-violet); opacity: .12; }
+.tl-compact line { stroke: var(--c-amber); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.tl-cost { fill: none; stroke: var(--c-green); stroke-width: 1.75; stroke-linejoin: round; }
+.tl-end { font-size: var(--fs-xs); fill: var(--c-text-dim); font-variant-numeric: tabular-nums; }
+.tl-end.ctx { fill: var(--c-violet); }
+.tl-end.cost { fill: var(--c-green); }
+.tl-bar { fill: var(--c-cyan); opacity: .85; }
+.tl-bar.agent { fill: var(--c-violet-dim); opacity: 1; }
+.tl-tool { stroke: var(--c-cyan-dim); stroke-width: 1.5; }
+.tl-tool.err { stroke: var(--c-red); stroke-width: 2; }
+.tl-prompt { cursor: pointer; }
+.tl-prompt rect { fill: var(--c-violet); }
+.tl-prompt:hover rect, .tl-prompt:focus-visible rect { fill: var(--c-text); }
+.tl-prompt:focus { outline: none; }
+.tl-cross { stroke: var(--c-text-faint); stroke-width: 1; pointer-events: none; }
+
+.tl-tip { position: absolute; transform: translateX(12px); pointer-events: none; min-width: 190px; padding: 10px 12px; display: grid; gap: 4px; font-size: var(--fs-sm); color: var(--c-text-dim); background: var(--c-bg-elevated); border: 1px solid var(--c-hairline-strong); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.4); z-index: 2; }
+.tl-tip.left { transform: translateX(calc(-100% - 12px)); }
+.tl-tip > div:not(.tl-tip-t):not(.tl-tip-tools) { display: flex; justify-content: space-between; gap: 14px; }
+.tl-tip b { color: var(--c-text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.tl-tip-t { color: var(--c-text); font-size: var(--fs-xs); }
+.tl-tip-tools { font-size: var(--fs-xs); color: var(--c-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+.tl-note { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--c-text-faint); }
+
+@media (max-width: 900px) { .tl-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .tl-live i { animation: none; } }

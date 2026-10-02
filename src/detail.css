@@ -20,7 +20,7 @@
 /* one flat background for every tab (same as the header); cards are outlined, not filled */
 .detail-body { background: var(--c-bg-panel); gap: 18px; padding: 20px var(--detail-pad, 24px) 28px; }
 .d-panel,
-.detail-body > div:not(.overview-grid):not(.overview-kpis):not(.live-empty):not(.clean-row):not(.placeholder) {
+.detail-body > div:not(.overview-grid):not(.overview-kpis):not(.live-empty):not(.clean-row):not(.placeholder):not(.tl-kpis) {
   background: transparent;
   border: 1px solid var(--c-hairline);
   border-radius: var(--radius-lg);
