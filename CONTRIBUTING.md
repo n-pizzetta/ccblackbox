@@ -23,19 +23,55 @@ CLAUDE_CONFIG_DIR="$PWD/.demo-claude" pnpm dev   # or pnpm serve
 
 `CLAUDE_CONFIG_DIR` is Claude Code's own variable for relocating `~/.claude`; the parser, API, hook and status line all honor it. Extend [`scripts/seed-demo.mjs`](scripts/seed-demo.mjs) when you need a new shape of data (a tool, a model, an edge case).
 
+## How changes ship
+
+The plugin marketplace points at this repository (`"source": "./"`), so **every merge to `main` reaches users** on their next plugin update. There is no staging branch: `main` must always be releasable.
+
+- Work on a short-lived branch created from an up-to-date `origin/main` (`git fetch && git switch -c fix/my-change origin/main`).
+- Pull requests are **squash-merged**: one PR becomes one commit on `main`.
+- Anything not ready for users stays out of `main`: keep it on your branch, or behind an option that is off by default.
+
 ## Before opening a pull request
 
 ```sh
 pnpm lint
 pnpm typecheck
+pnpm test
 pnpm build
 ```
 
-All three must pass. There are no automated tests yet: say in the PR how you checked the change (demo data, a specific transcript shape, a screenshot for UI changes).
+All four must pass; CI runs the same checks. `pnpm test` runs the parser against the `pnpm seed:demo` data (`tests/`). If you change the parser, add a case there, extending `scripts/seed-demo.mjs` if the shape you need is missing. Also say in the PR how you checked the change (demo data, a specific transcript shape, a screenshot for UI changes).
 
-- **`dist/` is committed.** The Claude Code plugin ships the prebuilt UI straight from the repo. If you change anything under `src/`, run `pnpm build` and commit `dist/` in a separate `build: rebuild dist` commit.
-- **Commits** follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): message`, lowercase, imperative, no period (`fix(parser): skip synthetic messages`).
+- **PR titles** follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): message`, lowercase, imperative, no period (`fix(parser): skip synthetic messages`). The title becomes the commit on `main` and the source of the changelog, so it is the one that matters; commits inside the branch are squashed away.
+- **`dist/` is committed.** The plugin ships the prebuilt UI straight from the repo. If you change anything under `src/`, run `pnpm build` and commit `dist/` in the same PR. CI fails if `dist/` doesn't match the sources.
+- **Add a line to `CHANGELOG.md`** under `[Unreleased]` for anything a user would notice.
 - **Keep PRs focused.** One fix or feature per PR; a refactor goes in its own PR.
+
+### Conflicts on `dist/`
+
+Every PR that touches `src/` regenerates `dist/`, so two such PRs open at the same time will conflict there. Never resolve `dist/` by hand: take `main`'s version, then rebuild.
+
+```sh
+git fetch && git rebase origin/main
+# on a conflict in dist/:
+git checkout origin/main -- dist/
+pnpm build && git add dist/ && git rebase --continue
+git push --force-with-lease
+```
+
+Resolve conflicts in `src/` normally first; `pnpm build` must run on the final sources.
+
+## Releases
+
+Maintainers cut releases from `main`; contributors don't need to bump anything. Claude Code compares the `version` field of `.claude-plugin/plugin.json` to detect plugin updates, so every release bumps it.
+
+1. Open a `chore(release): vX.Y.Z` PR that sets the same version in `.claude-plugin/plugin.json` and `package.json` ([SemVer](https://semver.org/)), and moves the `[Unreleased]` entries of `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`.
+2. Once it is merged, tag that commit and publish the GitHub release with the changelog section as notes:
+
+   ```sh
+   git fetch && git tag vX.Y.Z origin/main && git push origin vX.Y.Z
+   gh release create vX.Y.Z --title vX.Y.Z --notes-file notes.md   # notes.md: the CHANGELOG section
+   ```
 
 ## Where things live
 
