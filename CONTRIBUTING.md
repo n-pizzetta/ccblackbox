@@ -25,7 +25,10 @@ CLAUDE_CONFIG_DIR="$PWD/.demo-claude" pnpm dev   # or pnpm serve
 
 ## How changes ship
 
-The plugin marketplace points at this repository (`"source": "./"`), so **every merge to `main` reaches users** on their next plugin update. There is no staging branch: `main` must always be releasable.
+The plugin marketplace points at this repository (`"source": "./"`), with no staging branch, so `main` must always be releasable:
+
+- **New installs** clone `main` as it is, whatever the version says.
+- **Existing users** only update when the `version` in `.claude-plugin/plugin.json` changes ([Claude Code keeps the cached copy until then](https://code.claude.com/docs/en/plugins/loading.md#how-claude-code-computes-the-version)). A release then ships everything merged since the last one.
 
 - Work on a short-lived branch created from an up-to-date `origin/main` (`git fetch && git switch -c fix/my-change origin/main`).
 - Pull requests are **squash-merged**: one PR becomes one commit on `main`.
@@ -63,7 +66,7 @@ Resolve conflicts in `src/` normally first; `pnpm build` must run on the final s
 
 ## Releases
 
-Maintainers cut releases from `main`; contributors don't need to bump anything. Claude Code compares the `version` field of `.claude-plugin/plugin.json` to detect plugin updates, so every release bumps it.
+Maintainers cut releases from `main`; contributors don't need to bump anything. Existing users get nothing until `version` changes, so every release bumps it.
 
 1. Open a `chore(release): vX.Y.Z` PR that sets the same version in `.claude-plugin/plugin.json` and `package.json` ([SemVer](https://semver.org/)), and moves the `[Unreleased]` entries of `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`.
 2. Once it is merged, tag that commit and publish the GitHub release with the changelog section as notes:
