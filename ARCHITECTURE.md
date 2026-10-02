@@ -40,7 +40,7 @@ There is no database, no network access beyond loopback, and no runtime dependen
                          ▼
       src/App.tsx ─┬─ TopBar/StatsRow · SessionList (+ SessionFilters)
                    ├─ FleetDashboard (fleet/*)  or  SessionCompare
-                   └─ SessionDetail overlay (Overview · Tools · Tokens · Files)
+                   └─ SessionDetail overlay (Overview · Timeline · Tools · Tokens · Files)
 ```
 
 ---
@@ -271,7 +271,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 | `SessionList` | Filtered list, search, compare-mode selection, bulk ghost delete bar. |
 | `FleetDashboard` | Right pane when not comparing; composes `fleet/*`. |
 | `SessionCompare` | Side-by-side metrics for selected sessions. |
-| `SessionDetail` | Full-screen overlay: header (outcome, project, model, "Copy resume command", export), a context / cache banner (`ContextCard`), live / cleared-chain / ghost banners (reveal, delete), and four tabs: **Overview** (headline tiles from `SessionOverview`, then two columns: prompts timeline / list in the chosen usage unit on the left, frictions and small previews of the Tools, Tokens and Files tabs with "See all" links on the right; the summary is hidden when it repeats the goal), **Tools** (tool counts and sequence with results, can be focused on one prompt), **Tokens** (per-prompt and per-turn cost breakdown), **Files** (file-history versions with diffs via `diff`). |
+| `SessionDetail` | Full-screen overlay: header (outcome, project, model, "Copy resume command", export), a context / cache banner (`ContextCard`), live / cleared-chain / ghost banners (reveal, delete), and five tabs: **Overview** (headline tiles from `SessionOverview`, then two columns: prompts timeline / list in the chosen usage unit on the left, frictions and small previews of the Tools, Tokens and Files tabs with "See all" links on the right; the summary is hidden when it repeats the goal), **Timeline** (`SessionTimeline`, data from `src/utils/sessionTimeline.ts`: context fill per main-thread turn against a 200k or 1M window, compactions detected as a drop below half of the previous context, cumulative API value, fresh tokens per turn, prompts and tool calls with failures; idle gaps over 5 minutes are shortened; clicking a prompt focuses the Tools tab on it), **Tools** (tool counts and sequence with results, can be focused on one prompt), **Tokens** (per-prompt and per-turn cost breakdown), **Files** (file-history versions with diffs via `diff`). |
 | `HelpOverlay` | Keyboard shortcuts. |
 
 `fleet/`: `FleetDashboard` has two tabs (**Rankings** and **Analysis**; the choice is kept in `localStorage`, `ccblackbox:fleet-tab`). Rankings: `HeroBanner`, `TopSessions` (podium, `FireCanvas`), `Badges`, `ProjectRollup`. Analysis: `LiveTicker` (one line of live burn) and `FiveHourSession` (current 5h window, per-session / prompt share; all sessions, ignoring filters), then `AnomalyFlags`, `ModelMix`, `ToolsHeatmap`, `HeavyPrompts`, `TokenTimeSeries` (in the selected range). `BurnSpikeBanner` + `SpikeAnalysisOverlay` + `SpikeHeuristics` sit above the tabs.

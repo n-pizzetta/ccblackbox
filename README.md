@@ -13,7 +13,7 @@ The data is already on your disk. Nothing visualizes it. This does.
 ## Features
 
 - **Session list**: filterable (live / ghost / friction / failed / low-quality), keyboard-navigable (`j`/`k`).
-- **Session replay**: turn-by-turn view of prompts, tool calls and file diffs (versioned via `~/.claude/file-history/`), plus quality signals and a friction breakdown. Every session can be exported as a self-contained HTML snapshot.
+- **Session replay**: turn-by-turn view of prompts, tool calls and file diffs (versioned via `~/.claude/file-history/`), plus quality signals and a friction breakdown. A **Timeline** tab plots context fill, cumulative API value and tokens per turn over the session, with compactions, prompts and failed tool calls marked; it keeps updating while the session runs. Every session can be exported as a self-contained HTML snapshot.
 - **Session compare**: side-by-side metrics for several sessions, with min/max highlighting.
 - **Fleet dashboard**: token time series, model mix, top sessions, project rollup, tools heatmap, anomaly flags, and a 5-hour window view with your real 5h / 7-day usage limits, spike alerts and drill-down.
 - **Live view**: active sessions show up in real time, with the running tool, current burn rate and a sparkline of recent turns.
@@ -108,7 +108,7 @@ The dev server and `scripts/serve.mjs` mount the same API (`scripts/api.mjs`): i
                   ▼ fetch
    React 19 SPA (hash routing)
    ├─ StatsStrip / SessionList / SessionFilters
-   ├─ SessionDetail (Overview / Tools / Tokens / Files)
+   ├─ SessionDetail (Overview / Timeline / Tools / Tokens / Files)
    ├─ SessionCompare
    └─ FleetDashboard (src/components/fleet/)
 ```
