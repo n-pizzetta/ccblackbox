@@ -8,7 +8,8 @@
  * Install copies statusline.mjs (and its helper context-advice.mjs) to a stable path (~/.claude/ccblackbox/, so
  * plugin updates don't break settings.json), saves the current `statusLine`
  * setting to ~/.claude/ccblackbox/statusline.json and points `statusLine` at
- * the wrapper, which keeps rendering the previous status line.
+ * the wrapper, which keeps rendering the previous status line. It also sets
+ * `statusLine.refreshInterval` (unless already set) so the line updates while idle.
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -59,6 +60,12 @@ function removeState() {
   rmSync(join(DIR, "live"), { recursive: true, force: true });
 }
 
+/**
+ * Claude Code only re-runs the status line on events (a message, a turn), so an idle session
+ * would show a frozen cache countdown. Re-run it on a timer too; a value the user set is kept.
+ */
+const REFRESH_INTERVAL = 30;
+
 const isOurs = (statusLine) => typeof statusLine?.command === "string" && statusLine.command.includes(TARGET);
 
 function install() {
@@ -68,12 +75,22 @@ function install() {
 
   const settings = readSettings();
   if (isOurs(settings.statusLine)) {
+    if (settings.statusLine.refreshInterval === undefined) {
+      settings.statusLine.refreshInterval = REFRESH_INTERVAL;
+      writeSettings(settings);
+      console.log(`[ccblackbox] status line now refreshes every ${REFRESH_INTERVAL}s, so the cache countdown keeps moving while idle.`);
+    }
     console.log(`[ccblackbox] status line already installed; wrapper refreshed at ${TARGET}`);
     return;
   }
   const previous = settings.statusLine ?? null;
   writeFileSync(STATE, JSON.stringify({ previous }, null, 2) + "\n");
-  settings.statusLine = { ...(previous ?? {}), type: "command", command: `node "${TARGET}"` };
+  settings.statusLine = {
+    refreshInterval: REFRESH_INTERVAL,
+    ...(previous ?? {}),
+    type: "command",
+    command: `node "${TARGET}"`,
+  };
   writeSettings(settings);
   console.log(
     `[ccblackbox] status line installed. ` +
