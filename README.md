@@ -42,7 +42,7 @@ Turn-by-turn view of prompts, tool calls and file diffs (versioned via `~/.claud
 
 ### Timeline
 
-Context fill, cumulative API value and tokens per turn, with compactions, prompts and failed tool calls marked. Hover any turn for its numbers; it keeps updating while the session runs.
+Context fill, cumulative API value and tokens per turn, with compactions, prompts and failed tool calls marked. Hover any turn for its numbers, or click a prompt marker to see the tool calls it triggered.
 
 </td>
 <td width="60%">
