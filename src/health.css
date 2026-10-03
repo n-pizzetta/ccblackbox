@@ -82,3 +82,7 @@
   color: inherit;
   border-color: var(--c-text-faint);
 }
+
+/* score in the checklist heading */
+.health-score { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 400; color: var(--c-text-dim); }
+.health-score svg { flex: none; }

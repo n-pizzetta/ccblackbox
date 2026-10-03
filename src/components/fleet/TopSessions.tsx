@@ -9,6 +9,7 @@ interface Props {
   sessions: Session[];
   onSelectSession: (id: string) => void;
   limit?: number;
+  title?: string;
 }
 
 const PLACE_CLASS = ["first", "second", "third"];
@@ -29,7 +30,7 @@ function formatValue(c: Category, v: number): string {
   }
 }
 
-export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
+export function TopSessions({ sessions, onSelectSession, limit = 10, title = "Top sessions" }: Props) {
   const [category, setCategory] = useState<Category>("tokens");
   const ranked = useMemo(() => rankSessions(sessions, category, limit), [sessions, category, limit]);
   const podium = ranked.slice(0, 3);
@@ -40,7 +41,7 @@ export function TopSessions({ sessions, onSelectSession, limit = 10 }: Props) {
   return (
     <div className="fleet-block podium-block">
       <div className="section-title">
-        <span>Top sessions</span>
+        <span>{title}</span>
         <div className="podium-tabs" role="group" aria-label="Ranking category">
           {CATEGORIES.map((c) => (
             <button

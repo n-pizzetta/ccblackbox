@@ -4,7 +4,7 @@ import { activityStreak, levelOf } from "../utils/gamify";
 import { formatTokens } from "../utils/format";
 import { LimitsSection } from "./LimitsSection";
 import { UnitSetting } from "./UnitSetting";
-import { openDashboardTab } from "../utils/openTab";
+import type { Page } from "../utils/pages";
 
 const BUG_URL = "https://github.com/n-pizzetta/ccblackbox/issues/new/choose";
 
@@ -15,14 +15,15 @@ interface Props {
   parsedAgo: string;
   reportStatus: { exists: boolean };
   onHelp: () => void;
+  onOpenPage: (page: Page) => void;
 }
 
 /**
  * Top-bar profile chip (level, streak, data status) and its menu: progress,
- * shortcuts to Health and Rankings, display settings, data status and help.
+ * the Badges page and Health, display settings, data status and help.
  * Replaces the settings gear, the live-data chip, the report link and the ? button.
  */
-export function ProfileMenu({ allSessions, source, parsedAgo, reportStatus, onHelp }: Props) {
+export function ProfileMenu({ allSessions, source, parsedAgo, reportStatus, onHelp, onOpenPage }: Props) {
   const [open, setOpen] = useState(false);
   const popRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -50,8 +51,8 @@ export function ProfileMenu({ allSessions, source, parsedAgo, reportStatus, onHe
     };
   }, [open]);
 
-  const openTab = (tab: "rankings" | "health") => {
-    openDashboardTab(tab);
+  const openPage = (page: Page) => {
+    onOpenPage(page);
     setOpen(false);
   };
 
@@ -86,11 +87,11 @@ export function ProfileMenu({ allSessions, source, parsedAgo, reportStatus, onHe
           </div>
 
           <div className="profile-links">
-            <button className="profile-link" onClick={() => openTab("health")}>
-              <span>Health check</span><span aria-hidden="true">→</span>
+            <button className="profile-link" onClick={() => openPage("badges")}>
+              <span>Badges and records</span><span aria-hidden="true">→</span>
             </button>
-            <button className="profile-link" onClick={() => openTab("rankings")}>
-              <span>Badges and rankings</span><span aria-hidden="true">→</span>
+            <button className="profile-link" onClick={() => openPage("health")}>
+              <span>Health check</span><span aria-hidden="true">→</span>
             </button>
             {reportStatus.exists ? (
               <a className="profile-link" href="/usage-report.html" target="_blank" rel="noreferrer">

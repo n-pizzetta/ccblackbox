@@ -1,20 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
 import { BrandMark } from "./components/BrandMark";
-import { SessionFilters, type FilterId } from "./components/SessionFilters";
-import { TopBar, StatsRow, type ReportStatus } from "./components/StatsStrip";
-import { SessionList } from "./components/SessionList";
+import { type FilterId } from "./components/SessionFilters";
+import { AppHeader, type ReportStatus } from "./components/AppHeader";
+import { ScopeBar } from "./components/ScopeBar";
+import { StatsRow } from "./components/StatsStrip";
+import { sortSessions, type Sort } from "./utils/sortSessions";
 import { SessionDetail } from "./components/SessionDetail";
-import { SessionCompare } from "./components/SessionCompare";
-import { FleetDashboard } from "./components/FleetDashboard";
 import { HelpOverlay } from "./components/HelpOverlay";
+import { BurnSpikeBanner } from "./components/fleet/BurnSpikeBanner";
+import { SpikeAnalysisOverlay } from "./components/fleet/SpikeAnalysisOverlay";
+import { NowPage } from "./pages/NowPage";
+import { SessionsPage } from "./pages/SessionsPage";
+import { UsagePage } from "./pages/UsagePage";
+import { HealthPage } from "./pages/HealthPage";
+import { BadgesPage } from "./pages/BadgesPage";
 import { loadSessions, loadSessionDetail } from "./data/loadSessions";
 import type { Session } from "./types";
 import type { Range } from "./utils/range";
 import { filterByRange, scopeToRange } from "./utils/range";
 import { registerProjects } from "./utils/fleetStats";
+import { healthReport } from "./utils/healthRules";
+import { useRateLimits } from "./utils/rateLimits";
+import { useBurnTracker, type Spike } from "./utils/burnTracker";
+import { useUnit } from "./utils/units";
+import { NAV_PAGES, PAGE_IDS, SCOPED_PAGES, type Page } from "./utils/pages";
+import "./gamify.css";
 import "./App.css";
 import "./shell.css";
 import "./detail.css";
+import "./layout.css";
 import { Toaster } from "./components/Toaster";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { toastError } from "./utils/toast";
@@ -26,8 +40,10 @@ const FILTER_IDS: FilterId[] = ["all", "live", "ghost", "friction", "failed", "l
 const RANGE_IDS: Range[] = ["today", "7d", "30d", "all"];
 /** Sessions that can be compared side by side. Not applied to the ghost bulk-delete selection. */
 const MAX_COMPARE = 3;
+const DEFAULT_SORT: Sort = { key: "started", dir: "desc" };
 
 interface PersistedState {
+  page: Page;
   id: string | null;
   range: Range;
   filter: FilterId;
@@ -35,6 +51,7 @@ interface PersistedState {
   search: string;
 }
 
+/** `#<page>?query` or `#session/<id>?query`; the Now page has no path. */
 function parseHash(): Partial<PersistedState> {
   const raw = window.location.hash.replace(/^#/, "");
   if (!raw) return {};
@@ -42,6 +59,8 @@ function parseHash(): Partial<PersistedState> {
   const out: Partial<PersistedState> = {};
   const m = path.match(/^session\/([a-f0-9-]{36})$/i);
   if (m) out.id = m[1];
+  else if ((PAGE_IDS as string[]).includes(path)) out.page = path as Page;
+  else if (path === "") out.page = "now";
   if (query) {
     const params = new URLSearchParams(query);
     const r = params.get("range");
@@ -73,10 +92,10 @@ function writeHash(state: PersistedState) {
   if (state.project) params.set("project", state.project);
   if (state.search) params.set("q", state.search);
   const qs = params.toString();
-  const path = state.id ? `#session/${state.id}` : "";
-  const next = `${path}${qs ? (path ? "?" : "#?") + qs : ""}`;
-  if (window.location.hash !== next) {
-    const full = next || window.location.pathname + window.location.search;
+  const path = state.id ? `session/${state.id}` : state.page !== "now" ? state.page : "";
+  const hash = path || qs ? `#${path}${qs ? `?${qs}` : ""}` : "";
+  if (window.location.hash !== hash) {
+    const full = hash || window.location.pathname + window.location.search;
     window.history.replaceState(null, "", full);
   }
 }
@@ -87,22 +106,29 @@ function App() {
   const [source, setSource] = useState<"real" | "mock" | "loading">("loading");
   const [generatedAt, setGeneratedAt] = useState<string | undefined>();
   const [parseErrors, setParseErrors] = useState<string[] | undefined>();
+  const [page, setPage] = useState<Page>(initial.page && PAGE_IDS.includes(initial.page) ? initial.page : "now");
   const [selectedId, setSelectedIdInternal] = useState<string | null>(initial.id ?? null);
   const [filter, setFilter] = useState<FilterId>(initial.filter ?? "all");
   const [projectFilter, setProjectFilter] = useState<string | null>(initial.project ?? null);
   const [range, setRange] = useState<Range>(initial.range ?? "7d");
   const [search, setSearch] = useState(initial.search ?? "");
-  const [dashboardZoomed, setDashboardZoomed] = useState(false);
+  const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
   const [helpOpen, setHelpOpen] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [compareIds, setCompareIds] = useState<Set<string>>(new Set());
   const [reportStatus, setReportStatus] = useState<ReportStatus>({ exists: false });
+  const [analysisSpike, setAnalysisSpike] = useState<Spike | null>(null);
+  const unit = useUnit();
+  const limits = useRateLimits();
+  /** Sessions that count against the Claude usage limits: 5h window, burn rate, spikes. Codex has its own. */
+  const limitSessions = useMemo(() => allSessions.filter((s) => s.agent !== "codex"), [allSessions]);
+  const burn = useBurnTracker(limitSessions, limits);
 
   useEffect(() => {
-    const state: PersistedState = { id: selectedId, range, filter, project: projectFilter, search };
+    const state: PersistedState = { page, id: selectedId, range, filter, project: projectFilter, search };
     writeHash(state);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
-  }, [selectedId, range, filter, projectFilter, search]);
+  }, [page, selectedId, range, filter, projectFilter, search]);
 
   /** Leaving the ghost filter with a bigger selection than a comparison can hold trims it. */
   const changeFilter = (f: FilterId) => {
@@ -110,14 +136,10 @@ function App() {
     if (f !== "ghost") setCompareIds((prev) => (prev.size > MAX_COMPARE ? new Set([...prev].slice(0, MAX_COMPARE)) : prev));
   };
 
-  const toggleDashboardZoom = () => {
-    const next = !dashboardZoomed;
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
-    if (typeof doc.startViewTransition === "function") {
-      doc.startViewTransition(() => setDashboardZoomed(next));
-    } else {
-      setDashboardZoomed(next);
-    }
+  const resetFilters = () => {
+    changeFilter("all");
+    setProjectFilter(null);
+    setSearch("");
   };
 
   const setSelectedId = (id: string | null) => {
@@ -129,6 +151,7 @@ function App() {
       const parsed = parseHash();
       const next = parsed.id ?? null;
       if (next !== selectedId) setSelectedIdInternal(next);
+      if (parsed.page) setPage(parsed.page);
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -172,7 +195,7 @@ function App() {
   const inRange = useMemo(() => filterByRange(allSessions, range), [range, allSessions]);
 
   const q = search.trim().toLowerCase();
-  const filtered = inRange.filter((s) => {
+  const unsorted = useMemo(() => inRange.filter((s) => {
     if (projectFilter && s.project !== projectFilter) return false;
     if (q) {
       const hay = `${s.goal} ${s.project} ${s.summary}`.toLowerCase();
@@ -186,9 +209,16 @@ function App() {
     if (filter === "codex") return s.agent === "codex";
     if (filter === "claude") return s.agent !== "codex";
     return true;
-  });
+  }), [inRange, projectFilter, q, filter]);
+  // The table order is also the ↑ / ↓ order inside a session.
+  const filtered = useMemo(() => sortSessions(unsorted, sort, unit), [unsorted, sort, unit]);
   // Aggregates only count what was spent inside the range (per turn).
   const scopedFiltered = useMemo(() => scopeToRange(filtered, range), [filtered, range]);
+  const healthIssues = useMemo(
+    () => healthReport(scopedFiltered, allSessions).rules.filter((r) => r.status === "fail" || r.status === "warn").length,
+    [scopedFiltered, allSessions],
+  );
+  const activeFilterCount = (filter !== "all" ? 1 : 0) + (projectFilter ? 1 : 0) + (search ? 1 : 0);
 
   const selectedSummary: Session | null = selectedId
     ? filtered.find((s) => s.id === selectedId) ??
@@ -236,10 +266,10 @@ function App() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-      if (e.altKey || (e.metaKey && e.key !== "f") || (e.ctrlKey && e.key !== "f")) return;
+      if (e.altKey || e.metaKey || e.ctrlKey) return;
       const isNav = e.key === "ArrowDown" || e.key === "j" || e.key === "ArrowUp" || e.key === "k";
       if (isNav) {
-        // only hijack arrows while a session is open, so the dashboard can still scroll
+        // only hijack arrows while a session is open, so pages can still scroll
         if (!selectedId || helpOpen) return;
         e.preventDefault();
         navigate(e.key === "ArrowDown" || e.key === "j" ? "next" : "prev");
@@ -247,11 +277,10 @@ function App() {
       else if (e.key === "Escape") {
         if (helpOpen) return;
         if (selectedId) setSelectedId(null);
-        else if (dashboardZoomed) toggleDashboardZoom();
       }
-      else if (e.key === "f" && (e.metaKey || e.ctrlKey) && !selectedId) {
-        e.preventDefault();
-        toggleDashboardZoom();
+      else if (/^[1-9]$/.test(e.key) && !selectedId && !helpOpen) {
+        const target = NAV_PAGES[Number(e.key) - 1];
+        if (target) setPage(target.id);
       }
       else if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
         e.preventDefault();
@@ -261,7 +290,7 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIdx, filtered.length, dashboardZoomed, selectedId, helpOpen]);
+  }, [selectedIdx, filtered.length, selectedId, helpOpen]);
 
   if (source === "loading") {
     return (
@@ -274,48 +303,71 @@ function App() {
     );
   }
 
-  const sessionOpen = !!selected;
+  const scoped = SCOPED_PAGES.has(page);
 
   return (
-    <div className={`app ${sessionOpen ? "session-overlay" : ""} ${dashboardZoomed && !sessionOpen ? "dashboard-zoomed" : ""}`}>
-      <main className="main scrollbar">
-        <TopBar
-          allSessions={allSessions}
+    <div className="app">
+      <AppHeader
+        page={page}
+        onPageChange={setPage}
+        sessionCount={filtered.length}
+        healthIssues={healthIssues}
+        allSessions={allSessions}
+        source={source}
+        generatedAt={generatedAt}
+        reportStatus={reportStatus}
+        parseErrors={parseErrors}
+        onHelp={() => setHelpOpen(true)}
+      />
+      {scoped && (
+        <ScopeBar
           range={range}
           onRangeChange={setRange}
-          source={source}
-          generatedAt={generatedAt}
-          activeFilterCount={
-            (filter !== "all" ? 1 : 0) +
-            (projectFilter ? 1 : 0) +
-            (search ? 1 : 0)
-          }
-          onClearFilters={() => {
-            changeFilter("all");
-            setProjectFilter(null);
-            setSearch("");
-          }}
-          onHelp={() => setHelpOpen(true)}
-          reportStatus={reportStatus}
-          parseErrors={parseErrors}
+          filter={filter}
+          onFilterChange={changeFilter}
+          projectFilter={projectFilter}
+          onProjectFilterChange={setProjectFilter}
+          search={search}
+          onSearchChange={setSearch}
+          inRange={inRange}
+          count={filtered.length}
+          onReset={resetFilters}
         />
-        <StatsRow
-          sessions={scopedFiltered}
-          totalInRange={inRange.length}
-          range={range}
-          activeFilterCount={
-            (filter !== "all" ? 1 : 0) +
-            (projectFilter ? 1 : 0) +
-            (search ? 1 : 0)
-          }
-        />
-        <div className="split">
-          <SessionList
+      )}
+      <main className={`app-content scrollbar ${page === "sessions" ? "fill" : ""}`}>
+        {burn.activeSpike && (
+          <BurnSpikeBanner
+            spike={burn.activeSpike}
+            onInvestigate={() => setAnalysisSpike(burn.activeSpike)}
+            onDismiss={burn.dismissSpike}
+          />
+        )}
+        {scoped && (
+          <StatsRow
+            sessions={scopedFiltered}
+            totalInRange={inRange.length}
+            range={range}
+            activeFilterCount={activeFilterCount}
+          />
+        )}
+        {page === "now" && (
+          <NowPage
+            allSessions={allSessions}
+            limitSessions={limitSessions}
+            limits={limits}
+            onSelectSession={setSelectedId}
+            onShowAllSessions={() => setPage("sessions")}
+          />
+        )}
+        {page === "sessions" && (
+          <SessionsPage
             sessions={filtered}
+            allSessions={allSessions}
             selectedId={selected?.id ?? null}
             onSelect={setSelectedId}
-            search={search}
-            onSearchChange={setSearch}
+            sort={sort}
+            onSortChange={setSort}
+            onProjectClick={(p) => setProjectFilter((cur) => (cur === p ? null : p))}
             compareMode={compareMode}
             onToggleCompareMode={() => {
               setCompareMode((v) => {
@@ -336,18 +388,15 @@ function App() {
                 return next;
               });
             }}
+            onRemoveCompare={(id) =>
+              setCompareIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+              })
+            }
             compareLimit={filter === "ghost" ? undefined : MAX_COMPARE}
             ghostsFocused={filter === "ghost"}
-            onProjectClick={(p) => setProjectFilter((cur) => (cur === p ? null : p))}
-            filters={
-              <SessionFilters
-                filter={filter}
-                onFilterChange={changeFilter}
-                projectFilter={projectFilter}
-                onProjectFilterChange={setProjectFilter}
-                sessions={inRange}
-              />
-            }
             onBulkDelete={async (ids) => {
               const res = await fetch("/api/ghost/bulk-delete", {
                 method: "POST",
@@ -361,38 +410,26 @@ function App() {
               setCompareIds(new Set());
             }}
           />
-          {compareMode ? (
-            <SessionCompare
-              sessions={allSessions.filter((s) => compareIds.has(s.id))}
-              onClose={() => {
-                setCompareMode(false);
-                setCompareIds(new Set());
-              }}
-              onRemove={(id) =>
-                setCompareIds((prev) => {
-                  const next = new Set(prev);
-                  next.delete(id);
-                  return next;
-                })
-              }
-              onPick={(id) => {
-                setCompareMode(false);
-                setCompareIds(new Set());
-                setSelectedId(id);
-              }}
-            />
-          ) : (
-            <FleetDashboard
-              sessions={scopedFiltered}
-              allSessions={allSessions}
-              range={range}
-              zoomed={dashboardZoomed}
-              onToggleZoom={toggleDashboardZoom}
-              onSelectSession={setSelectedId}
-            />
-          )}
-        </div>
+        )}
+        {page === "usage" && (
+          <UsagePage sessions={scopedFiltered} allSessions={allSessions} range={range} onSelectSession={setSelectedId} />
+        )}
+        {page === "health" && (
+          <HealthPage sessions={scopedFiltered} allSessions={allSessions} onSelectSession={setSelectedId} />
+        )}
+        {page === "badges" && <BadgesPage allSessions={allSessions} onSelectSession={setSelectedId} />}
       </main>
+      {analysisSpike && (
+        <SpikeAnalysisOverlay
+          spike={analysisSpike}
+          sessions={scopedFiltered.filter((s) => s.agent !== "codex")}
+          onClose={() => setAnalysisSpike(null)}
+          onSelectSession={(id) => {
+            setAnalysisSpike(null);
+            setSelectedId(id);
+          }}
+        />
+      )}
       {selected && (
         <div className="session-overlay-host">
           <ErrorBoundary key={selected.id} onClose={() => setSelectedId(null)}>

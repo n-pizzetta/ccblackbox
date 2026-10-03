@@ -5,10 +5,10 @@ interface Props {
 }
 
 const SHORTCUTS: Array<[string, string]> = [
+  ["1 – 4", "Now · Sessions · Usage · Health"],
   ["↑ / k", "Previous session (while one is open)"],
   ["↓ / j", "Next session (while one is open)"],
-  ["⌘F / Ctrl+F", "Zoom the fleet dashboard (list view)"],
-  ["Esc", "Exit zoom / close overlay"],
+  ["Esc", "Close the session / overlay"],
   ["?", "Toggle this help"],
 ];
 

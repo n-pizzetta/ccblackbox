@@ -75,7 +75,7 @@
 }
 
 /* ---- Podium ---- */
-.fleet-dashboard .podium-block .section-title {
+.page .podium-block .section-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
