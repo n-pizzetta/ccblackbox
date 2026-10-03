@@ -39,8 +39,8 @@ There is no database, no network access beyond loopback, and no runtime dependen
       src/utils/rateLimits.ts   (/api/limits)
                          │
                          ▼
-      src/App.tsx ─┬─ TopBar/StatsRow · SessionList (+ SessionFilters)
-                   ├─ FleetDashboard (fleet/*)  or  SessionCompare
+      src/App.tsx ─┬─ AppHeader · ScopeBar (+ SessionFilters) · StatsRow
+                   ├─ pages/: Now · Sessions (SessionList, SessionCompare) · Usage · Health · Badges
                    └─ SessionDetail overlay (Overview · Timeline · Tools · Tokens · Files)
 ```
 
@@ -195,7 +195,7 @@ Grades: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, else F. The list payload keeps t
 
 ### Health check (`src/utils/healthRules.ts`)
 
-The **Health** tab is a checklist of rules over the sessions in the selected range (ghosts excluded, except for the housekeeping rule). Each rule passes, warns or fails against a threshold written next to it, explains why it matters and what to do, and links up to 5 sessions behind a miss. Rules without data (for example outcomes before `/insights` ran) show as n/a and don't count. The Rankings hero shows the result (`passed / total`).
+The **Health** tab is a checklist of rules over the sessions in the selected range (ghosts excluded, except for the housekeeping rule). Each rule passes, warns or fails against a threshold written next to it, explains why it matters and what to do, and links up to 5 sessions behind a miss. Rules without data (for example outcomes before `/insights` ran) show as n/a and don't count. The checklist heading shows the result (`passed / total`), and the Health tab of the header counts the rules that warn or fail.
 
 Rules: context quality, context headroom, compactions, prompt cache, startup cost (median first-turn context: system prompt, CLAUDE.md, memory, skills and MCP tools; this rule and the cache rule only count Claude Code sessions, the others need data Codex sessions don't have), outcomes, friction, forgotten sessions (process running over 24h, from the pid file's `startedAt`) and housekeeping (ghosts). Adding one means appending a function to `RULES`.
 
@@ -256,26 +256,35 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 
 ### State and routing (`App.tsx`)
 
-- Selected session, range (`today` / `7d` / `30d` / `all`), list filter (`all`, `live`, `ghost`, `friction`, `failed`, `lowquality`), project and search are mirrored to the URL hash (`#session/<id>?range=…&filter=…&project=…&q=…`) and to `localStorage` (`ccblackbox:state`).
+- Page (`now` / `sessions` / `usage` / `health` / `badges`, see `utils/pages.ts`), selected session, range (`today` / `7d` / `30d` / `all`), list filter (`all`, `live`, `ghost`, `friction`, `failed`, `lowquality`), project and search are mirrored to the URL hash (`#<page>?range=…&filter=…&project=…&q=…`, or `#session/<id>?…` while a session is open; Now has no path) and to `localStorage` (`ccblackbox:state`).
+- **Scope.** Sessions, Usage and Health follow the range and filters and show the scope bar and the headline tiles (`StatsRow`); Now and Badges ignore them and say so in their headings. The table sort (`utils/sortSessions.ts`) also orders ↑ / ↓ in the session view.
 - The detail view merges the list summary with the fetched full session.
-- Keyboard: `j`/`k` or arrows (next/previous), `Esc` (close / exit zoom), `Cmd/Ctrl+F` (zoom dashboard), `?` (help).
+- Keyboard: `1`–`4` (Now, Sessions, Usage, Health), `j`/`k` or arrows (next/previous session while one is open), `Esc` (close), `?` (help).
 
 ### Components
 
 | Component | Role |
 |---|---|
-| `SessionFilters` | Filters button + popover (status filters with counts, ghosts split by crashed / empty, Claude Code / Codex when both are present; project list; outcome-bar legend) and the removable chips of the active filters. Clicking a project pill on a session row filters on that project. |
+| `AppHeader` | Brand, page navigation (session count on Sessions, failing checks on Health), `LimitsPill`, `ParseErrors`, `ProfileMenu`. |
+| `ScopeBar` / `SessionFilters` | Range, project and status pickers (counts from the range, before filtering; ghosts split by crashed / empty in the tooltip; Claude Code / Codex when both are present), search, the resulting count and a reset. Clicking a project in the sessions table filters on it. |
+| `Kpi` / `KpiRow` | The one headline-tile style (label, value, context line), used by `StatsRow`, the session view and the 5h window. Up to six tiles share a row. |
 | `LimitsPill` | The 5h and 7-day usage windows (fill, elapsed-time tick, reset countdown); rendered in the top bar and in the session view so they are always on screen. |
 | `units` (`utils/units.ts`, `UnitSetting`) | Display unit for usage: **tokens** (fresh = input + output + cache writes; cached reads are shown apart) or **API value** ($ at API prices, read as a relative weight, since a subscription is limited by the 5h / 7d windows rather than dollars). Persisted in `localStorage` (`ccblackbox:unit`), set from the profile menu. Rankings by weight (podium "Heaviest", project league) use API value. The podium "Longest" ranks by `longestRunMs` (longest main-thread stretch with no pause over 15 min), not `durationMs`, which adds up to 5 min per gap and so favors sessions left open for days. |
-| `ParseErrors` / `ProfileMenu` | Top-bar badge listing unreadable session-meta files with a Trash action (only shown when there are some). Profile chip (data status dot, level, streak) opening a menu: level progress, links to the Health and Rankings tabs (`utils/openTab.ts` event, since `FleetDashboard` owns the tab), usage unit, data status and insights report, `LimitsSection`, keyboard shortcuts, bug report link. The top bar keeps only what is read constantly: limits, range and this chip. |
-| `StatsStrip` (`TopBar`, `StatsRow`) | Brand, usage limits, range picker, data source + freshness, link to `/usage-report.html`, headline stats for the filtered set. |
-| `SessionList` | Filtered list, search, compare-mode selection, bulk ghost delete bar. |
-| `FleetDashboard` | Right pane when not comparing; composes `fleet/*`. |
+| `ParseErrors` / `ProfileMenu` | Top-bar badge listing unreadable session-meta files with a Trash action (only shown when there are some). Profile chip (data status dot, level, streak) opening a menu: level progress, links to the Badges page and Health, usage unit, data status and insights report, `LimitsSection`, keyboard shortcuts, bug report link. |
+| `StatsStrip` (`StatsRow`) | Headline tiles of the scope: sessions, active time, API value, fresh tokens. |
+| `SessionList` | The sessions table: status glyph (live, ghost, cleared, or an outcome dot filled as far as the goal was met), goal, project, flags (Codex tag, friction, plugin capture), usage, active time, start; sortable headers; day headers when sorted by date; virtualized. Also renders the short lists of the Now page, and `BulkGhostBar`. |
 | `SessionCompare` | Side-by-side metrics for selected sessions. |
-| `SessionDetail` | Full-screen overlay: header (outcome, project, model, "Copy resume command", export), a context / cache banner (`ContextCard`), live / cleared-chain / ghost banners (reveal, delete), and five tabs: **Overview** (headline tiles from `SessionOverview`, then two columns: prompts timeline / list in the chosen usage unit on the left, frictions and small previews of the Tools, Tokens and Files tabs with "See all" links on the right; the summary is hidden when it repeats the goal), **Timeline** (`SessionTimeline`, data from `src/utils/sessionTimeline.ts`: context fill per main-thread turn against a 200k or 1M window, compactions detected as a drop below half of the previous context, cumulative API value, fresh tokens per turn, prompts and tool calls with failures; idle gaps over 5 minutes are shortened; clicking a prompt focuses the Tools tab on it), **Tools** (tool counts and sequence with results, can be focused on one prompt), **Tokens** (per-prompt and per-turn cost breakdown), **Files** (file-history versions with diffs via `diff`). |
-| `HelpOverlay` | Keyboard shortcuts. |
+| `SessionDetail` | Full-screen overlay: header (outcome, project, model, "Copy resume command", export), a context / cache banner (`ContextCard`), live / cleared-chain / ghost banners (reveal, delete), and five tabs: **Overview** (headline tiles from `SessionOverview`, then two columns: prompts timeline / list in the chosen usage unit on the left, frictions and small previews of the Tools, Tokens and Files tabs with "See all" links on the right; the summary is hidden when it repeats the goal), **Timeline** (`SessionTimeline`, data from `src/utils/sessionTimeline.ts`: context fill per main-thread turn against a 200k or 1M window, compactions detected as a drop below half of the previous context, cumulative API value, fresh tokens per turn, prompts and tool calls with failures; idle gaps over 5 minutes are shortened; clicking a prompt focuses the Tools tab on it), **Tools** (tool counts and sequence with results, can be focused on one prompt), **Tokens** (headline tiles, then volume and cost per token kind in one panel), **Files** (file-history versions with diffs via `diff`). |
+| `HelpOverlay` | Keyboard shortcuts, the table glyphs, glossary, data sources. |
 
-`fleet/`: `FleetDashboard` has three tabs (**Rankings**, **Health** and **Analysis**; the choice is kept in `localStorage`, `ccblackbox:fleet-tab`). Rankings: `TopSessions` (podium, `FireCanvas`), `Badges`, `ProjectRollup`. Health: `HealthScore` (pass ring), `HealthCheck` (rule checklist). Analysis: `LiveTicker` (one line of live burn) and `FiveHourSession` (current 5h window, per-session / prompt share; all sessions, ignoring filters), then `AnomalyFlags`, `ModelMix`, `ToolsHeatmap`, `HeavyPrompts`, `TokenTimeSeries` (in the selected range). `BurnSpikeBanner` + `SpikeAnalysisOverlay` + `SpikeHeuristics` sit above the tabs.
+`pages/` (one question each) compose `fleet/`:
+- **Now**: `LiveTicker` (one line of live burn), `FiveHourSession` (current 5h window, per-session / prompt / tool / project share; all sessions, ignoring the scope), then live sessions, or the latest ones when none runs.
+- **Sessions**: the table, and `SessionCompare` beside it in compare mode (up to 3), or `BulkGhostBar` when the ghost filter is on.
+- **Usage**: `TokenTimeSeries`, then `ProjectRollup`, `ModelMix` and `ToolsHeatmap` side by side, then `HeavyPrompts`.
+- **Health**: `HealthCheck` (rule checklist, score in its heading), `AnomalyFlags`.
+- **Badges** (from the profile menu): level and streak, `TopSessions` as all-time records (podium, `FireCanvas`), `Badges`.
+
+`BurnSpikeBanner` (+ `SpikeAnalysisOverlay`, `SpikeHeuristics`) shows above any page.
 
 `utils/`: `fleetStats` (window/bucket aggregations, costs via `models.mjs`), `aggregateByPrompt`, `classifyPrompt`, `burnTracker`, `rateLimits`, `windowState`, `range`, `format`, `exportSession` (standalone HTML export of a session).
 
