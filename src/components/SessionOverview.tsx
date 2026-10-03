@@ -1,54 +1,51 @@
 import type { Session } from "../types";
 import { costOf } from "../../scripts/models.mjs";
 import { formatCost, formatDuration, formatTokens } from "../utils/format";
-import { freshTokens, formatUsage, useUnit } from "../utils/units";
+import { API_VALUE_HINT, freshTokens, useUnit } from "../utils/units";
+import { KpiRow, type KpiItem } from "./Kpi";
 
 export type DetailTab = "overview" | "tools" | "tokens" | "files";
 
-type Tile = { label: string; value: string; sub?: string; title?: string };
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-/** Headline figures of a session, above the prompts. Zero-valued optional tiles are left out. */
+/** Headline figures of a session, above the prompts: always four tiles, smaller counts as context. */
 export function SessionKpis({ session }: { session: Session }) {
   const unit = useUnit();
   const toolCalls = Object.values(session.toolCounts ?? {}).reduce((a, n) => a + n, 0);
   const fresh = freshTokens(session.tokens);
-  const tiles: Tile[] = [
-    {
-      label: "Active time",
-      value: formatDuration(session.durationMs),
-      sub: session.wallMs && session.wallMs > session.durationMs * 1.2 ? `${formatDuration(session.wallMs)} wall-clock` : undefined,
-      title: "Idle gaps over 5 minutes are excluded",
-    },
-    unit === "tokens"
-      ? {
-          label: "Fresh tokens",
-          value: formatUsage(unit, session.tokens, session.costUsd),
-          sub: `+ ${formatTokens(session.tokens.cacheRead)} cached reads`,
-          title: "Input + output + cache writes. Cached reads weigh far less.",
-        }
-      : {
-          label: "API value",
-          value: formatUsage(unit, session.tokens, session.costUsd),
-          sub: `${formatTokens(fresh)} fresh tokens`,
-          title: "What this would cost at API prices, read as a relative weight.",
-        },
-    { label: "Messages", value: String(session.messages) },
-    { label: "Tool calls", value: String(toolCalls) },
-  ];
-  if (session.filesChanged > 0) tiles.push({ label: "Files changed", value: String(session.filesChanged) });
-  if (session.commits > 0) tiles.push({ label: "Commits", value: String(session.commits) });
-  if (session.subAgents > 0) tiles.push({ label: "Sub-agents", value: String(session.subAgents) });
+  const tokensTile: KpiItem = {
+    label: "Fresh tokens",
+    value: formatTokens(fresh),
+    sub: `+ ${formatTokens(session.tokens.cacheRead)} cached reads`,
+    title: "Input + output + cache writes. Cached reads weigh far less.",
+  };
+  const costTile: KpiItem = {
+    label: "API value",
+    value: formatCost(session.costUsd),
+    sub: session.prompts?.length ? `${formatCost(session.costUsd / session.prompts.length)} / prompt` : undefined,
+    title: API_VALUE_HINT,
+  };
+  const activity = [
+    plural(session.messages, "message"),
+    session.filesChanged > 0 && plural(session.filesChanged, "file"),
+    session.commits > 0 && plural(session.commits, "commit"),
+    session.subAgents > 0 && plural(session.subAgents, "sub-agent"),
+  ].filter(Boolean).join(" · ");
 
   return (
-    <div className="overview-kpis">
-      {tiles.map((t) => (
-        <div key={t.label} className="kpi-tile" title={t.title}>
-          <span className="kpi-value tabular">{t.value}</span>
-          <span className="kpi-label">{t.label}</span>
-          {t.sub && <span className="kpi-sub mono">{t.sub}</span>}
-        </div>
-      ))}
-    </div>
+    <KpiRow
+      items={[
+        {
+          label: "Active time",
+          value: formatDuration(session.durationMs),
+          sub: session.wallMs && session.wallMs > session.durationMs * 1.2 ? `${formatDuration(session.wallMs)} wall-clock` : "idle gaps excluded",
+          title: "Idle gaps over 5 minutes are excluded",
+        },
+        // the chosen unit comes first
+        ...(unit === "tokens" ? [tokensTile, costTile] : [costTile, tokensTile]),
+        { label: "Tool calls", value: toolCalls, sub: activity },
+      ]}
+    />
   );
 }
 

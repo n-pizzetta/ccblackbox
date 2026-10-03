@@ -14,6 +14,7 @@ import { aggregateByPrompt, type PromptStats } from "../../utils/aggregateByProm
 import { loadWindowStart, saveWindowStart } from "../../utils/windowState";
 import { formatCost, formatDuration, formatTokens } from "../../utils/format";
 import type { RateLimits } from "../../utils/rateLimits";
+import { KpiRow } from "../Kpi";
 
 interface Props {
   sessions: Session[];
@@ -169,7 +170,7 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
     return (
       <div className="fleet-block five-hour-session five-hour-idle">
         <div className="section-title">
-          <span>Current 5h session</span>
+          <span>Current 5h window</span>
         </div>
         <span className="dim">Idle · waiting for the first message</span>
       </div>
@@ -179,7 +180,7 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
     return (
       <div className="fleet-block five-hour-session five-hour-idle">
         <div className="section-title">
-          <span>Current 5h session</span>
+          <span>Current 5h window</span>
         </div>
         <span className="dim">Idle · no Claude Code activity in the last 5h</span>
       </div>
@@ -191,27 +192,23 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
   return (
     <div className="fleet-block five-hour-session">
       <div className="section-title">
-        <span>Current 5h session</span>
-        <span className="dim mono tabular">
-          started {formatClock(fromMs)} · {formatDuration(elapsed)} ago · resets in {formatDuration(resetIn)}
-        </span>
+        <span>Current 5h window</span>
+        <span className="dim mono tabular">started {formatClock(fromMs)}</span>
       </div>
 
-      <div className="five-hour-summary">
-        <div className="five-hour-summary-metric">
-          <div className="mono caps dim five-hour-metric-label">tokens</div>
-          <div className="five-hour-metric-val tabular">{formatTokens(totalTokens)}</div>
-        </div>
-        <div className="five-hour-summary-metric">
-          <div className="mono caps dim five-hour-metric-label">cost</div>
-          <div className="five-hour-metric-val tabular" style={{ color: "var(--c-amber)" }}>{formatCost(windowBurn.cost)}</div>
-        </div>
-      </div>
+      <KpiRow
+        items={[
+          { label: "Tokens", value: formatTokens(totalTokens), sub: "all kinds, in this window" },
+          { label: "API value", value: formatCost(windowBurn.cost), sub: pct !== null ? `${Math.round(pct * 100)}% of the 5h limit used` : "limit not reported" },
+          { label: "Elapsed", value: formatDuration(elapsed), sub: "of 5h" },
+          { label: "Resets in", value: formatDuration(resetIn), sub: `at ${formatClock(sessionEnd)}` },
+        ]}
+      />
 
       <div className="five-hour-grid">
         {/* Top sessions */}
         <div className="five-hour-card">
-          <div className="five-hour-card-title mono caps dim">
+          <div className="five-hour-card-title">
             Top sessions <span className="five-hour-card-sub">· % {shareSuffix}</span>
           </div>
           {topSessions.length === 0 ? (
@@ -238,7 +235,7 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
 
         {/* Top prompts */}
         <div className="five-hour-card">
-          <div className="five-hour-card-title mono caps dim">Top prompts</div>
+          <div className="five-hour-card-title">Top prompts</div>
           {topPrompts.length === 0 ? (
             <div className="placeholder mono dim">—</div>
           ) : (
@@ -264,7 +261,7 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
 
         {/* Tools */}
         <div className="five-hour-card">
-          <div className="five-hour-card-title mono caps dim">Tools</div>
+          <div className="five-hour-card-title">Tools</div>
           {toolsBreakdown.length === 0 ? (
             <div className="placeholder mono dim">—</div>
           ) : (
@@ -291,7 +288,7 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
 
         {/* Projects */}
         <div className="five-hour-card">
-          <div className="five-hour-card-title mono caps dim">
+          <div className="five-hour-card-title">
             Projects <span className="five-hour-card-sub">· % {shareSuffix}</span>
           </div>
           {projectSplit.length === 0 ? (

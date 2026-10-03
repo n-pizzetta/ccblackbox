@@ -1,11 +1,4 @@
 /* ---- Session timeline tab ---- */
-.tl-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
-.tl-kpi { border: 1px solid var(--c-hairline); border-radius: var(--radius-lg); padding: 12px 14px; display: grid; gap: 4px; min-width: 0; }
-.tl-kpi-l { font-size: var(--fs-sm); color: var(--c-text-dim); }
-.tl-kpi-v { font-size: 20px; font-weight: 600; color: var(--c-text); line-height: 1.1; }
-.tl-kpi-v.amber { color: var(--c-amber); }
-.tl-kpi-v.red { color: var(--c-red); }
-.tl-kpi-s { font-size: var(--fs-xs); color: var(--c-text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .tl-head { display: flex; flex-wrap: wrap; gap: 8px 14px; }
 .tl-live { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 500; color: var(--c-green); }
@@ -57,5 +50,4 @@
 .tl-tip-tools { font-size: var(--fs-xs); color: var(--c-cyan); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
 .tl-note { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--c-text-faint); }
 
-@media (max-width: 900px) { .tl-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .tl-live i { animation: none; } }

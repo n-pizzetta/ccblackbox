@@ -451,3 +451,26 @@
   .scope-search { width: 100%; order: 5; }
   .scope-summary { margin-left: 0; }
 }
+
+/* ---- Session view: Tokens tab ---- */
+.tokens-bars { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.tokens-bars-row { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 12px; }
+.tokens-bars-label { font-size: var(--fs-md); color: var(--c-text-dim); }
+.tokens-bars .tokens-bar { margin: 0; }
+.tokens-table { background: transparent; }
+.tokens-table-head { font-family: var(--f-ui); font-size: var(--fs-sm); letter-spacing: 0; color: var(--c-text-faint); background: transparent; }
+.tokens-table-row { font-size: var(--fs-md); }
+
+/* ---- Now: 5h window panel ---- */
+.five-hour-session > .kpi-row { margin-bottom: 16px; }
+.five-hour-session .kpi { background: transparent; }
+.five-hour-card-title {
+  margin-bottom: 8px;
+  font-family: var(--f-ui);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--c-text-soft);
+}
+.five-hour-card-sub { font-weight: 400; color: var(--c-text-faint); }
