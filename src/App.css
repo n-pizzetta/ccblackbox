@@ -736,21 +736,6 @@ a:focus-visible,
   border-radius: 999px;
   border: 1px dashed var(--c-text-faint);
 }
-.glyph-friction {
-  color: var(--c-text-faint);
-  font-size: var(--fs-md);
-  font-weight: 700;
-}
-.glyph-failed {
-  width: 8px;
-  height: 2px;
-  background: var(--c-text-faint);
-  border-radius: 1px;
-}
-.glyph-lowquality {
-  color: var(--c-text-faint);
-  font-size: var(--fs-md);
-}
 .parse-errors-popover {
   position: fixed;
   z-index: 1000;

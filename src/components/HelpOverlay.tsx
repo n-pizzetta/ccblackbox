@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import type { Outcome } from "../types";
+import { outcomeColor } from "../utils/format";
 
 interface Props {
   onClose: () => void;
@@ -12,12 +14,26 @@ const SHORTCUTS: Array<[string, string]> = [
   ["?", "Toggle this help"],
 ];
 
+/** The session table's status column: one dot per outcome, filled as far as the goal was met. */
+const OUTCOME_GLYPHS: Array<[Outcome, string, string]> = [
+  ["fully_achieved", "Achieved", "Goal met, as rated by /insights"],
+  ["mostly_achieved", "Mostly achieved", "Goal mostly met"],
+  ["partially_achieved", "Partially achieved", "Part of the goal met"],
+  ["not_achieved", "Not achieved", "Goal not met"],
+  ["unknown", "Not rated yet", "Run /insights in Claude Code to rate it"],
+];
+
 const GLYPHS: Array<{ glyph: React.ReactNode; label: string; kind: string }> = [
   { glyph: <span className="glyph glyph-live" />, label: "Live", kind: "Claude Code: running process · Codex: task in progress" },
   { glyph: <span className="glyph glyph-ghost" />, label: "Ghost", kind: "Empty session, or its Claude Code process died (Claude Code only)" },
-  { glyph: <span className="glyph glyph-friction">△</span>, label: "Friction", kind: "Friction points flagged by /insights" },
-  { glyph: <span className="glyph glyph-failed" />, label: "Low outcome", kind: "Rated partially / not achieved by /insights" },
-  { glyph: <span className="glyph glyph-lowquality">◐</span>, label: "Low quality", kind: "Context quality score < 70" },
+  { glyph: <span className="glyph glyph-cleared">⟲</span>, label: "Cleared", kind: "Context cleared: the work continues in the next session" },
+  ...OUTCOME_GLYPHS.map(([outcome, label, kind]) => ({
+    glyph: <span className={`glyph outcome-dot outcome-${outcome}`} style={{ "--oc": outcomeColor(outcome) } as React.CSSProperties} />,
+    label,
+    kind,
+  })),
+  { glyph: <span className="glyph friction-chip">△</span>, label: "Friction", kind: "Friction points flagged by /insights" },
+  { glyph: <span className="agent-tag">codex</span>, label: "Codex", kind: "Session from Codex (~/.codex)" },
 ];
 
 const GLOSSARY: Array<[string, string]> = [
