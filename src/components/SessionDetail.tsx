@@ -809,13 +809,13 @@ function OverviewTab({
             <div className="prompt-list">
               <div className="prompt-row prompt-row-head mono dim caps">
                 <span>#</span>
-                <span>t</span>
-                <span>cat</span>
-                <span className="right">tools</span>
+                <span>Time</span>
+                <span>Kind</span>
+                <span className="right">Tools</span>
                 <span className="right">{unit === "tokens" ? "tok" : "$"}</span>
                 <span />
-                <span>preview</span>
-                <span className="right">len</span>
+                <span>Prompt</span>
+                <span className="right">Length</span>
               </div>
               {prompts.map((_, revIdx) => {
                 const i = prompts.length - 1 - revIdx;
@@ -1050,7 +1050,7 @@ function ToolsTab({
               );
             })}
             {sequence.length >= 300 && (
-              <div className="mono dim" style={{ padding: "8px 10px", fontSize: 11 }}>
+              <div className="mono dim" style={{ padding: "8px 10px", fontSize: "var(--fs-sm)" }}>
                 (older tool calls truncated — showing first 300 captured)
               </div>
             )}
@@ -1563,14 +1563,14 @@ function TurnBreakdown({ details }: { details: PromptStats["turnDetails"] }) {
         <div className="turn-breakdown-table">
           <div className="turn-breakdown-head mono dim caps">
             <span>#</span>
-            <span className="right">gap</span>
-            <span className="right">inB</span>
-            <span className="right">outB</span>
-            <span className="right">cacheR</span>
-            <span className="right">cacheW</span>
+            <span className="right">Gap</span>
+            <span className="right">In</span>
+            <span className="right">Out</span>
+            <span className="right">Cache R</span>
+            <span className="right">Cache W</span>
             <span className="right">1h</span>
             <span className="right">5m</span>
-            <span>tools</span>
+            <span>Tools</span>
           </div>
           {details.map((d, i) => {
             const hasCw = d.cacheWrite > 0;

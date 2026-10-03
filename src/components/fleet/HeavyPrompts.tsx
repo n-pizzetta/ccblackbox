@@ -59,12 +59,12 @@ export function HeavyPrompts({ sessions, onSelectSession, limit = 10 }: Props) {
       <div className="heavy-prompts">
         <div className="heavy-prompts-head mono dim caps">
           <span>#</span>
-          <span>project</span>
-          <span>t</span>
-          <span>preview</span>
-          <span className="right">cost</span>
-          <span className="right">out</span>
-          <span className="right">cache hit</span>
+          <span>Project</span>
+          <span>Time</span>
+          <span>Prompt</span>
+          <span className="right">Cost</span>
+          <span className="right">Output</span>
+          <span className="right">Cache hit</span>
         </div>
         {top.map((r, i) => {
           const p = r.session.prompts?.[r.stat.promptIdx];

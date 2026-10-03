@@ -54,7 +54,6 @@
 }
 .resume-btn:hover { color: var(--c-cyan); border-color: var(--c-cyan); }
 
-
 /* ---- Two columns on wide screens ---- */
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: stretch; }
 .overview-main, .overview-rail { display: flex; flex-direction: column; gap: 18px; min-width: 0; }

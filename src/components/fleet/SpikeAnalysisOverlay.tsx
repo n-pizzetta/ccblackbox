@@ -180,8 +180,8 @@ function SpikeSessionsTable({
       </div>
       <div className="spike-table">
         <div className="spike-table-head spike-sessions-grid mono dim caps">
-          <span>#</span><span>project</span><span>goal</span>
-          <span className="right">tokens</span><span className="right">cost</span><span className="right">% spike</span>
+          <span>#</span><span>Project</span><span>Goal</span>
+          <span className="right">Tokens</span><span className="right">Cost</span><span className="right">% of spike</span>
         </div>
         {rows.map((r, i) => {
           const tokens = sumTokens(r.burn.tokens);
@@ -225,8 +225,8 @@ function SpikePromptsTable({
       </div>
       <div className="spike-table">
         <div className="spike-table-head spike-prompts-grid mono dim caps">
-          <span>#</span><span>project</span><span>preview</span>
-          <span className="right">cost</span><span className="right">turns</span><span className="right">out</span>
+          <span>#</span><span>Project</span><span>Prompt</span>
+          <span className="right">Cost</span><span className="right">Turns</span><span className="right">Output</span>
         </div>
         {rows.map((r, i) => {
           const p = r.session.prompts?.[r.stat.promptIdx];
