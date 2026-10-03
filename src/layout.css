@@ -532,3 +532,17 @@
   background: var(--c-bg-elevated);
   border-radius: 999px;
 }
+
+/* small screens: the Sessions page scrolls as a whole, the table keeps a usable height */
+@media (max-width: 900px) {
+  .app-content.fill { overflow-y: auto; }
+  .sessions-body { flex: none; height: 70vh; min-height: 420px; }
+}
+.profile-trigger { white-space: nowrap; }
+@media (max-width: 520px) {
+  .app-header-right { order: 2; width: 100%; margin-left: 0; justify-content: space-between; }
+}
+@media (max-width: 520px) {
+  .limits-pill-bar { width: 40px; }
+  .app-header .limits-pill { padding-inline: 10px; }
+}
