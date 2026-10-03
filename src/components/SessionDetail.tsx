@@ -124,7 +124,7 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
           "--badge-border": `${c}40`,
         } as React.CSSProperties}
       >
-        <span className="quality-label">QUALITY</span>
+        <span className="quality-label">Quality</span>
         <span className="quality-grade">{quality.grade}</span>
         <span className="quality-score tabular">{quality.score.toFixed(1)}</span>
         <span className="badge-info" aria-hidden>ⓘ</span>
@@ -218,6 +218,7 @@ export function SessionDetail({
   const [toolFocus, setToolFocus] = useState<{ promptIdx: number; start: number; end: number } | null>(null);
   const [resumeCopied, setResumeCopied] = useState(false);
   const c = outcomeColor(session.outcome);
+  const toolCallCount = Object.values(session.toolCounts ?? {}).reduce((a, n) => a + n, 0);
 
   const shellEscape = (s: string) => (/^[A-Za-z0-9_@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`);
   const resume = session.agent === "codex" ? `codex resume ${session.id}` : `claude --resume ${session.id}`;
@@ -263,12 +264,11 @@ export function SessionDetail({
           <div className="detail-toolbar-right">
             <LimitsPill />
             <button
-              className="toolbar-btn"
+              className="toolbar-btn wide"
               onClick={() => downloadSessionHtml(session)}
               title="Export session as HTML"
-              aria-label="Export session"
             >
-              ↓
+              Export
             </button>
             {onClose ? (
               <button
@@ -313,7 +313,7 @@ export function SessionDetail({
                   boxShadow: `0 0 8px ${c}`,
                 }}
               />
-              {outcomeLabel(session.outcome)}
+              <span>Outcome: {outcomeLabel(session.outcome)}</span>
               <InfoDot
                 title={
                   session.outcome === "in_progress"
@@ -327,8 +327,13 @@ export function SessionDetail({
               />
             </div>
             {session.quality && <QualityChip quality={session.quality} />}
-            <span className="proj-pill" style={{ "--pc": projectColor(session.project) } as React.CSSProperties}>{session.project}</span>
-            <span className="detail-meta mono">{modelLabel(session.model)} · {new Date(session.startedAt).toLocaleString()}</span>
+            <span className="st-project">
+              <span className="project-dot" style={{ background: projectColor(session.project) }} aria-hidden="true" />
+              <span className="mono">{session.project}</span>
+            </span>
+            <span className="detail-meta">
+              {modelLabel(session.model)} · {new Date(session.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            </span>
           </div>
           <div className="goal-row">
             <div className="goal">{session.goal}</div>
@@ -356,6 +361,8 @@ export function SessionDetail({
               {t.id === "overview" && session.frictions.length > 0 && (
                 <span className="tab-badge">{session.frictions.length}</span>
               )}
+              {t.id === "tools" && <span className="tab-count mono tabular">{toolCallCount}</span>}
+              {t.id === "files" && <span className="tab-count mono tabular">{session.filesChanged}</span>}
             </button>
           ))}
         </div>
@@ -384,7 +391,6 @@ export function SessionDetail({
             {resumeCopied ? "✓ copied" : session.id}
           </button>
         </span>
-        <span className="cost tabular" title="API value: what this would cost at API prices">API value {formatCost(session.costUsd)}</span>
       </div>
     </div>
   );
@@ -1068,7 +1074,9 @@ function ToolSeqRow({
   const hasResult = !!entry.result;
   const hasFull = !!entry.full;
   const expandable = hasResult || hasFull;
+  const isError = !!entry.result?.isError;
   const resultOneLine = entry.result?.text.replace(/\s+/g, " ").trim() ?? "";
+  const status = pending ? "running" : isError ? "error" : hasResult ? "ok" : "no result";
   return (
     <div className={`tool-seq-row ${expandable ? "has-result" : ""} ${open ? "open" : ""} ${pending ? "pending" : ""}`}>
       <button
@@ -1078,32 +1086,36 @@ function ToolSeqRow({
         aria-label={expandable ? (open ? "Collapse tool details" : "Expand tool details") : undefined}
       >
         <span className="tool-seq-time mono dim tabular">{formatClockAt(startedAt, entry.t)}</span>
-        <span className="tool-seq-name mono">
-          {entry.tool}
+        <span className={`tool-seq-status ${pending ? "run" : isError ? "err" : hasResult ? "ok" : ""}`} title={status} aria-label={status}>
+          {pending ? "▶" : isError ? "✗" : hasResult ? "✓" : "·"}
+        </span>
+        <span className="tool-seq-name mono" title={entry.tool}>{entry.tool}</span>
+        <span className="tool-seq-preview mono dim">{entry.preview}</span>
+        <span className="tool-seq-size">
           {entry.result?.bytes != null && entry.result.bytes > 0 && (
-            <span className={`result-size-chip mono tabular ${
-              entry.result.bytes > 30_000 ? "hot" : entry.result.bytes > 8_000 ? "warm" : ""
-            }`}>
+            <span
+              className={`result-size-chip mono tabular ${entry.result.bytes > 30_000 ? "hot" : entry.result.bytes > 8_000 ? "warm" : ""}`}
+              title="Size of the tool result sent back to the model"
+            >
               {formatBytes(entry.result.bytes)}
             </span>
           )}
         </span>
-        <span className="tool-seq-preview mono dim">{entry.preview}</span>
-        {pending && <span className="tool-seq-pending mono" aria-label="Running">▶ running</span>}
-        {expandable && <span className="tool-seq-toggle mono dim">{open ? "▾" : "▸"}</span>}
+        <span className="tool-seq-toggle mono dim" aria-hidden="true">{expandable ? (open ? "▾" : "▸") : ""}</span>
       </button>
       {open && (
         <pre className="tool-seq-command mono">{entry.full ?? entry.preview}</pre>
       )}
       {hasResult && open && (
-        <pre className={`tool-seq-result mono ${entry.result!.isError ? "is-error" : ""}`}>
+        <pre className={`tool-seq-result mono ${isError ? "is-error" : ""}`}>
           {entry.result!.text}
           {entry.result!.truncated && <span className="dim"> …</span>}
         </pre>
       )}
-      {hasResult && !open && (
-        <div className="tool-seq-result-hint mono dim">
-          → {resultOneLine.slice(0, 100)}{resultOneLine.length > 100 ? "…" : ""}
+      {/* successes stay one line; failures show why */}
+      {isError && !open && (
+        <div className="tool-seq-result-hint mono">
+          {resultOneLine.slice(0, 140)}{resultOneLine.length > 140 ? "…" : ""}
         </div>
       )}
     </div>
