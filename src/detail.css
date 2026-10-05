@@ -1,36 +1,95 @@
 /* Session view: panels, headline tiles, two-column overview. Loaded after App.css. */
 
 /* ---- Frame: the session view is a true full-screen page, content centered on very wide screens ---- */
-.session-overlay-host { --detail-pad: max(24px, calc((100vw - 1640px) / 2)); }
+.session-overlay-host {
+  --detail-pad: max(24px, calc((100vw - 1640px) / 2));
+  /* the same ambient backdrop as the app, so the tabs' glass reads */
+  background:
+    radial-gradient(52% 70% at 8% -8%, rgba(94, 125, 166, 0.22), transparent 72%),
+    radial-gradient(40% 55% at 92% -4%, rgba(196, 160, 118, 0.1), transparent 70%),
+    var(--c-bg);
+}
 .session-overlay-host .detail,
 .session-overlay-host .detail.fullscreen {
   height: 100%;
   max-height: none;
   padding: 0;
   border-radius: 0;
-  background: var(--c-bg-panel);
+  background: transparent;
 }
-.session-overlay-host .detail-toolbar { padding: 8px 24px; }
-.session-overlay-host .detail-sticky { background: var(--c-bg-panel); }
+/* flat toolbar: ghost buttons, the limits inline, nothing boxed */
+.session-overlay-host .detail-sticky { background: transparent; border-bottom: none; }
+.session-overlay-host .detail-toolbar { padding-block: 12px 4px; background: transparent; border-bottom: none; }
 .session-overlay-host .detail-header { padding-inline: var(--detail-pad); }
 .session-overlay-host .detail-sticky > :not(.detail-toolbar):not(.detail-header):not(.tabs) { margin-inline: var(--detail-pad); }
-.session-overlay-host .tabs { padding-inline: calc(var(--detail-pad) - 14px); }
-.session-overlay-host .detail-footer { padding-inline: var(--detail-pad); background: var(--c-bg-panel); }
+.session-overlay-host .detail-footer { padding-inline: var(--detail-pad); background: transparent; border-top: none; }
+.detail-footer .cost { color: var(--c-text); }
 
-/* one flat background for every tab (same as the header); cards are outlined, not filled */
-.detail-body { background: var(--c-bg-panel); gap: 18px; padding: 20px var(--detail-pad, 24px) 28px; }
+.toolbar-btn {
+  width: 32px;
+  height: 32px;
+  color: var(--c-text);
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+}
+.toolbar-btn:hover:not(:disabled) { background: var(--c-fill); border-color: transparent; }
+.toolbar-btn.wide { width: auto; padding: 0 14px; font-size: var(--fs-base); font-weight: 500; }
+.toolbar-pos { font-family: var(--f-ui); font-size: var(--fs-base); color: var(--c-text-dim); }
+
+/* the tabs: the one glass element of the session view */
+.session-overlay-host .tabs {
+  display: flex;
+  gap: 2px;
+  width: fit-content;
+  max-width: calc(100% - 2 * var(--detail-pad));
+  overflow-x: auto;
+  margin: 10px var(--detail-pad) 14px;
+  padding: 4px;
+  border-bottom: none;
+  border-radius: 22px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-glass);
+}
+.session-overlay-host .tab {
+  height: 36px;
+  padding: 0 16px;
+  gap: 6px;
+  margin: 0;
+  white-space: nowrap;
+  color: var(--c-text-dim);
+  border-bottom: none;
+  border-radius: 18px;
+  transition: color var(--t-fast), background var(--t-fast);
+}
+.session-overlay-host .tab:hover { color: var(--c-text); background: rgba(255, 255, 255, 0.05); }
+.session-overlay-host .tab.active { font-weight: 600; color: var(--c-text); background: var(--c-lens); box-shadow: var(--shadow-lens); }
+.session-overlay-host .tab-count { min-width: 0; padding: 0; font-family: var(--f-ui); font-size: var(--fs-md); font-weight: 500; color: var(--c-text-faint); background: none; }
+.session-overlay-host .tab-badge { height: 18px; padding: 0 6px; color: var(--c-amber); background: color-mix(in srgb, var(--c-amber) 16%, transparent); border-radius: 9px; }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .session-overlay-host .tabs { background: #2a2c33; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .session-overlay-host .tabs { background: #2a2c33; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* every tab sits on the backdrop; its panels are opaque cards */
+.detail-body { background: transparent; gap: 18px; padding: 6px var(--detail-pad, 24px) 28px; }
 .d-panel,
 .detail-body > div:not(.overview-grid):not(.kpi-row):not(.live-empty):not(.clean-row):not(.placeholder) {
-  background: transparent;
-  border: 1px solid var(--c-hairline);
+  background: var(--c-bg-panel);
+  border: none;
   border-radius: var(--radius-lg);
-  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+  padding: 18px 20px;
 }
 .detail .section-title {
   font-family: var(--f-ui);
-  font-size: var(--fs-base);
-  font-weight: 600;
-  letter-spacing: 0;
+  font-size: var(--fs-body);
+  font-weight: 650;
+  letter-spacing: -0.01em;
   text-transform: none;
   color: var(--c-text);
   align-items: center;
@@ -42,17 +101,21 @@
 .detail-meta { font-size: var(--fs-sm); color: var(--c-text-faint); }
 .goal-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .goal-row .goal { min-width: 0; }
+/* the primary action of the view: the one filled accent button */
 .resume-btn {
   flex: none;
-  padding: 6px 12px;
-  font-size: var(--fs-md);
-  color: var(--c-text-soft);
-  background: var(--c-bg);
-  border: 1px solid var(--c-hairline-strong);
-  border-radius: 999px;
-  transition: color var(--t-fast), border-color var(--t-fast);
+  height: 36px;
+  padding: 0 18px;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: #fff;
+  background: color-mix(in oklab, var(--c-cyan) 74%, #000);
+  border: none;
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 16px -6px color-mix(in srgb, var(--c-cyan) 50%, transparent);
+  transition: filter var(--t-fast);
 }
-.resume-btn:hover { color: var(--c-cyan); border-color: var(--c-cyan); }
+.resume-btn:hover { filter: brightness(1.15); }
 
 /* ---- Two columns on wide screens ---- */
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: stretch; }
