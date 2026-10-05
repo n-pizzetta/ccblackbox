@@ -11,7 +11,7 @@ import { promisify } from "node:util";
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
-import { promises as fsp, watch, existsSync, statSync, createReadStream } from "node:fs";
+import { promises as fsp, watch, existsSync, readFileSync, statSync, createReadStream } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { mergeLimits, parseAllSessions, readLimits, readLiveContext, summarizeSession } from "./parse-sessions.mjs";
 import { badgeStatePath, computeBadges, loadBadgeState, saveBadgeState } from "./badges.mjs";
@@ -20,6 +20,8 @@ import { dataDir } from "./data-dir.mjs";
 // Honors CLAUDE_CONFIG_DIR, like Claude Code.
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
 const DATA = dataDir(CLAUDE);
+/** This install's version, from package.json (the plugin ships it). */
+export const VERSION = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const PROJECTS = join(CLAUDE, "projects");
 const STALE = join(CLAUDE, "sessions", ".stale");
 const FILE_HISTORY = join(CLAUDE, "file-history");
@@ -295,6 +297,11 @@ async function handleApi(req, res) {
   if (url === "/api/badges") {
     res.setHeader("cache-control", "no-store");
     return sendJson(res, 200, cache.badges ?? { startedAt: null, total: 0, families: [] });
+  }
+
+  // Lets a newer /marey:replay recognize this server and replace it.
+  if (url === "/api/version") {
+    return sendJson(res, 200, { name: "marey", version: VERSION, pid: process.pid });
   }
 
   if (url === "/api/limits") {
