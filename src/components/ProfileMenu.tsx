@@ -70,7 +70,7 @@ export function ProfileMenu({ allSessions, source, parsedAgo, reportStatus, onHe
       >
         <span className={`profile-status ${source}`} aria-hidden="true" />
         <span className="profile-level mono">Lv {level.level}</span>
-        {streak > 0 && <span className="profile-streak mono tabular">🔥 {streak}</span>}
+        {streak > 0 && <span className="profile-streak mono tabular" title={`${streak} day streak`}>🔥 {streak}</span>}
       </button>
 
       {open && (
@@ -78,7 +78,6 @@ export function ProfileMenu({ allSessions, source, parsedAgo, reportStatus, onHe
           <div className="profile-head">
             <div className="profile-head-row">
               <span className="profile-head-level">Lv {level.level} <span className="dim">{level.title}</span></span>
-              <span className="mono tabular dim">🔥 {streak} day{streak === 1 ? "" : "s"}</span>
             </div>
             <span className="hero-track profile-track" aria-hidden="true">
               <span style={{ width: `${Math.round(level.progress * 100)}%` }} />
@@ -93,28 +92,28 @@ export function ProfileMenu({ allSessions, source, parsedAgo, reportStatus, onHe
             <button className="profile-link" onClick={() => openTab("rankings")}>
               <span>Badges and rankings</span><span aria-hidden="true">→</span>
             </button>
-          </div>
-
-          <UnitSetting />
-
-          <div className="settings-section">
-            <div className="settings-label mono caps dim">Data</div>
-            <div className="mono dim limits-status">
-              <span style={{ color: source === "real" ? "var(--c-green)" : "var(--c-amber)" }}>
-                ● {source === "real" ? "live data" : "mock data"}
-              </span>
-              {parsedAgo && <> · parsed {parsedAgo}</>}
-            </div>
             {reportStatus.exists ? (
               <a className="profile-link" href="/usage-report.html" target="_blank" rel="noreferrer">
                 <span>Insights report</span><span aria-hidden="true">↗</span>
               </a>
             ) : (
-              <div className="mono dim limits-status">Insights report: run <code>/insights</code> in Claude Code.</div>
+              <span className="profile-link disabled" title="Run /insights in Claude Code to generate it">
+                <span>Insights report</span><span className="mono dim">/insights</span>
+              </span>
             )}
           </div>
 
-          <LimitsSection />
+          <div className="profile-section">
+            <UnitSetting />
+            <div className="profile-row">
+              <span className="profile-row-label">Data</span>
+              <span className="profile-row-value mono">
+                <span className={`profile-dot ${source === "real" ? "ok" : "warn"}`} aria-hidden="true" />
+                {source === "real" ? (parsedAgo ? `live · ${parsedAgo}` : "live") : "mock"}
+              </span>
+            </div>
+            <LimitsSection />
+          </div>
 
           <div className="profile-foot">
             <button
