@@ -110,15 +110,17 @@ const RULES: Rule[] = [
       why: "Cached input is about 10× cheaper and counts far less against your limits.",
       hint: "Avoid long pauses mid-session (the cache expires) and editing CLAUDE.md or MCP config mid-session.",
     };
+    // Claude Code's cache: Codex caches automatically and never writes, so it would always pass.
+    const claude = sessions.filter((s) => s.agent !== "codex");
     let read = 0;
     let all = 0;
-    for (const s of sessions) {
+    for (const s of claude) {
       read += s.tokens.cacheRead;
       all += s.tokens.input + s.tokens.cacheRead + s.tokens.cacheWrite;
     }
     if (all < 100_000) return na(base);
     const ratio = read / all;
-    const worst = sessions
+    const worst = claude
       .map((s) => ({ s, pool: s.tokens.input + s.tokens.cacheRead + s.tokens.cacheWrite }))
       .filter(({ pool }) => pool >= 100_000)
       .map(({ s, pool }) => ({ s, r: s.tokens.cacheRead / pool }))
@@ -135,7 +137,9 @@ const RULES: Rule[] = [
       why: "System prompt, CLAUDE.md, memory, skills and MCP tool definitions are paid on every turn of every session.",
       hint: "Trim CLAUDE.md and its @imports, disable MCP servers and plugins you don't use.",
     };
+    // The advice is about Claude Code's own setup (CLAUDE.md, MCP, plugins).
     const first = sessions
+      .filter((s) => s.agent !== "codex")
       .map((s) => ({ s, t: s.turns?.[0]?.tokens }))
       .filter((x): x is { s: Session; t: NonNullable<typeof x.t> } => !!x.t)
       .map(({ s, t }) => ({ s, ctx: t.input + t.cacheRead + t.cacheWrite }))

@@ -223,7 +223,8 @@ export async function saveBadgeState(path, state) {
  */
 export function computeBadges(allSessions, state, now = Date.now()) {
   const since = Date.parse(state.startedAt);
-  const sessions = allSessions.filter((s) => !s.ghost && startMs(s) >= since);
+  // Badges are earned with Claude Code: Codex sessions don't count (their tools and models differ).
+  const sessions = allSessions.filter((s) => !s.ghost && s.agent !== "codex" && startMs(s) >= since);
   const ctx = buildContext(sessions, now);
   ctx.streak = bestWeekdayStreak(ctx.days, since, now);
   const available = {
