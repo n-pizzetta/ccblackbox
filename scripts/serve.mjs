@@ -16,7 +16,9 @@ import { fileURLToPath } from "node:url";
 import { platform } from "node:os";
 import { dirname, join, resolve, extname, normalize, sep } from "node:path";
 import { existsSync, statSync, createReadStream } from "node:fs";
-import { handleRequest, startApi } from "./api.mjs";
+import { VERSION, handleRequest, startApi } from "./api.mjs";
+import { dataDir } from "./data-dir.mjs";
+import { isOlder, refreshStatusline, runningServer, stopServer } from "./takeover.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -109,6 +111,8 @@ async function main() {
     console.warn("[marey] dist/ not found — run `pnpm build` to produce the UI bundle.");
   }
 
+  if (refreshStatusline(dataDir(), __dirname)) console.log(`[marey] status line wrapper updated to ${VERSION}`);
+
   await startApi();
 
   const server = createServer(async (req, res) => {
@@ -121,10 +125,25 @@ async function main() {
     }
   });
 
-  server.on("error", (err) => {
+  // Loopback only: the API serves prompts, file snapshots and account info.
+  const listen = () => server.listen(args.port, "127.0.0.1");
+  let replaced = false;
+
+  server.on("error", async (err) => {
     if (err.code === "EADDRINUSE") {
       const url = `http://localhost:${args.port}`;
-      console.log(`[marey] port ${args.port} is already in use. If Marey is running, it is at ${url}; otherwise pass --port <n>.`);
+      // After a plugin update, the server still running is the old version: replace it.
+      const running = replaced ? null : await runningServer(args.port);
+      if (running && isOlder(running.version, VERSION) && (await stopServer(running.pid, args.port))) {
+        replaced = true;
+        console.log(`[marey] replaced Marey ${running.version ?? "(older)"} on port ${args.port} with ${VERSION}`);
+        return listen();
+      }
+      console.log(
+        running
+          ? `[marey] Marey ${running.version ?? "(older)"} is already running at ${url}`
+          : `[marey] port ${args.port} is already in use. If Marey is running, it is at ${url}; otherwise pass --port <n>.`,
+      );
       if (args.open) openBrowser(url);
       process.exit(0);
     }
@@ -132,12 +151,12 @@ async function main() {
     process.exit(1);
   });
 
-  // Loopback only: the API serves prompts, file snapshots and account info.
-  server.listen(args.port, "127.0.0.1", () => {
+  server.on("listening", () => {
     const url = `http://localhost:${args.port}`;
-    console.log(`[marey] listening on ${url}`);
+    console.log(`[marey] ${VERSION} listening on ${url}`);
     if (args.open) openBrowser(url);
   });
+  listen();
 }
 
 main().catch((err) => {
