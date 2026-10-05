@@ -44,7 +44,7 @@
   padding: 5.2cqw 5.6cqw 5cqw;
   overflow: hidden;
   border-radius: 7.8cqw;
-  background: linear-gradient(180deg, #151d28, #0b1117);
+  background: linear-gradient(180deg, var(--c-bg-panel), var(--c-bg));
 }
 
 .badge-art {
@@ -56,7 +56,7 @@
   place-items: center;
   overflow: hidden;
   border-radius: 5cqw;
-  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--tier) 22%, #0f151d), #090d13 74%);
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--tier) 22%, var(--c-bg-panel)), var(--c-bg) 74%);
 }
 
 .badge-glyph {
@@ -90,9 +90,10 @@
   text-wrap: balance;
 }
 
-/* ---- Finishes ---- */
+/* ---- Finishes ----
+   Metal and holographic colours are literal on purpose: the finish must not follow the UI accent. */
 .badge-card:not(.locked) .badge-frame { background: linear-gradient(140deg, var(--tier-hi), var(--tier) 32%, var(--tier-lo) 62%, var(--tier)); }
-.badge-card.tier-platinum .badge-frame { background: linear-gradient(140deg, #e9fbff, var(--c-cyan) 28%, var(--c-violet) 56%, var(--c-pink) 78%, var(--c-teal)); }
+.badge-card.tier-platinum .badge-frame { background: linear-gradient(140deg, #e9fbff, #4cc2ff 28%, #b084ff 56%, #ff7eb6 78%, #5eead4); }
 .badge-card:not(.locked) .badge-face { box-shadow: inset 0 0 0 0.5cqw rgba(255, 255, 255, 0.07); }
 .badge-card:not(.locked) .badge-art {
   box-shadow: inset 0 0 0 0.5cqw color-mix(in srgb, var(--tier) 45%, #1a222c), inset 0 0 12px color-mix(in srgb, var(--tier) 14%, transparent);
@@ -140,7 +141,7 @@
   background:
     repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 6px),
     repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 6px),
-    linear-gradient(180deg, #10161e, #0a0f15);
+    linear-gradient(180deg, var(--c-bg-elevated), var(--c-bg));
 }
 .badge-card.locked .badge-art { background: none; box-shadow: inset 0 0 0 0.5cqw rgba(255, 255, 255, 0.05); }
 .badge-card.locked .badge-art::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.45), transparent 70%); }
@@ -184,7 +185,7 @@
   padding: 12px 14px;
   background: var(--c-bg-elevated);
   border: 1px solid var(--c-hairline-strong);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   box-shadow: var(--shadow-pop);
   pointer-events: none;
 }
