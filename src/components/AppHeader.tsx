@@ -1,4 +1,4 @@
-import type { Session } from "../types";
+import type { Level, Streak } from "../utils/gamify";
 import { PRODUCT_NAME } from "../utils/brand";
 import { NAV_PAGES, type Page } from "../utils/pages";
 import { LimitsPill } from "./LimitsGauge";
@@ -18,7 +18,10 @@ interface Props {
   sessionCount: number;
   /** Failing or warning health checks in the scope, shown on the Health tab. */
   healthIssues: number;
-  allSessions: Session[];
+  /** Badge unlocks not seen on the Progress page yet. */
+  unseenUnlocks: number;
+  level: Level | null;
+  streak: Streak | null;
   source: "real" | "mock";
   generatedAt?: string;
   reportStatus: ReportStatus;
@@ -41,7 +44,9 @@ export function AppHeader({
   onPageChange,
   sessionCount,
   healthIssues,
-  allSessions,
+  unseenUnlocks,
+  level,
+  streak,
   source,
   generatedAt,
   reportStatus,
@@ -71,6 +76,11 @@ export function AppHeader({
                 {healthIssues}
               </span>
             )}
+            {p.id === "badges" && unseenUnlocks > 0 && (
+              <span className="app-nav-count new mono tabular" title={`${unseenUnlocks} new badge${unseenUnlocks > 1 ? "s" : ""}`}>
+                {unseenUnlocks}
+              </span>
+            )}
           </button>
         ))}
       </nav>
@@ -79,7 +89,8 @@ export function AppHeader({
         <LimitsPill />
         {parseErrors && parseErrors.length > 0 && <ParseErrors errors={parseErrors} />}
         <ProfileMenu
-          allSessions={allSessions}
+          level={level}
+          streak={streak}
           source={source}
           parsedAgo={formatAge(generatedAt)}
           reportStatus={reportStatus}

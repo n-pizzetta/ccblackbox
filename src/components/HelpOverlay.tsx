@@ -7,7 +7,7 @@ interface Props {
 }
 
 const SHORTCUTS: Array<[string, string]> = [
-  ["1 – 4", "Now · Sessions · Usage · Health"],
+  ["1 – 5", "Now · Sessions · Usage · Health · Progress"],
   ["↑ / k", "Previous session (while one is open)"],
   ["↓ / j", "Next session (while one is open)"],
   ["Esc", "Close the session / overlay"],
@@ -44,6 +44,8 @@ const GLOSSARY: Array<[string, string]> = [
   ["Spike", "Your 5h limit jumped by 4 percentage points (amber) or 10 (red) within 5 minutes."],
   ["Ghost", "A session that ended without a clean shutdown, so its data may be incomplete."],
   ["Friction", "Moments where the session stalled, got corrected or went in circles, as flagged by an LLM."],
+  ["XP / Level", "Earned by how sessions were run (commits, tests, lint or build, context score), never by tokens spent, plus good-practice badges. See Progress."],
+  ["Streak", "Active days in a row. A quiet Saturday or Sunday doesn't break it; the flame dims on a weekday you haven't worked yet."],
 ];
 
 const DATA_SOURCES: Array<{ tag: string; label: string; examples: string }> = [

@@ -109,9 +109,14 @@ export function projectLeague(sessions: Session[], allSessions: Session[], range
     });
 }
 
-/* ---- Badges (computed server-side by scripts/badges.mjs) ---- */
+/* ---- Badges, level and streak (computed server-side by scripts/badges.mjs) ---- */
 
 export type Tier = "bronze" | "silver" | "gold" | "platinum";
+
+export const TIER_LABEL: Record<Tier, string> = { bronze: "Bronze", silver: "Silver", gold: "Gold", platinum: "Platinum" };
+
+/** `xp` is what unlocking the tier adds to the level: 0 for volume and spend families. */
+export type BadgeTier = { tier: Tier; target: number; progress: number; unlockedAt: string | null; xp: number };
 
 export type BadgeFamily = {
   id: string;
@@ -122,10 +127,30 @@ export type BadgeFamily = {
   window: "ever" | "30d";
   /** False when the family needs data this user doesn't have (/insights, scored sessions). */
   available: boolean;
-  tiers: Array<{ tier: Tier; target: number; progress: number; unlockedAt: string | null }>;
+  /** Rewards good practice (tests, commits, cache, context): the only families suggested as a next goal. */
+  nudge: boolean;
+  tiers: BadgeTier[];
 };
 
-export type BadgesPayload = { startedAt: string | null; total: number; families: BadgeFamily[] };
+/** XP from how sessions were run (all history) plus good-practice badge tiers. Level n starts at `from`. */
+export type Level = {
+  level: number;
+  title: string;
+  xp: number;
+  from: number;
+  next: number;
+  /** XP of sessions worked in today and badges unlocked today. */
+  today: number;
+  /** XP per session for each criterion met. */
+  rules: Array<{ label: string; points: number }>;
+  /** XP a good-practice badge adds when a tier unlocks. */
+  tierXp: Record<Tier, number>;
+};
+
+/** Active days in a row; quiet weekends don't break it, a quiet weekday today puts it at risk. */
+export type Streak = { current: number; activeToday: boolean; atRisk: boolean };
+
+export type BadgesPayload = { startedAt: string | null; total: number; families: BadgeFamily[]; level?: Level; streak?: Streak };
 
 /** Fetches /api/badges whenever `version` changes (pass the session list); null without the API. */
 export function useBadges(version: unknown): BadgesPayload | null {
@@ -141,48 +166,22 @@ export function useBadges(version: unknown): BadgesPayload | null {
   return data;
 }
 
-/* ---- Hero: health score, streak, level ---- */
+export const badgeKey = (f: BadgeFamily, t: BadgeTier) => `${f.id}:${t.tier}`;
 
-function dayKey(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+/** `family:tier` keys of every unlocked tier. */
+export function unlockedKeys(families: BadgeFamily[]): string[] {
+  return families.flatMap((f) => f.tiers.filter((t) => t.unlockedAt).map((t) => badgeKey(f, t)));
 }
 
-/** Consecutive days with activity, ending today (a quiet today keeps yesterday's streak alive). */
-export function activityStreak(allSessions: Session[], now: number = Date.now()): number {
-  const days = new Set<string>();
-  for (const s of allSessions) {
-    const base = new Date(s.startedAt).getTime();
-    days.add(dayKey(base));
-    if (s.lastEventAt) days.add(dayKey(new Date(s.lastEventAt).getTime()));
-    for (const t of s.turns ?? []) days.add(dayKey(base + t.t));
+export type NextGoal = { family: BadgeFamily; tier: BadgeTier; ratio: number };
+
+/** The locked tiers closest to unlocking, among families that reward good practice. */
+export function nextUp(families: BadgeFamily[], limit: number): NextGoal[] {
+  const out: NextGoal[] = [];
+  for (const family of families) {
+    if (!family.available || !family.nudge) continue;
+    const tier = family.tiers.find((t) => !t.unlockedAt);
+    if (tier) out.push({ family, tier, ratio: tier.progress / tier.target });
   }
-  let cursor = now;
-  if (!days.has(dayKey(cursor))) cursor -= DAY_MS;
-  let streak = 0;
-  while (days.has(dayKey(cursor))) {
-    streak += 1;
-    cursor -= DAY_MS;
-  }
-  return streak;
-}
-
-const LEVEL_UNIT = 1_000_000;
-const LEVEL_TITLES = ["Rookie", "Operator", "Engineer", "Architect", "Wizard", "Legend"];
-
-export type Level = { level: number; title: string; progress: number; nextAt: number; total: number };
-
-/** Cosmetic level from lifetime fresh tokens: level n starts at 1M × (n-1)². */
-export function levelOf(allSessions: Session[]): Level {
-  const total = allSessions.reduce((a, s) => a + freshTokens(s.tokens), 0);
-  const level = Math.floor(Math.sqrt(total / LEVEL_UNIT)) + 1;
-  const from = LEVEL_UNIT * (level - 1) ** 2;
-  const nextAt = LEVEL_UNIT * level ** 2;
-  return {
-    level,
-    title: LEVEL_TITLES[Math.min(level - 1, LEVEL_TITLES.length - 1)],
-    progress: (total - from) / (nextAt - from),
-    nextAt,
-    total,
-  };
+  return out.sort((a, b) => b.ratio - a.ratio || (a.tier.target - a.tier.progress) - (b.tier.target - b.tier.progress)).slice(0, limit);
 }
