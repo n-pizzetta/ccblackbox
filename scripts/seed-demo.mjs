@@ -176,8 +176,8 @@ for (let day = 6; day >= 0; day--) {
 }
 
 // Usage limits as recorded by the status line wrapper.
-mkdirSync(join(CLAUDE, "ccblackbox"), { recursive: true });
-writeFileSync(join(CLAUDE, "ccblackbox", "limits.json"), JSON.stringify({
+mkdirSync(join(CLAUDE, "marey"), { recursive: true });
+writeFileSync(join(CLAUDE, "marey", "limits.json"), JSON.stringify({
   capturedAt: NOW,
   rate_limits: {
     five_hour: { used_percentage: 58, resets_at: Math.floor((NOW + 2 * HOUR + 14 * MIN) / 1000) },
@@ -186,7 +186,7 @@ writeFileSync(join(CLAUDE, "ccblackbox", "limits.json"), JSON.stringify({
 }));
 
 // Badges count from the first launch; backdate it so the demo history counts.
-writeFileSync(join(CLAUDE, "ccblackbox", "badges.json"), JSON.stringify({ version: 1, startedAt: new Date(NOW - 365 * 24 * HOUR).toISOString(), unlocked: {} }));
+writeFileSync(join(CLAUDE, "marey", "badges.json"), JSON.stringify({ version: 1, startedAt: new Date(NOW - 365 * 24 * HOUR).toISOString(), unlocked: {} }));
 
 /**
  * One Codex rollout. `legacy` mimics older CLIs (user_message events, direct

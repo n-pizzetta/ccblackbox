@@ -7,12 +7,12 @@ import { handleRequest, startApi } from "./scripts/api.mjs";
  * Dev server: mounts the same API as scripts/serve.mjs (scripts/api.mjs) and
  * pushes an HMR event after every re-parse so the UI refetches immediately.
  */
-function ccblackboxApi(): Plugin {
+function mareyApi(): Plugin {
   return {
-    name: "ccblackbox-api",
+    name: "marey-api",
     configureServer(server) {
       startApi({
-        onParsed: () => server.ws.send({ type: "custom", event: "ccblackbox:sessions-updated" }),
+        onParsed: () => server.ws.send({ type: "custom", event: "marey:sessions-updated" }),
       });
       server.middlewares.use(async (req, res, next) => {
         try {
@@ -26,5 +26,5 @@ function ccblackboxApi(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), ccblackboxApi()],
+  plugins: [react(), mareyApi()],
 });

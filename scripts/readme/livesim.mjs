@@ -13,7 +13,7 @@ const dir = join(CLAUDE, "projects", "-Users-demo-dev-web-dashboard");
 const file = join(dir, `${id}.jsonl`);
 const start = Date.now() - 14 * 60_000;
 mkdirSync(join(CLAUDE, "sessions"), { recursive: true });
-mkdirSync(join(CLAUDE, "ccblackbox", "live"), { recursive: true });
+mkdirSync(join(CLAUDE, "marey", "live"), { recursive: true });
 writeFileSync(join(CLAUDE, "sessions", `${proc.pid}.json`), JSON.stringify({ pid: proc.pid, sessionId: id, cwd, startedAt: start }));
 let n = 0, ctx = 52_000, pending = null;
 const base = () => ({ sessionId: id, cwd });
@@ -28,7 +28,7 @@ function turn(ts, last = false) {
   line({ type: "assistant", timestamp: new Date(ts).toISOString(), requestId: `req_live${n}`, message: { ...msg, content: [{ type: "tool_use", id: tid, name, input }] } });
   if (last) pending = tid;
   else line({ type: "user", timestamp: new Date(ts + 1500).toISOString(), message: { role: "user", content: [{ type: "tool_result", tool_use_id: tid, content: "ok" }] } });
-  writeFileSync(join(CLAUDE, "ccblackbox", "live", `${id}.json`), JSON.stringify({ v: 1, sessionId: id, capturedAt: Date.now(), model: "claude-opus-5-5", costUsd: 2 + n * 0.11, context: { usedPct: Math.round(ctx / 10_000), size: 1_000_000, tokens: ctx }, cache: { observed: true, warm: true, ttl: "1h", expiresAt: Math.floor(Date.now() / 1000) + 3540, requests: n + 10, misses: 1, hitRatio: 0.94, lastMissCause: null, recacheTokensIfCold: ctx } }));
+  writeFileSync(join(CLAUDE, "marey", "live", `${id}.json`), JSON.stringify({ v: 1, sessionId: id, capturedAt: Date.now(), model: "claude-opus-5-5", costUsd: 2 + n * 0.11, context: { usedPct: Math.round(ctx / 10_000), size: 1_000_000, tokens: ctx }, cache: { observed: true, warm: true, ttl: "1h", expiresAt: Math.floor(Date.now() / 1000) + 3540, requests: n + 10, misses: 1, hitRatio: 0.94, lastMissCause: null, recacheTokensIfCold: ctx } }));
 }
 line({ type: "user", timestamp: new Date(start).toISOString(), message: { role: "user", content: "Build a dark-mode toggle that respects the system setting" } });
 for (let i = 0; i < 14; i++) turn(start + 30_000 + i * 55_000);

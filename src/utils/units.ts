@@ -27,7 +27,7 @@ export function formatUsage(unit: Unit, tokens: TokenCounts, costUsd: number): s
   return unit === "tokens" ? formatTokens(freshTokens(tokens)) : formatCost(costUsd);
 }
 
-const KEY = "ccblackbox:unit";
+const KEY = "marey:unit";
 const listeners = new Set<() => void>();
 
 function read(): Unit {

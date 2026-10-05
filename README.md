@@ -1,9 +1,9 @@
 <h1 align="center">
-  <img src="./docs/logo.svg" alt="" width="64" valign="middle" /> CCblackbox
+  <img src="./docs/logo.svg" alt="" width="64" valign="middle" /> Marey
 </h1>
 
 <p align="center">
-  <a href="https://github.com/n-pizzetta/ccblackbox/releases"><img src="https://img.shields.io/github/v/release/n-pizzetta/ccblackbox?style=flat&amp;color=08C" alt="Latest release" /></a>
+  <a href="https://github.com/n-pizzetta/marey/releases"><img src="https://img.shields.io/github/v/release/n-pizzetta/marey?style=flat&amp;color=08C" alt="Latest release" /></a>
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-D97757?style=flat" alt="Claude Code plugin" />
   <img src="https://img.shields.io/badge/100%25%20local-no%20telemetry-3DDC97?style=flat" alt="100% local, no telemetry" />
   <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="License: MIT" />
@@ -17,10 +17,10 @@
 <h3 align="center"><a href="#install"><ins>Install as a Claude Code plugin</ins></a></h3>
 
 <p align="center">
-  <img src="./docs/readme/hero.png" alt="The ccblackbox dashboard, with a Claude Code terminal in front showing the context and prompt-cache segment ccblackbox adds to the status line (synthetic demo data)" width="960" />
+  <img src="./docs/readme/hero.png" alt="The Marey dashboard, with a Claude Code terminal in front showing the context and prompt-cache segment Marey adds to the status line (synthetic demo data)" width="960" />
 </p>
 
-`ccblackbox` reads the session data Claude Code already writes under `~/.claude/` (and Codex under `~/.codex/`) and turns it into a local dashboard. The data is already there. Nothing visualizes it. This does.
+Marey reads the session data Claude Code already writes under `~/.claude/` (and Codex under `~/.codex/`) and turns it into a local dashboard. The data is already there. Nothing visualizes it. This does.
 
 ## Features
 
@@ -112,38 +112,52 @@ Empty sessions and sessions whose Claude Code process died are flagged. Get the 
 **1. Add the plugin.** In Claude Code:
 
 ```
-/plugin marketplace add n-pizzetta/ccblackbox
-/plugin install ccblackbox@ccblackbox
+/plugin marketplace add n-pizzetta/marey
+/plugin install marey@marey
 ```
 
-**2. Open the dashboard.** `/ccblackbox:replay` parses `~/.claude` and opens `localhost:3333`.
+**2. Open the dashboard.** `/marey:replay` parses `~/.claude` and opens `localhost:3333`.
 
-**3. Connect your limits** *(recommended)*. `/ccblackbox:limits` turns on the real 5h and 7-day limits and the context advice. Re-run it after updating ccblackbox; `/ccblackbox:limits --uninstall` undoes it.
+**3. Connect your limits** *(recommended)*. `/marey:limits` turns on the real 5h and 7-day limits and the context advice. Re-run it after updating Marey; `/marey:limits --uninstall` undoes it.
 
 Needs Node 20+ on your `PATH`.
 
 <details>
-<summary>What <code>/ccblackbox:limits</code> changes</summary>
+<summary>What <code>/marey:limits</code> changes</summary>
 
 Claude Code only exposes your 5-hour and 7-day usage limits (the numbers behind `/usage`) to the status line, so the command installs a small wrapper that records them for the dashboard:
 
 - Your existing status line keeps rendering unchanged, and `settings.json` is backed up first.
 - It also records each live session's context fill and prompt-cache warmth, which power the *keep going / compact / clear* verdict in the session view.
-- A short `ctx ━━━───── 33% │ cache warm 59m` segment is appended to your status line, colored green / yellow / red by level. Hide it with `"verdict": false` in `~/.claude/ccblackbox/statusline.json`.
+- A short `ctx ━━━───── 33% │ cache warm 59m` segment is appended to your status line, colored green / yellow / red by level. Hide it with `"verdict": false` in `~/.claude/marey/statusline.json`.
 - `statusLine.refreshInterval` is set to 30 seconds (unless you already set one) so the cache countdown keeps moving while the session is idle.
 
 Without it, the dashboard still shows tokens and cost for an inferred 5h window, just not the limit percentages.
 
 </details>
 
-The plugin also registers a `PostToolUse` hook that records fine-grained tool sequences to `~/.claude/ccblackbox/cache/{sessionId}.jsonl`, so sessions can be replayed call by call.
+The plugin also registers a `PostToolUse` hook that records fine-grained tool sequences to `~/.claude/marey/cache/{sessionId}.jsonl`, so sessions can be replayed call by call.
+
+### Upgrading from ccblackbox
+
+Marey was called ccblackbox. The plugin id changed, so Claude Code won't update it by itself: remove the old plugin and add the new one.
+
+```
+/plugin uninstall ccblackbox@ccblackbox
+/plugin marketplace remove ccblackbox
+/plugin marketplace add n-pizzetta/marey
+/plugin install marey@marey
+/marey:limits
+```
+
+Your data moves on its own: the first run moves `~/.claude/ccblackbox/` (XP, badges, limits history, tool cache, model overrides) to `~/.claude/marey/` and leaves a link at the old path, so nothing breaks in between. `/marey:limits` points your status line at the new folder; your previous status line is kept. Dashboard settings saved in the browser carry over too.
 
 ### From source
 
 Requires Node 20+ and pnpm.
 
 ```sh
-git clone https://github.com/n-pizzetta/ccblackbox && cd ccblackbox
+git clone https://github.com/n-pizzetta/marey && cd marey
 pnpm install
 pnpm serve                            # parse ~/.claude/, serve on :3333 and open the browser
 node scripts/serve.mjs --help         # --port, --no-open
@@ -154,7 +168,7 @@ node scripts/install-statusline.mjs   # optional: real usage limits (see above)
 
 ## Privacy
 
-**Everything runs locally: no network calls, no telemetry.** `ccblackbox` reads (from `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set):
+**Everything runs locally: no network calls, no telemetry.** Marey reads (from `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set):
 
 | Data | Source |
 | --- | --- |
@@ -164,13 +178,13 @@ node scripts/install-statusline.mjs   # optional: real usage limits (see above)
 | Live session state | `~/.claude/sessions/` |
 | Codex rollouts and thread names (or under `$CODEX_HOME` when set) | `~/.codex/sessions/`, `~/.codex/archived_sessions/`, `~/.codex/session_index.jsonl` |
 
-The server only listens on `127.0.0.1` and refuses state-changing requests from other websites. The optional `pnpm parse` dump is written to `~/.claude/ccblackbox/sessions.json`, never inside the repo.
+The server only listens on `127.0.0.1` and refuses state-changing requests from other websites. The optional `pnpm parse` dump is written to `~/.claude/marey/sessions.json`, never inside the repo.
 
 ## Pricing
 
 Costs are estimates at Anthropic's and OpenAI's public API rates (no batch or negotiated discounts; on a Pro/Max plan they are an API-equivalent value, not what you pay). The table lives in [`scripts/models.mjs`](./scripts/models.mjs) and every turn is priced with its own model.
 
-A model missing from the table still gets a readable name and is priced like the latest model of its family. Costs that include it are marked `~` in the dashboard. To fix one without waiting for a release, add it to `~/.claude/ccblackbox/models.json` (prices in USD per million tokens; picked up on the next refresh):
+A model missing from the table still gets a readable name and is priced like the latest model of its family. Costs that include it are marked `~` in the dashboard. To fix one without waiting for a release, add it to `~/.claude/marey/models.json` (prices in USD per million tokens; picked up on the next refresh):
 
 ```json
 {
@@ -190,7 +204,7 @@ pnpm lint         # ESLint
 pnpm typecheck    # tsc
 pnpm build        # typecheck + build → dist/ (committed: the plugin ships it prebuilt)
 pnpm test         # node --test (parser)
-pnpm parse        # one-shot dump of every session to ~/.claude/ccblackbox/sessions.json
+pnpm parse        # one-shot dump of every session to ~/.claude/marey/sessions.json
 ```
 
 The dev server and `scripts/serve.mjs` mount the same API (`scripts/api.mjs`): it runs the parser in-process, keeps sessions in memory and re-parses when `~/.claude/` changes (unchanged transcripts are cached). The front-end fetches a lightweight list (`/api/sessions`) and loads each session's detail on demand (`/api/sessions/:id`). If the API is unreachable, it falls back to built-in demo data.
@@ -228,12 +242,12 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the parser internals, component m
 
 ## Community &amp; Support
 
-- **Feedback &amp; ideas:** missing something? [Open an issue](https://github.com/n-pizzetta/ccblackbox/issues).
+- **Feedback &amp; ideas:** missing something? [Open an issue](https://github.com/n-pizzetta/marey/issues).
 - **Contributing:** pull requests are welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, the synthetic demo data (`pnpm seed:demo`) and the privacy rules.
 - **Security:** see [`SECURITY.md`](./SECURITY.md) to report a vulnerability.
 - **Release notes &amp; roadmap:** [`CHANGELOG.md`](./CHANGELOG.md).
-- **Show support:** [star the repo](https://github.com/n-pizzetta/ccblackbox) to follow along.
+- **Show support:** [star the repo](https://github.com/n-pizzetta/marey) to follow along.
 
 ## License
 
-ccblackbox is free and open source under the [MIT License](./LICENSE).
+Marey is free and open source under the [MIT License](./LICENSE).

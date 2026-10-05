@@ -5,7 +5,7 @@ import { LimitsSection } from "./LimitsSection";
 import { UnitSetting } from "./UnitSetting";
 import type { Page } from "../utils/pages";
 
-const BUG_URL = "https://github.com/n-pizzetta/ccblackbox/issues/new/choose";
+const BUG_URL = "https://github.com/n-pizzetta/marey/issues/new/choose";
 
 interface Props {
   /** Null without the local API (static export, mock data). */

@@ -15,7 +15,7 @@ dist-ssr
 !dist/
 !dist/**
 
-# Legacy `pnpm parse` output location (it now writes to ~/.claude/ccblackbox/).
+# Legacy `pnpm parse` output location (it now writes to ~/.claude/marey/).
 # Kept ignored so personal session data can never be committed.
 public/sessions.json
 dist/sessions.json

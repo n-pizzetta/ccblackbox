@@ -26,11 +26,13 @@ import {
 } from "./transcript-utils.mjs";
 import { CODEX, codexRootOf, indexCodexRollouts, isCodexLive, isCodexRunning, parseCodexRollout } from "./codex.mjs";
 import { costOf, DEFAULT_MODEL, isKnownModel, normalizeModel, priceFor, setModelOverrides } from "./models.mjs";
+import { dataDir } from "./data-dir.mjs";
 
 // `pnpm parse` dump. Never under public/ or dist/: it holds real prompts and paths.
 // Claude Code moves ~/.claude when CLAUDE_CONFIG_DIR is set; so do we.
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
-const OUT = join(CLAUDE, "ccblackbox", "sessions.json");
+const DATA = dataDir(CLAUDE);
+const OUT = join(DATA, "sessions.json");
 const META_DIR = join(CLAUDE, "usage-data", "session-meta");
 const FACETS_DIR = join(CLAUDE, "usage-data", "facets");
 const LIVE_DIR = join(CLAUDE, "sessions");
@@ -38,7 +40,7 @@ const STALE_DIR = join(LIVE_DIR, ".stale");
 const HISTORY = join(CLAUDE, "history.jsonl");
 const PROJECTS_DIR = join(CLAUDE, "projects");
 const FILE_HISTORY_DIR = join(CLAUDE, "file-history");
-const PLUGIN_CACHE_DIR = join(CLAUDE, "ccblackbox", "cache");
+const PLUGIN_CACHE_DIR = join(DATA, "cache");
 
 /** User-role lines that are not prompts the user typed. */
 const NON_PROMPT_RE = /^\s*(<(command-|local-command-|task-notification|system-reminder)|\[Request interrupted|Caveat:)/;
@@ -823,12 +825,12 @@ function normalizeWindow(w, now) {
 }
 
 /**
- * Real usage limits recorded by the ccblackbox status line wrapper
+ * Real usage limits recorded by the Marey status line wrapper
  * (scripts/statusline.mjs), or null when it isn't installed yet.
  */
 export async function readLimits(now = Date.now()) {
   try {
-    const raw = JSON.parse(await readFile(join(CLAUDE, "ccblackbox", "limits.json"), "utf8"));
+    const raw = JSON.parse(await readFile(join(DATA, "limits.json"), "utf8"));
     const rl = raw.rate_limits ?? {};
     return {
       capturedAt: raw.capturedAt ?? null,
@@ -840,7 +842,7 @@ export async function readLimits(now = Date.now()) {
   }
 }
 
-const LIVE_CONTEXT_DIR = join(CLAUDE, "ccblackbox", "live");
+const LIVE_CONTEXT_DIR = join(DATA, "live");
 const LIVE_CONTEXT_KEEP_MS = 3 * 86_400_000;
 
 /**
@@ -873,7 +875,7 @@ export async function readLiveContext(now = Date.now()) {
   return out.sort((a, b) => b.capturedAt - a.capturedAt);
 }
 
-const MODEL_OVERRIDES_FILE = join(CLAUDE, "ccblackbox", "models.json");
+const MODEL_OVERRIDES_FILE = join(DATA, "models.json");
 
 /** User pricing overrides; see setModelOverrides in models.mjs. */
 async function loadModelOverrides() {
@@ -881,7 +883,7 @@ async function loadModelOverrides() {
   try {
     raw = JSON.parse(await readFile(MODEL_OVERRIDES_FILE, "utf8"));
   } catch (err) {
-    if (err.code !== "ENOENT") console.warn(`[ccblackbox] ignoring ${MODEL_OVERRIDES_FILE}: ${err.message}`);
+    if (err.code !== "ENOENT") console.warn(`[marey] ignoring ${MODEL_OVERRIDES_FILE}: ${err.message}`);
   }
   return setModelOverrides(raw);
 }

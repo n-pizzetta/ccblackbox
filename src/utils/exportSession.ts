@@ -55,7 +55,7 @@ export function exportSessionHtml(session: Session): string {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>ccblackbox · ${esc(session.goal.slice(0, 60))}</title>
+<title>Marey · ${esc(session.goal.slice(0, 60))}</title>
 <style>
   :root {
     --fg: #e6e6e6; --bg: #0d0f11; --dim: #7a7f86; --panel: #14171b; --hair: #222730;
@@ -114,7 +114,7 @@ export function exportSessionHtml(session: Session): string {
   ${fileRows ? `<h2>Files edited</h2><ul>${fileRows}</ul>` : ""}
 
   <footer>
-    Exported from ccblackbox · session <code>${esc(session.id)}</code>
+    Exported from Marey · session <code>${esc(session.id)}</code>
   </footer>
 </main>
 </body>

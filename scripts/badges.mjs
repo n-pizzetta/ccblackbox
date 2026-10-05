@@ -2,8 +2,8 @@
  * Badge catalog and progress, computed server-side from full sessions (the
  * list payload has no shell counters).
  *
- * Badges only count sessions started after ccblackbox first ran: that date
- * and each unlock are kept in ~/.claude/ccblackbox/badges.json, so an unlock
+ * Badges only count sessions started after Marey first ran: that date
+ * and each unlock are kept in ~/.claude/marey/badges.json, so an unlock
  * survives transcript cleanup and 30-day windows sliding past it.
  *
  * Calibration (see ARCHITECTURE.md): one metric per family, only the target
@@ -13,6 +13,7 @@
  */
 import { promises as fsp } from "node:fs";
 import { dirname, join } from "node:path";
+import { dataDir } from "./data-dir.mjs";
 
 const DAY_MS = 86_400_000;
 const WINDOW_MS = 30 * DAY_MS;
@@ -141,7 +142,7 @@ const FAMILIES = [
   // Rolling 30 days
   { id: "shipper", nudge: true, name: "Shipper", icon: "🚢", tierNames: ["Dinghy", "Sailboat", "Steamer", "Flagship"], window: "30d", hint: "Days with a commit made by Claude in the last 30 days", targets: [3, 8, 15, 22], metric: (c) => c.commitDays30 },
   { id: "cache", nudge: true, name: "Cache keeper", icon: "🧊", tierNames: ["Ice cube", "Iceberg", "Glacier"], window: "30d", hint: "Sessions over 100k tokens in the last 30 days with a cache hit of 95% (bronze, silver) or 98% (gold)", targets: [1, 10, 25], metric: (c) => [c.cache95, c.cache95, c.cache98] },
-  { id: "streak", name: "Streak", icon: "🔥", tierNames: ["Spark", "Flame", "Bonfire", "Wildfire"], hint: "Best run of active days in a row since ccblackbox first ran; quiet weekends don't break it", targets: [3, 7, 14, 30], metric: (c) => c.streak },
+  { id: "streak", name: "Streak", icon: "🔥", tierNames: ["Spark", "Flame", "Bonfire", "Wildfire"], hint: "Best run of active days in a row since Marey first ran; quiet weekends don't break it", targets: [3, 7, 14, 30], metric: (c) => c.streak },
 
   // Shipping and rigor (shell commands run by Claude)
   { id: "pr", nudge: true, name: "PR opener", icon: "🔀", tierNames: ["First PR", "Contributor", "Maintainer", "Core team"], hint: "Pull requests opened with gh pr create", targets: [1, 10, 200, 1000], metric: (c) => sum(c.sessions, (s) => s.shell?.prs ?? 0) },
@@ -261,7 +262,7 @@ function buildContext(sessions, now) {
 /* ---- State ---- */
 
 export function badgeStatePath(claudeDir) {
-  return join(claudeDir, "ccblackbox", "badges.json");
+  return join(dataDir(claudeDir), "badges.json");
 }
 
 /** Reads badges.json, creating it (first launch = now) when missing. */
@@ -285,7 +286,7 @@ export async function saveBadgeState(path, state) {
     await fsp.writeFile(tmp, JSON.stringify({ version: 1, ...state }, null, 2) + "\n");
     await fsp.rename(tmp, path);
   } catch (e) {
-    console.error("[ccblackbox] could not save badges:", e.message);
+    console.error("[marey] could not save badges:", e.message);
   }
 }
 

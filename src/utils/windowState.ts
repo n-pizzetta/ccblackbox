@@ -1,4 +1,4 @@
-const KEY = "ccblackbox:window-start";
+const KEY = "marey:window-start";
 
 export function loadWindowStart(): number | null {
   try {
@@ -18,5 +18,5 @@ export function saveWindowStart(ms: number | null): void {
   } catch {
     /* ignore */
   }
-  window.dispatchEvent(new CustomEvent("ccblackbox:window-changed"));
+  window.dispatchEvent(new CustomEvent("marey:window-changed"));
 }

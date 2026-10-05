@@ -3,7 +3,7 @@
 Report security issues to maintainers privately. Do not open a public issue or pull
 request for a vulnerability.
 
-Use the **Report a vulnerability** button on the [Security tab](https://github.com/n-pizzetta/ccblackbox/security/advisories/new). It is the only reporting channel.
+Use the **Report a vulnerability** button on the [Security tab](https://github.com/n-pizzetta/marey/security/advisories/new). It is the only reporting channel.
 
 ## Scope
 
@@ -15,10 +15,10 @@ Use the **Report a vulnerability** button on the [Security tab](https://github.c
 
 ## Out of scope
 
-- Data you commit yourself to the repo (ccblackbox does not add, commit or push
+- Data you commit yourself to the repo (Marey does not add, commit or push
   anything on your behalf).
 - Third-party tooling outside this repository.
 
-ccblackbox is designed to run locally with no network calls and no telemetry; a
+Marey is designed to run locally with no network calls and no telemetry; a
 report that demonstrates a way around that property is the most valuable thing
 you can send.

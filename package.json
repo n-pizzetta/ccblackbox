@@ -1,5 +1,5 @@
 {
-  "name": "ccblackbox",
+  "name": "marey",
   "private": true,
   "version": "0.3.0",
   "description": "Visual debugger and analytics dashboard for Claude Code and Codex sessions",
@@ -14,13 +14,13 @@
     "dashboard",
     "agent"
   ],
-  "homepage": "https://github.com/n-pizzetta/ccblackbox",
+  "homepage": "https://github.com/n-pizzetta/marey",
   "repository": {
     "type": "git",
-    "url": "https://github.com/n-pizzetta/ccblackbox.git"
+    "url": "https://github.com/n-pizzetta/marey.git"
   },
   "bugs": {
-    "url": "https://github.com/n-pizzetta/ccblackbox/issues"
+    "url": "https://github.com/n-pizzetta/marey/issues"
   },
   "license": "MIT",
   "author": {
@@ -32,7 +32,7 @@
     "node": ">=20"
   },
   "bin": {
-    "ccblackbox": "scripts/serve.mjs"
+    "marey": "scripts/serve.mjs"
   },
   "files": [
     "dist",

@@ -1,7 +1,7 @@
 {
-  "name": "ccblackbox",
+  "name": "marey",
   "metadata": {
-    "description": "Visual debugger and analytics dashboard for Claude Code sessions"
+    "description": "Visual debugger and analytics dashboard for Claude Code and Codex sessions"
   },
   "owner": {
     "name": "Nathan Pizzetta",
@@ -9,7 +9,7 @@
   },
   "plugins": [
     {
-      "name": "ccblackbox",
+      "name": "marey",
       "description": "Replay turns, inspect tool calls and file diffs, track tokens/cost, and surface friction patterns across your fleet.",
       "source": "./",
       "category": "productivity"

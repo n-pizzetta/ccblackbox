@@ -1,3 +1,4 @@
+import "./utils/legacyStorage";
 // Fonts are bundled (no request to Google Fonts): the dashboard makes no network calls.
 import "@fontsource-variable/inter-tight";
 import "@fontsource-variable/jetbrains-mono";

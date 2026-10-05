@@ -43,7 +43,7 @@ export function LimitsPill() {
 
   if (rows.length === 0) {
     return (
-      <div className="limits-pill off" title="Run /ccblackbox:limits in Claude Code to connect your real 5h and 7-day limits">
+      <div className="limits-pill off" title="Run /marey:limits in Claude Code to connect your real 5h and 7-day limits">
         <span className="limits-pill-label">usage limits · not connected</span>
       </div>
     );

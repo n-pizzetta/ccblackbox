@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * ccblackbox local server.
+ * Marey local server.
  *
  * Serves the prebuilt dashboard (dist/) and the API from scripts/api.mjs
  * (also used by the Vite dev server), on 127.0.0.1 only.
  *
  * Used in two modes:
- *   1. `npx ccblackbox` (or `pnpm serve`)
+ *   1. `npx marey` (or `pnpm serve`)
  *   2. The `/replay` slash command from the Claude Code plugin
  */
 
@@ -46,7 +46,7 @@ function parseArgs(argv) {
     if (a === "--port") {
       args.port = Number(argv[++i]);
       if (!Number.isInteger(args.port) || args.port < 1 || args.port > 65535) {
-        console.error(`[ccblackbox] invalid --port: ${argv[i]}`);
+        console.error(`[marey] invalid --port: ${argv[i]}`);
         process.exit(1);
       }
     }
@@ -54,9 +54,9 @@ function parseArgs(argv) {
     else if (a === "--open") args.open = true;
     else if (a === "--help" || a === "-h") {
       console.log(
-        "ccblackbox — local dashboard for Claude Code sessions\n" +
+        "marey — local dashboard for Claude Code and Codex sessions\n" +
         "\n" +
-        "Usage: ccblackbox [options]\n" +
+        "Usage: marey [options]\n" +
         "  --port <n>       listen on port (default: 3333)\n" +
         "  --no-open        do not open the browser on start\n",
       );
@@ -106,7 +106,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   if (!existsSync(DIST)) {
-    console.warn("[ccblackbox] dist/ not found — run `pnpm build` to produce the UI bundle.");
+    console.warn("[marey] dist/ not found — run `pnpm build` to produce the UI bundle.");
   }
 
   await startApi();
@@ -116,7 +116,7 @@ async function main() {
       if (await handleRequest(req, res)) return;
       return serveStatic(req, res);
     } catch (e) {
-      console.error("[ccblackbox] handler error:", e);
+      console.error("[marey] handler error:", e);
       send(res, 500, "internal error");
     }
   });
@@ -124,23 +124,23 @@ async function main() {
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
       const url = `http://localhost:${args.port}`;
-      console.log(`[ccblackbox] port ${args.port} is already in use. If ccblackbox is running, it is at ${url}; otherwise pass --port <n>.`);
+      console.log(`[marey] port ${args.port} is already in use. If Marey is running, it is at ${url}; otherwise pass --port <n>.`);
       if (args.open) openBrowser(url);
       process.exit(0);
     }
-    console.error("[ccblackbox] server error:", err.message);
+    console.error("[marey] server error:", err.message);
     process.exit(1);
   });
 
   // Loopback only: the API serves prompts, file snapshots and account info.
   server.listen(args.port, "127.0.0.1", () => {
     const url = `http://localhost:${args.port}`;
-    console.log(`[ccblackbox] listening on ${url}`);
+    console.log(`[marey] listening on ${url}`);
     if (args.open) openBrowser(url);
   });
 }
 
 main().catch((err) => {
-  console.error("[ccblackbox] fatal:", err);
+  console.error("[marey] fatal:", err);
   process.exit(1);
 });

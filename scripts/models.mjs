@@ -67,7 +67,7 @@ export function normalizeModel(id) {
 }
 
 /**
- * Replace user overrides (from ~/.claude/ccblackbox/models.json) on top of the
+ * Replace user overrides (from ~/.claude/marey/models.json) on top of the
  * built-in table. Keys may be raw ids (`claude-opus-6`) or normalized
  * (`opus-6`); rows need numeric `in`, `out`, `cacheRead` ($/MTok) and an
  * optional `label`. Invalid rows are skipped. Returns the accepted rows.

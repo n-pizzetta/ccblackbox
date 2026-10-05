@@ -56,7 +56,7 @@ export function formatCost(usd: number): string {
 export function estimateHint(models: Iterable<string>): string {
   return (
     `No pricing yet for ${[...models].join(", ")}: cost estimated from the latest model of the same family. ` +
-    "Add the model to ~/.claude/ccblackbox/models.json to fix it."
+    "Add the model to ~/.claude/marey/models.json to fix it."
   );
 }
 

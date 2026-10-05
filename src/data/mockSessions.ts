@@ -55,8 +55,8 @@ function mulberry32(a: number) {
 const RAW_SESSIONS: Session[] = [
   {
     id: "s_a1f3",
-    project: "ccblackbox",
-    cwd: "~/dev/personal/ccblackbox",
+    project: "marey",
+    cwd: "~/dev/personal/marey",
     startedAt: "2026-04-20T14:02:00Z",
     durationMs: 1000 * 60 * 47,
     model: "opus-5.5",
@@ -172,7 +172,7 @@ const RAW_SESSIONS: Session[] = [
   },
   {
     id: "s_f8a2",
-    project: "ccblackbox",
+    project: "marey",
     cwd: "~/dev/personal",
     startedAt: "2026-04-18T22:14:00Z",
     durationMs: 1000 * 60 * 19,
