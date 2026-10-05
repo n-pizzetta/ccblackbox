@@ -1174,23 +1174,16 @@ a:focus-visible,
   flex-shrink: 0;
   filter: drop-shadow(0 0 10px rgba(76, 194, 255, 0.25));
 }
-.brand-mark-rec {
-  animation: brand-rec 2.4s ease-in-out infinite;
-}
 .brand-mark-trace {
   stroke-dasharray: 60;
   animation: brand-trace 1.2s ease-out both;
-}
-@keyframes brand-rec {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
 }
 @keyframes brand-trace {
   from { stroke-dashoffset: 60; }
   to { stroke-dashoffset: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .brand-mark-rec, .brand-mark-trace { animation: none; }
+  .brand-mark-trace { animation: none; }
 }
 
 .brand-text {

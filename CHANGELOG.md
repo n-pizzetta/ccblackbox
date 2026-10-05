@@ -8,8 +8,13 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Added
 
-- Session **Timeline** tab: context fill, cumulative API value and fresh tokens per turn over time, with compactions, prompts and failed tool calls marked. Updates while a session runs.
+- Session **Timeline** tab: context fill, cumulative API value and fresh tokens per turn over time, with compactions, prompts and failed tool calls marked. It loads when you open a session, for review after the fact.
 - Demo data (`pnpm seed:demo`) now includes compactions and failed tool calls.
+
+### Changed
+
+- Logo and favicon: the red recording dot is gone, leaving the session trace.
+- README: hero image, one animated demo per feature, and install via `/plugin`.
 
 ### Planned
 

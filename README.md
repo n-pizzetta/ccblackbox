@@ -1,61 +1,140 @@
-<p align="center"><img src="./docs/logo.svg" width="96" alt="ccblackbox logo"></p>
+<h1 align="center">
+  <img src="./docs/logo.svg" alt="" width="64" valign="middle" /> CCblackbox
+</h1>
 
-# ccblackbox
+<p align="center">
+  <a href="https://github.com/n-pizzetta/ccblackbox/releases"><img src="https://img.shields.io/github/v/release/n-pizzetta/ccblackbox?style=flat&amp;color=08C" alt="Latest release" /></a>
+  <img src="https://img.shields.io/badge/Claude%20Code-plugin-D97757?style=flat" alt="Claude Code plugin" />
+  <img src="https://img.shields.io/badge/100%25%20local-no%20telemetry-3DDC97?style=flat" alt="100% local, no telemetry" />
+  <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="License: MIT" />
+</p>
 
-> The flight recorder for your Claude Code sessions.
+<p align="center">
+  <strong>The flight recorder for your Claude Code sessions.</strong><br/>
+  Replay every turn, see where the tokens went, and spot the sessions that went sideways — all from data already on your disk.
+</p>
 
-`ccblackbox` reads the session data Claude Code already writes under `~/.claude/` and turns it into a local dashboard: turn-by-turn replays, tool breakdowns, file diffs, friction maps, token/cost analytics and fleet-wide views across all your projects.
+<h3 align="center"><a href="#install"><ins>Install as a Claude Code plugin</ins></a></h3>
 
-The data is already on your disk. Nothing visualizes it. This does.
+<p align="center">
+  <img src="./docs/readme/hero.png" alt="The ccblackbox dashboard, with a Claude Code terminal in front showing the context and prompt-cache segment ccblackbox adds to the status line (synthetic demo data)" width="960" />
+</p>
 
-![ccblackbox dashboard with synthetic demo data](./docs/screenshot.png)
+`ccblackbox` reads the session data Claude Code already writes under `~/.claude/` and turns it into a local dashboard. The data is already there. Nothing visualizes it. This does.
 
 ## Features
 
-- **Session list**: filterable (live / ghost / friction / failed / low-quality), keyboard-navigable (`j`/`k`).
-- **Session replay**: turn-by-turn view of prompts, tool calls and file diffs (versioned via `~/.claude/file-history/`), plus quality signals and a friction breakdown. A **Timeline** tab plots context fill, cumulative API value and tokens per turn over the session, with compactions, prompts and failed tool calls marked; it keeps updating while the session runs. Every session can be exported as a self-contained HTML snapshot.
-- **Session compare**: side-by-side metrics for several sessions, with min/max highlighting.
-- **Fleet dashboard**: token time series, model mix, top sessions, project rollup, tools heatmap, anomaly flags, and a 5-hour window view with your real 5h / 7-day usage limits, spike alerts and drill-down.
-- **Live view**: active sessions show up in real time, with the running tool, current burn rate and a sparkline of recent turns.
-- **Ghost cleanup**: empty sessions and sessions whose Claude Code process died can be inspected, revealed in Finder, or permanently deleted.
+<table>
+<tr>
+<td width="40%" valign="middle">
 
-## Privacy
+### Session Replay
 
-Everything runs locally: no network calls, no telemetry. `ccblackbox` reads (from `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set):
+Turn-by-turn view of prompts, tool calls and file diffs (versioned via `~/.claude/file-history/`), with quality signals and a friction breakdown. Export any session as a self-contained HTML snapshot.
 
-- Prompts and assistant outputs (`~/.claude/projects/*/*.jsonl`, `~/.claude/history.jsonl`)
-- Session metadata, tool counts, tokens, cost (`~/.claude/usage-data/`)
-- Versioned snapshots of files edited via Claude Code (`~/.claude/file-history/`)
-- Live session state (`~/.claude/sessions/`)
+</td>
+<td width="60%">
+  <img src="./docs/readme/replay.gif" alt="Replaying a session: overview, tool call sequence and token breakdown" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
 
-The server only listens on `127.0.0.1` and refuses state-changing requests from other websites. The optional `pnpm parse` dump is written to `~/.claude/ccblackbox/sessions.json`, never inside the repo.
+### Timeline
+
+Context fill, cumulative API value and tokens per turn, with compactions, prompts and failed tool calls marked. Hover any turn for its numbers, or click a prompt marker to see the tool calls it triggered.
+
+</td>
+<td width="60%">
+  <img src="./docs/readme/timeline.gif" alt="Session timeline with context fill, API value and tokens per turn, and a compaction marker" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
+
+### Live View
+
+Running sessions show up in real time with the current tool, context fill and prompt-cache countdown, plus a *keep going / compact / clear* verdict and its reasons.
+
+</td>
+<td width="60%">
+  <img src="./docs/readme/live.gif" alt="A live session updating in real time with its running tool and context verdict" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
+
+### Fleet Dashboard
+
+Rankings, health checks and analysis across all your projects: top sessions, model mix, tools heatmap, anomaly flags and the current 5-hour window against your real 5h / 7-day limits.
+
+</td>
+<td width="60%">
+  <img src="./docs/readme/fleet.gif" alt="Fleet dashboard cycling through rankings, health checks and analysis" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
+
+### Filter &amp; Compare
+
+Filter by live / ghost / friction / low-outcome / low-quality or by project, navigate with `j`/`k`, and put up to three sessions side by side with min/max highlighting.
+
+</td>
+<td width="60%">
+  <img src="./docs/readme/compare.gif" alt="Filtering sessions with friction and comparing three of them side by side" width="100%" />
+</td>
+</tr>
+<tr>
+<td width="40%" valign="middle">
+
+### Ghost Cleanup
+
+Empty sessions and sessions whose Claude Code process died are flagged. Get the resume command, reveal the transcript, or delete it permanently.
+
+</td>
+<td width="60%">
+  <img src="./docs/readme/ghost.gif" alt="Inspecting a crashed ghost session and its cleanup actions" width="100%" />
+</td>
+</tr>
+</table>
+
+<p align="center"><sub>All screenshots use synthetic data from <code>pnpm seed:demo</code>.</sub></p>
+
+---
 
 ## Install
 
 ### As a Claude Code plugin (recommended)
 
-Add the marketplace and enable the plugin in `~/.claude/settings.json`:
+**1. Add the plugin.** In Claude Code:
 
-```jsonc
-{
-  "extraKnownMarketplaces": {
-    "ccblackbox": {
-      "source": { "source": "github", "repo": "n-pizzetta/ccblackbox" }
-    }
-  },
-  "enabledPlugins": {
-    "ccblackbox@ccblackbox": true
-  }
-}
+```
+/plugin marketplace add n-pizzetta/ccblackbox
+/plugin install ccblackbox@ccblackbox
 ```
 
-Then run `/ccblackbox:replay` (or `/replay`) to open the dashboard. The plugin also registers a `PostToolUse` hook that records fine-grained tool sequences to `~/.claude/ccblackbox/cache/{sessionId}.jsonl`, so sessions can be replayed call by call.
+**2. Open the dashboard.** `/ccblackbox:replay` parses `~/.claude` and opens `localhost:3333`.
 
-#### Real usage limits (optional)
+**3. Connect your limits** *(recommended)*. `/ccblackbox:limits` turns on the real 5h and 7-day limits and the context advice. Re-run it after updating ccblackbox; `/ccblackbox:limits --uninstall` undoes it.
 
-Claude Code only exposes your 5-hour and 7-day usage limits (the numbers behind `/usage`) to the status line. Run `/ccblackbox:limits` once to install a small wrapper that records them for the dashboard. Your existing status line keeps rendering unchanged, and `settings.json` is backed up first. The same wrapper also records how full each live session's context is and how warm its prompt cache is: session rows show the context fill and the prompt-cache countdown, with a *keep going / compact / clear* verdict (and its reasons) in the session view, and a short `ctx ━━━───── 33% │ cache warm 59m` segment is appended to your status line, values colored green / yellow / red by level (set `"verdict": false` in `~/.claude/ccblackbox/statusline.json` to hide it). The installer also sets `statusLine.refreshInterval` to 30 seconds (unless you already set one) so the cache countdown keeps moving while the session is idle. Re-run `/ccblackbox:limits` after updating ccblackbox to refresh the wrapper. Undo with `/ccblackbox:limits --uninstall`.
+Needs Node 20+ on your `PATH`.
+
+<details>
+<summary>What <code>/ccblackbox:limits</code> changes</summary>
+
+Claude Code only exposes your 5-hour and 7-day usage limits (the numbers behind `/usage`) to the status line, so the command installs a small wrapper that records them for the dashboard:
+
+- Your existing status line keeps rendering unchanged, and `settings.json` is backed up first.
+- It also records each live session's context fill and prompt-cache warmth, which power the *keep going / compact / clear* verdict in the session view.
+- A short `ctx ━━━───── 33% │ cache warm 59m` segment is appended to your status line, colored green / yellow / red by level. Hide it with `"verdict": false` in `~/.claude/ccblackbox/statusline.json`.
+- `statusLine.refreshInterval` is set to 30 seconds (unless you already set one) so the cache countdown keeps moving while the session is idle.
 
 Without it, the dashboard still shows tokens and cost for an inferred 5h window, just not the limit percentages.
+
+</details>
+
+The plugin also registers a `PostToolUse` hook that records fine-grained tool sequences to `~/.claude/ccblackbox/cache/{sessionId}.jsonl`, so sessions can be replayed call by call.
 
 ### From source
 
@@ -64,10 +143,25 @@ Requires Node 20+ and pnpm.
 ```sh
 git clone https://github.com/n-pizzetta/ccblackbox && cd ccblackbox
 pnpm install
-pnpm serve                       # parse ~/.claude/, serve on :3333 and open the browser
-node scripts/serve.mjs --help    # --port, --no-open
+pnpm serve                            # parse ~/.claude/, serve on :3333 and open the browser
+node scripts/serve.mjs --help         # --port, --no-open
 node scripts/install-statusline.mjs   # optional: real usage limits (see above)
 ```
+
+---
+
+## Privacy
+
+**Everything runs locally: no network calls, no telemetry.** `ccblackbox` reads (from `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set):
+
+| Data | Source |
+| --- | --- |
+| Prompts and assistant outputs | `~/.claude/projects/*/*.jsonl`, `~/.claude/history.jsonl` |
+| Session metadata, tool counts, tokens, cost | `~/.claude/usage-data/` |
+| Versioned snapshots of files edited via Claude Code | `~/.claude/file-history/` |
+| Live session state | `~/.claude/sessions/` |
+
+The server only listens on `127.0.0.1` and refuses state-changing requests from other websites. The optional `pnpm parse` dump is written to `~/.claude/ccblackbox/sessions.json`, never inside the repo.
 
 ## Pricing
 
@@ -83,13 +177,16 @@ A model missing from the table still gets a readable name and is priced like the
 
 Cache writes are derived from `in` (1.25x for the 5-minute TTL, 2x for 1 hour). Entries override built-in rows with the same id.
 
-## Development
+---
+
+## Developing
 
 ```sh
 pnpm dev          # Vite dev server with live re-parse on ~/.claude changes
 pnpm lint         # ESLint
 pnpm typecheck    # tsc
 pnpm build        # typecheck + build → dist/ (committed: the plugin ships it prebuilt)
+pnpm test         # node --test (parser)
 pnpm parse        # one-shot dump of every session to ~/.claude/ccblackbox/sessions.json
 ```
 
@@ -117,18 +214,22 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the parser internals, component m
 
 **Stack:** React 19, TypeScript, Vite, `diff`, bundled Inter Tight / JetBrains Mono fonts. The server uses Node built-ins only.
 
-## Known limitations
+### Known limitations
 
 - Cold start re-parses every session (a few seconds with several hundred sessions).
 - Live-session detection uses `ps`, so on Windows running sessions show as crashed. Windows is otherwise untested.
-- No automated tests yet.
+- Test coverage is thin: only the parser has tests (`pnpm test`).
 
-See [`CHANGELOG.md`](./CHANGELOG.md) for release notes and the roadmap.
+---
 
-## Contributing
+## Community &amp; Support
 
-Issues and pull requests are welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, the synthetic demo data (`pnpm seed:demo`) and the privacy rules.
+- **Feedback &amp; ideas:** missing something? [Open an issue](https://github.com/n-pizzetta/ccblackbox/issues).
+- **Contributing:** pull requests are welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for setup, the synthetic demo data (`pnpm seed:demo`) and the privacy rules.
+- **Security:** see [`SECURITY.md`](./SECURITY.md) to report a vulnerability.
+- **Release notes &amp; roadmap:** [`CHANGELOG.md`](./CHANGELOG.md).
+- **Show support:** [star the repo](https://github.com/n-pizzetta/ccblackbox) to follow along.
 
 ## License
 
-[MIT](./LICENSE)
+ccblackbox is free and open source under the [MIT License](./LICENSE).
