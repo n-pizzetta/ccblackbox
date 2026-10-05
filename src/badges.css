@@ -193,59 +193,50 @@ button.badge-card:focus-visible {
 .badge-mini .badge-card { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(0, 0, 0, 0.6); }
 button.next-up-item:hover .badge-mini { opacity: 0.85; }
 
-/* ---- Focus view: one card brought forward, large and alive, with everything about it ---- */
+/* ---- Focus view: the card floats on the dimmed page, everything about it in one panel beside it ---- */
 .badge-focus-backdrop {
   position: fixed;
   inset: 0;
   z-index: 100;
-  display: grid;
-  place-items: center;
+  display: flex;
   padding: 24px;
-  background: rgba(4, 5, 7, 0.66);
+  overflow-y: auto; /* when taller than the window, card and panel scroll together */
+  overscroll-behavior: contain;
+  background: rgba(4, 5, 7, 0.72);
   backdrop-filter: blur(4px);
   animation: badge-focus-fade 180ms ease-out;
 }
+/* The dialog itself has no surface: it only places the card and the panel side by side. */
 .badge-focus {
-  position: relative;
-  display: flex;
-  width: min(840px, 100%);
-  max-height: calc(100dvh - 48px);
-  overflow: hidden;
-  background: var(--c-bg-panel);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-modal);
+  display: grid;
+  grid-template-columns: auto minmax(0, 540px);
+  justify-content: center;
+  align-items: center;
+  gap: 48px;
+  width: min(880px, 100%);
+  margin: auto; /* centred, yet never clipped at the top when it scrolls */
   animation: badge-focus-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.badge-focus[tabindex]:focus-visible { outline: none; border-radius: var(--radius-lg); }
-.badge-focus-body {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  overflow-y: auto;
-}
+.badge-focus[tabindex]:focus-visible { outline: none; }
 
-/* The stage: the card on the page's darkest tone, lit by its own finish. */
+/* The card and its arrows, straight on the backdrop; the whole column steers the tilt. */
 .badge-focus-stage {
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 22px;
-  padding: 44px 32px 24px;
-  background:
-    radial-gradient(70% 52% at 50% 42%, color-mix(in srgb, var(--tier, #5d626c) 16%, transparent), transparent 72%),
-    var(--c-bg);
 }
-.badge-focus-stage .badge-slot { width: 232px; perspective: 900px; }
-/* the loop in useLiveCard eases the tilt itself */
+.badge-focus-stage .badge-slot { width: 256px; perspective: 900px; }
+/* the loop in useLiveCard eases the tilt itself; the only light is the card's own soft glow */
 .badge-focus .badge-card,
 .badge-focus .badge-card:hover {
   transition: none;
-  box-shadow: 0 28px 56px -18px rgba(0, 0, 0, 0.75), 0 0 64px -16px color-mix(in srgb, var(--tier) 30%, transparent), 0 0 0 0.5px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.8), 0 0 56px -18px color-mix(in srgb, var(--tier) 26%, transparent), 0 0 0 0.5px rgba(0, 0, 0, 0.6);
 }
 
-.badge-focus-nav { display: flex; align-items: center; gap: 4px; font-size: var(--fs-md); color: var(--c-text-faint); }
+.badge-focus-nav { display: flex; align-items: center; gap: 4px; font-size: var(--fs-md); color: var(--c-text-dim); }
 .badge-focus-nav .mono { min-width: 56px; text-align: center; }
 .badge-focus-nav button,
 .badge-focus-close {
@@ -261,9 +252,20 @@ button.next-up-item:hover .badge-mini { opacity: 0.85; }
 .badge-focus-close:hover { background: var(--c-fill); color: var(--c-text); }
 .badge-focus-nav button:focus-visible,
 .badge-focus-close:focus-visible { border-radius: 999px; }
-.badge-focus-close { position: absolute; top: 14px; right: 14px; z-index: 1; }
+.badge-focus-close { position: absolute; top: 14px; right: 14px; }
 
-.badge-focus-info { display: flex; flex-direction: column; gap: 20px; min-width: 0; padding: 32px 32px 28px; }
+/* The one surface: the text. */
+.badge-focus-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  padding: 32px 32px 28px;
+  background: var(--c-bg-panel);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+}
 .badge-focus-head { display: flex; flex-direction: column; gap: 4px; padding-right: 32px; }
 .badge-focus-head h2 { font-size: var(--fs-xl); font-weight: 650; line-height: 1.2; letter-spacing: -0.02em; color: var(--c-text); }
 .badge-focus-status { font-size: var(--fs-body); color: var(--c-text-dim); }
@@ -327,15 +329,18 @@ button.next-up-item:hover .badge-mini { opacity: 0.85; }
 @keyframes badge-focus-fade { from { opacity: 0; } }
 @keyframes badge-focus-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
 
-/* Phones: the card above the details, the whole panel scrolls. */
+@media (max-width: 900px) {
+  .badge-focus { gap: 32px; }
+  .badge-focus-stage .badge-slot { width: 208px; }
+}
+/* Phones: the card floats above the panel and the two scroll together. */
 @media (max-width: 640px) {
-  .badge-focus-backdrop { padding: 12px; }
-  .badge-focus { max-height: calc(100dvh - 24px); }
-  .badge-focus-body { grid-template-columns: minmax(0, 1fr); }
-  .badge-focus-stage { gap: 14px; padding: 32px 16px 14px; }
-  .badge-focus-stage .badge-slot { width: 168px; }
-  .badge-focus-info { gap: 18px; padding: 20px 18px 22px; }
-  .badge-focus-head { padding-right: 0; }
+  .badge-focus-backdrop { padding: 24px 12px 12px; }
+  .badge-focus { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .badge-focus-stage { gap: 12px; }
+  .badge-focus-stage .badge-slot { width: 176px; }
+  .badge-focus-panel { gap: 18px; padding: 20px 18px 22px; }
+  .badge-focus-close { top: 10px; right: 10px; }
   .badge-focus-tiers :is(th, td) { padding-inline: 8px; }
   .badge-focus-tiers { width: calc(100% + 16px); margin-inline: -8px; }
 }

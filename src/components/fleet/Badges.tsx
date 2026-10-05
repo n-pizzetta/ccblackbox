@@ -133,11 +133,11 @@ function useLiveCard(stage: RefObject<HTMLElement | null>, card: RefObject<HTMLE
 }
 
 /** Tab cycles through the dialog's controls instead of leaving it. */
-function trapTab(e: KeyboardEvent, panel: HTMLElement | null) {
-  if (!panel) return;
-  const items = [...panel.querySelectorAll<HTMLElement>("button:not(:disabled)")];
+function trapTab(e: KeyboardEvent, dialog: HTMLElement | null) {
+  if (!dialog) return;
+  const items = [...dialog.querySelectorAll<HTMLElement>("button:not(:disabled)")];
   const i = items.indexOf(document.activeElement as HTMLElement);
-  if (items.length === 0 || (i === -1 && !e.shiftKey && panel.contains(document.activeElement))) return;
+  if (items.length === 0 || (i === -1 && !e.shiftKey && dialog.contains(document.activeElement))) return;
   if (e.shiftKey && i <= 0) {
     e.preventDefault();
     items[items.length - 1].focus();
@@ -146,6 +146,9 @@ function trapTab(e: KeyboardEvent, panel: HTMLElement | null) {
     items[0].focus();
   }
 }
+
+/** The dimmed background, or the empty room around the floating card: a click there closes the focus view. */
+const onBackdrop = (t: EventTarget) => t instanceof Element && !t.closest(".badge-focus .badge-slot, .badge-focus-nav, .badge-focus-panel");
 
 interface FocusProps {
   f: BadgeFamily;
@@ -159,10 +162,10 @@ interface FocusProps {
   onClose: () => void;
 }
 
-/** One badge brought forward: its card large and alive on the left, everything about it on the right. */
+/** One badge brought forward: its card large and alive, floating on the left; everything about it in a panel on the right. */
 function BadgeFocus({ f, pos, count, fresh, startedAt, onMove, onClose }: FocusProps) {
   const titleId = useId();
-  const panel = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const pressed = useRef(false);
@@ -175,7 +178,7 @@ function BadgeFocus({ f, pos, count, fresh, startedAt, onMove, onClose }: FocusP
   useLayoutEffect(() => {
     const root = document.getElementById("root");
     root?.setAttribute("inert", "");
-    panel.current?.focus({ preventScroll: true });
+    dialog.current?.focus({ preventScroll: true });
     return () => root?.removeAttribute("inert");
   }, []);
 
@@ -188,7 +191,7 @@ function BadgeFocus({ f, pos, count, fresh, startedAt, onMove, onClose }: FocusP
       } else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault();
         onMove(e.key === "ArrowLeft" ? -1 : 1);
-      } else if (e.key === "Tab") trapTab(e, panel.current);
+      } else if (e.key === "Tab") trapTab(e, dialog.current);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -199,12 +202,13 @@ function BadgeFocus({ f, pos, count, fresh, startedAt, onMove, onClose }: FocusP
   return createPortal(
     <div
       className="badge-focus-backdrop"
-      // Closes on a click that starts and ends on the backdrop, not on a drag out of the panel.
-      onPointerDown={(e) => { pressed.current = e.target === e.currentTarget; }}
-      onClick={(e) => { if (pressed.current && e.target === e.currentTarget) onClose(); }}
+      // Closes on a click that starts and ends on the dimmed background (around the card included),
+      // not on the card, its arrows or the panel, nor on a drag out of them.
+      onPointerDown={(e) => { pressed.current = onBackdrop(e.target); }}
+      onClick={(e) => { if (pressed.current && onBackdrop(e.target)) onClose(); }}
     >
       <div
-        ref={panel}
+        ref={dialog}
         className={`badge-focus${best ? ` tier-${best.tier}` : ""}`}
         role="dialog"
         aria-modal="true"
@@ -212,108 +216,107 @@ function BadgeFocus({ f, pos, count, fresh, startedAt, onMove, onClose }: FocusP
         aria-describedby={`${titleId}-status`}
         tabIndex={-1}
       >
-        <button type="button" className="badge-focus-close" aria-label="Close" onClick={onClose}>{ICON_CLOSE}</button>
-        <div className="badge-focus-body">
-          <div ref={stage} className="badge-focus-stage">
-            <div className="badge-slot">
-              <div ref={card} className={cardClass(best)} aria-hidden="true">
-                <CardLayers f={f} t={shown} lit={best !== null} />
-              </div>
+        {/* The card floats on the dimmed page, no surface behind it. */}
+        <div ref={stage} className="badge-focus-stage">
+          <div className="badge-slot">
+            <div ref={card} className={cardClass(best)} aria-hidden="true">
+              <CardLayers f={f} t={shown} lit={best !== null} />
             </div>
-            {count > 1 && (
-              <div className="badge-focus-nav">
-                <button type="button" aria-label="Previous badge" title="Previous badge (←)" onClick={() => onMove(-1)}>{ICON_PREV}</button>
-                <span className="mono tabular">{pos} / {count}</span>
-                <button type="button" aria-label="Next badge" title="Next badge (→)" onClick={() => onMove(1)}>{ICON_NEXT}</button>
-              </div>
-            )}
           </div>
+          {count > 1 && (
+            <div className="badge-focus-nav">
+              <button type="button" aria-label="Previous badge" title="Previous badge (←)" onClick={() => onMove(-1)}>{ICON_PREV}</button>
+              <span className="mono tabular">{pos} / {count}</span>
+              <button type="button" aria-label="Next badge" title="Next badge (→)" onClick={() => onMove(1)}>{ICON_NEXT}</button>
+            </div>
+          )}
+        </div>
 
-          <div className="badge-focus-info">
-            <header className="badge-focus-head">
-              <h2 id={titleId}>{f.name}</h2>
-              <p id={`${titleId}-status`} className="badge-focus-status">
-                {best ? (
-                  <><b>{best.name}</b> · {TIER_LABEL[best.tier]} · tier {f.tiers.indexOf(best) + 1} of {f.tiers.length}</>
-                ) : (
-                  <>Locked · face down until its first tier</>
-                )}
-              </p>
-            </header>
+        <div className="badge-focus-panel">
+          <button type="button" className="badge-focus-close" aria-label="Close" onClick={onClose}>{ICON_CLOSE}</button>
+          <header className="badge-focus-head">
+            <h2 id={titleId}>{f.name}</h2>
+            <p id={`${titleId}-status`} className="badge-focus-status">
+              {best ? (
+                <><b>{best.name}</b> · {TIER_LABEL[best.tier]} · tier {f.tiers.indexOf(best) + 1} of {f.tiers.length}</>
+              ) : (
+                <>Locked · face down until its first tier</>
+              )}
+            </p>
+          </header>
 
-            <section className="badge-focus-section">
-              <h3>How to earn it</h3>
-              <p className="badge-focus-hint">{f.hint}</p>
+          <section className="badge-focus-section">
+            <h3>How to earn it</h3>
+            <p className="badge-focus-hint">{f.hint}</p>
+          </section>
+
+          {next ? (
+            <section className={`badge-focus-next tier-${next.tier}`}>
+              <div className="badge-focus-next-head">
+                <span>{best ? "Next" : "To unlock"}: <b>{next.name}</b> <span className="dim">· {TIER_LABEL[next.tier]}</span></span>
+                <span className="mono tabular dim">{Math.floor((next.progress / next.target) * 100)}%</span>
+              </div>
+              <span className="badge-track" aria-hidden="true">
+                <span style={{ width: `${(next.progress / next.target) * 100}%` }} />
+              </span>
+              <span className="mono tabular dim">
+                {fmt(next.progress, null)} / {fmt(next.target, f.unit)} · {fmt(next.target - next.progress, f.unit)} to go
+              </span>
             </section>
+          ) : (
+            <section className="badge-focus-next done">
+              <div className="badge-focus-next-head"><span><b>Every tier earned</b></span></div>
+            </section>
+          )}
 
-            {next ? (
-              <section className={`badge-focus-next tier-${next.tier}`}>
-                <div className="badge-focus-next-head">
-                  <span>{best ? "Next" : "To unlock"}: <b>{next.name}</b> <span className="dim">· {TIER_LABEL[next.tier]}</span></span>
-                  <span className="mono tabular dim">{Math.floor((next.progress / next.target) * 100)}%</span>
-                </div>
-                <span className="badge-track" aria-hidden="true">
-                  <span style={{ width: `${(next.progress / next.target) * 100}%` }} />
-                </span>
-                <span className="mono tabular dim">
-                  {fmt(next.progress, null)} / {fmt(next.target, f.unit)} · {fmt(next.target - next.progress, f.unit)} to go
-                </span>
-              </section>
-            ) : (
-              <section className="badge-focus-next done">
-                <div className="badge-focus-next-head"><span><b>Every tier earned</b></span></div>
-              </section>
-            )}
-
-            <table className="badge-focus-tiers">
-              <thead>
-                <tr>
-                  <th scope="col">Tier</th>
-                  <th scope="col">Target</th>
-                  <th scope="col">Unlocked</th>
-                </tr>
-              </thead>
-              <tbody>
-                {f.tiers.map((t) => (
-                  <tr key={t.tier} className={`tier-${t.tier}${t.unlockedAt ? " done" : ""}${t === best ? " current" : ""}`}>
-                    <td>
-                      <span className="badge-focus-tier">
-                        <span className="badge-focus-swatch" aria-hidden="true" />
-                        <span className="badge-focus-tier-text">
-                          <span className="badge-focus-tier-name">
-                            {t.name}
-                            {fresh.has(badgeKey(f, t)) && <span className="badge-focus-new mono">new</span>}
-                          </span>
-                          <span className="badge-focus-tier-sub">{TIER_LABEL[t.tier]}{t.xp ? ` · +${t.xp} XP` : ""}</span>
+          <table className="badge-focus-tiers">
+            <thead>
+              <tr>
+                <th scope="col">Tier</th>
+                <th scope="col">Target</th>
+                <th scope="col">Unlocked</th>
+              </tr>
+            </thead>
+            <tbody>
+              {f.tiers.map((t) => (
+                <tr key={t.tier} className={`tier-${t.tier}${t.unlockedAt ? " done" : ""}${t === best ? " current" : ""}`}>
+                  <td>
+                    <span className="badge-focus-tier">
+                      <span className="badge-focus-swatch" aria-hidden="true" />
+                      <span className="badge-focus-tier-text">
+                        <span className="badge-focus-tier-name">
+                          {t.name}
+                          {fresh.has(badgeKey(f, t)) && <span className="badge-focus-new mono">new</span>}
                         </span>
+                        <span className="badge-focus-tier-sub">{TIER_LABEL[t.tier]}{t.xp ? ` · +${t.xp} XP` : ""}</span>
                       </span>
-                    </td>
-                    <td className="mono tabular">{fmt(t.target, f.unit)}</td>
-                    <td className="tabular">{t.unlockedAt ? day(t.unlockedAt) : "Locked"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </span>
+                  </td>
+                  <td className="mono tabular">{fmt(t.target, f.unit)}</td>
+                  <td className="tabular">{t.unlockedAt ? day(t.unlockedAt) : "Locked"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-            <dl className="badge-focus-facts">
-              <div>
-                <dt>XP</dt>
-                <dd>
-                  {f.nudge
-                    ? `+${xpEarned} of ${xpTotal} earned: a good-practice badge, each tier adds to your level`
-                    : "None: a volume badge, it unlocks but only good-practice badges add XP"}
-                </dd>
-              </div>
-              <div>
-                <dt>Counts</dt>
-                <dd>
-                  {f.window === "30d"
-                    ? "The last 30 days: progress drops as days slide out, an unlocked tier stays"
-                    : startedAt ? `Sessions since ${day(startedAt)}` : "All sessions"}
-                </dd>
-              </div>
-            </dl>
-          </div>
+          <dl className="badge-focus-facts">
+            <div>
+              <dt>XP</dt>
+              <dd>
+                {f.nudge
+                  ? `+${xpEarned} of ${xpTotal} earned: a good-practice badge, each tier adds to your level`
+                  : "None: a volume badge, it unlocks but only good-practice badges add XP"}
+              </dd>
+            </div>
+            <div>
+              <dt>Counts</dt>
+              <dd>
+                {f.window === "30d"
+                  ? "The last 30 days: progress drops as days slide out, an unlocked tier stays"
+                  : startedAt ? `Sessions since ${day(startedAt)}` : "All sessions"}
+              </dd>
+            </div>
+          </dl>
         </div>
       </div>
     </div>,
