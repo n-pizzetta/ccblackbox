@@ -825,8 +825,39 @@ function normalizeWindow(w, now) {
 }
 
 /**
+ * The fresher of two readings of one limit window: the later reset wins and,
+ * within a window, the higher use (it only grows until the reset). A reading
+ * without an open window (missing, or from a window that has reset) never
+ * replaces one that is still open.
+ */
+export function freshestWindow(held, read, now = Date.now()) {
+  const open = (w) => w?.resetsAt != null && w.resetsAt > now;
+  if (!open(held)) return read;
+  if (!open(read) || read.resetsAt < held.resetsAt) return held;
+  if (read.resetsAt > held.resetsAt) return read;
+  return read.usedPct >= held.usedPct ? read : held;
+}
+
+/**
+ * Every running Claude Code session refreshes its status line and overwrites
+ * limits.json with its own last-known limits, so an idle one writes a lower %,
+ * a window that has already reset, or no 5h window at all, every few seconds.
+ * The server merges each read into what it already holds (`freshestWindow`).
+ * Null (no limits.json: the status line is not installed) clears it.
+ */
+export function mergeLimits(held, read, now = Date.now()) {
+  if (!read || !held) return read;
+  return {
+    capturedAt: read.capturedAt,
+    fiveHour: freshestWindow(held.fiveHour, read.fiveHour, now),
+    sevenDay: freshestWindow(held.sevenDay, read.sevenDay, now),
+  };
+}
+
+/**
  * Real usage limits recorded by the Marey status line wrapper
- * (scripts/statusline.mjs), or null when it isn't installed yet.
+ * (scripts/statusline.mjs), or null when it isn't installed yet. One reading:
+ * the API merges them with `mergeLimits`.
  */
 export async function readLimits(now = Date.now()) {
   try {

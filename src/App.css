@@ -362,107 +362,6 @@ a:focus-visible,
 }
 .five-hour-session .section-title { padding-bottom: 4px; border-bottom: 1px solid var(--c-hairline); display: flex; align-items: center; gap: 12px; }
 .five-hour-session .section-title > :first-child { margin-right: auto; }
-.five-hour-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-@media (max-width: 900px) {
-  .five-hour-grid { grid-template-columns: 1fr; }
-}
-.five-hour-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  background: var(--c-bg-panel);
-  border: 1px solid var(--c-hairline);
-  border-radius: var(--radius-sm);
-}
-.five-hour-card-title { font-size: var(--fs-xs); letter-spacing: 0.08em; }
-.five-hour-card-sub { color: var(--c-text-faint); letter-spacing: 0.04em; font-size: var(--fs-xs); }
-
-.five-hour-rows { display: flex; flex-direction: column; gap: 2px; }
-.five-hour-row {
-  display: grid;
-  /* Proportional: the cards are narrow in the two-column layout. */
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto auto;
-  gap: 8px;
-  align-items: center;
-  padding: 4px 6px;
-  background: transparent;
-  border: none;
-  color: inherit;
-  font-family: inherit;
-  cursor: pointer;
-  text-align: left;
-  font-size: var(--fs-md);
-  border-radius: 3px;
-}
-.five-hour-row > * { min-width: 0; }
-.five-hour-row:hover { background: var(--c-bg-elevated); }
-.five-hour-row-name {
-  color: var(--c-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.five-hour-row-sub {
-  color: var(--c-text-dim);
-  font-size: var(--fs-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.five-hour-row .right { text-align: right; justify-self: end; }
-
-.five-hour-tools { display: flex; flex-direction: column; gap: 4px; }
-.five-hour-tool-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(48px, 1fr) auto auto;
-  gap: 8px;
-  align-items: center;
-  font-size: var(--fs-md);
-  padding: 2px 4px;
-}
-.five-hour-tool-name { color: var(--c-text); }
-.five-hour-tool-bar-wrap {
-  height: 7px;
-  background: var(--c-bg-elevated);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.five-hour-tool-bar {
-  height: 100%;
-  background: linear-gradient(90deg, var(--c-cyan), var(--c-violet));
-}
-.five-hour-tool-row .right { text-align: right; justify-self: end; }
-
-.five-hour-project-bar {
-  display: flex;
-  height: 10px;
-  border-radius: 2px;
-  overflow: hidden;
-  background: var(--c-bg-elevated);
-}
-.five-hour-project-seg { min-width: 1px; }
-.five-hour-project-list { display: flex; flex-direction: column; gap: 2px; }
-.five-hour-project-row {
-  display: grid;
-  grid-template-columns: 10px 1fr 70px 40px;
-  gap: 8px;
-  align-items: center;
-  padding: 2px 4px;
-  font-size: var(--fs-sm);
-}
-.five-hour-project-swatch { width: 10px; height: 10px; border-radius: 2px; }
-.five-hour-project-name {
-  color: var(--c-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.five-hour-project-row .right { text-align: right; justify-self: end; }
 
 /* ---- Burn spike banner ---- */
 .burn-spike-banner {
@@ -1858,7 +1757,7 @@ a:focus-visible,
   color: var(--c-text-dim);
 }
 /* Tool names include MCP servers (`mcp:plugin_playwright_playwright`): truncate. */
-.tool-name, .tools-heatmap-name, .five-hour-tool-name {
+.tool-name, .tools-heatmap-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -498,89 +498,73 @@
 .tokens-table-head { font-family: var(--f-ui); font-size: var(--fs-sm); letter-spacing: 0; color: var(--c-text-faint); background: transparent; }
 .tokens-table-row { font-size: var(--fs-md); }
 
-/* ---- Now: 5h window panel ---- */
-.five-hour-session > .kpi-row { margin-bottom: 16px; }
+/* ---- Now: 5h window panel ----
+   Reading order: the limit and the reset (tiles), then what used the window (WindowConsumers).
+   Flat inside the one card; bars are neutral except the project split, where colour is the data. */
+.five-hour-session > .kpi-row { margin: -8px -18px 6px; }
 .five-hour-session .kpi { background: transparent; }
-.five-hour-card-title {
-  margin-bottom: 8px;
-  font-family: var(--f-ui);
+.five-hour-idle .section-title { flex-wrap: wrap; margin-bottom: 0; }
+.five-hour-idle .consumers { margin-top: 16px; }
+
+.consumers { display: flex; flex-direction: column; gap: 14px; }
+.consumers-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; }
+.consumers-title { font-size: var(--fs-base); font-weight: 600; color: var(--c-text-soft); }
+.consumers-alert { font-size: var(--fs-md); color: var(--c-amber); }
+.consumers-unit { margin-left: auto; font-size: var(--fs-md); color: var(--c-text-faint); }
+
+/* the track is the 5h limit, the fill what is used, split by project with a 2px gap */
+.consumers-split { display: flex; flex-direction: column; gap: 10px; }
+.consumers-bar { display: flex; height: 10px; overflow: hidden; background: var(--c-fill); border-radius: 999px; }
+.consumers-bar-fill { display: flex; gap: 2px; height: 100%; overflow: hidden; border-radius: 999px; transition: width var(--t-slow); }
+.consumers-bar-fill > span { min-width: 2px; transition: flex-grow var(--t-slow); }
+.consumers-legend { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; font-size: var(--fs-md); color: var(--c-text-soft); }
+.consumers-legend-item { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; }
+.consumers-legend-name { max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consumers-legend-item .tabular { color: var(--c-text-dim); }
+.consumers-legend-scale { margin-left: auto; color: var(--c-text-faint); }
+.consumers-swatch { flex: none; align-self: center; width: 8px; height: 8px; border-radius: 2px; }
+
+.consumers-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 28px; }
+@media (max-width: 900px) {
+  .consumers-lists { grid-template-columns: minmax(0, 1fr); }
+}
+.consumers-list { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.consumers-list-title { margin-bottom: 4px; padding: 0 8px; font-size: var(--fs-md); font-weight: 500; color: var(--c-text-faint); }
+.consumers-empty { padding: 6px 8px; font-size: var(--fs-md); color: var(--c-text-faint); }
+.consumers-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) minmax(0, 0.4fr) 48px 40px 52px;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  padding: 0 8px;
   font-size: var(--fs-md);
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
   color: var(--c-text-soft);
-}
-.five-hour-card-sub { font-weight: 400; color: var(--c-text-faint); }
-
-/* ---- Now: hot spots (biggest consumers; heat is a warning, not a trophy) ---- */
-.hot-spots { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
-.five-hour-idle .hot-spots { margin: 8px 0 0; }
-.five-hour-idle .section-title { flex-wrap: wrap; }
-.five-hour-idle .section-title .dim { font-weight: 400; }
-.hot-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; }
-.hot-title { font-size: var(--fs-md); font-weight: 600; color: var(--c-text-soft); }
-.hot-alert { font-size: var(--fs-md); color: var(--c-amber); }
-.hot-grid { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: 10px; }
-.hot-label { font-size: var(--fs-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-text-faint); }
-.hot-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--c-text-dim); }
-.hot-bar { display: block; height: 4px; margin-top: 4px; background: var(--c-hairline-strong); border-radius: 999px; overflow: hidden; }
-.hot-bar > span { display: block; height: 100%; background: var(--heat); border-radius: inherit; transform-origin: left; animation: grow-x 600ms var(--t-slow) both; }
-
-.hot-hero {
-  --heat: var(--c-cyan);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--heat) 10%, var(--c-bg-elevated));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--heat) 30%, transparent);
-  overflow: hidden;
-}
-.hot-hero.heat-warm { --heat: var(--c-amber); }
-.hot-hero.heat-hot { --heat: var(--c-red); }
-.hot-hero-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 12px 14px 10px; text-align: left; }
-.hot-hero .hot-label { color: var(--heat); }
-.hot-hero-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-lg); font-weight: 600; color: var(--c-text); }
-.hot-hero-main:hover .hot-hero-name { text-decoration: underline; text-underline-offset: 3px; }
-.hot-share { font-size: var(--fs-md); color: var(--c-text-soft); }
-.hot-share b { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.02em; color: var(--heat); }
-.hot-runners {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  padding: 8px 14px;
-  font-size: var(--fs-sm);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--heat) 18%, transparent);
-}
-.hot-runners button { display: inline-flex; gap: 6px; min-width: 0; max-width: 100%; color: var(--c-text-soft); }
-.hot-runner-name { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hot-runners button:hover .hot-runner-name { color: var(--c-text); text-decoration: underline; text-underline-offset: 3px; }
-
-.hot-card {
-  --heat: var(--c-text-dim);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding: 12px 14px;
   text-align: left;
-  border-radius: var(--radius);
-  background: var(--c-bg-elevated);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
 }
-button.hot-card:hover { background: var(--c-bg-hover); }
-.hot-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-base); color: var(--c-text); }
-.hot-swatch { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 2px; vertical-align: middle; }
-
-@media (max-width: 1100px) {
-  .hot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .hot-hero { grid-column: 1 / -1; }
-}
-@media (max-width: 720px) {
-  .hot-grid { grid-template-columns: minmax(0, 1fr); }
+.consumers-row:hover { background: rgba(255, 255, 255, 0.05); }
+.consumers-row:hover .consumers-row-name,
+.consumers-list-title + .consumers-row .consumers-row-name { color: var(--c-text); }
+.consumers-list-title + .consumers-row .consumers-row-name { font-weight: 600; }
+.consumers-row-name,
+.consumers-row-project { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consumers-row-project { color: var(--c-text-faint); }
+.consumers-row-bar { height: 4px; overflow: hidden; background: var(--c-fill); border-radius: 999px; }
+.consumers-row-bar > span { display: block; height: 100%; background: rgba(233, 235, 239, 0.55); border-radius: inherit; transition: width var(--t-slow); }
+.consumers-row-share { text-align: right; color: var(--c-text); }
+.consumers-row-value { text-align: right; color: var(--c-text-dim); }
+@media (max-width: 520px) {
+  .consumers-row { grid-template-columns: 8px minmax(0, 1fr) 40px 52px; }
+  .consumers-row-project,
+  .consumers-row-bar { display: none; }
+  .consumers-unit,
+  .consumers-legend-scale { margin-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hot-bar > span { animation: none; }
+  .consumers-bar-fill,
+  .consumers-bar-fill > span,
+  .consumers-row-bar > span { transition: none; }
 }
 
 /* ---- Inside the cards ----
