@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Level, Streak } from "../utils/gamify";
 import { PRODUCT_NAME } from "../utils/brand";
 import { NAV_PAGES, type Page } from "../utils/pages";
@@ -38,6 +39,25 @@ function formatAge(iso?: string): string {
   return `${Math.floor(diff / 3_600_000)}h ago`;
 }
 
+/** Line icons for the page navigation, drawn on a 24 grid. */
+const NAV_ICONS: Record<Page, ReactNode> = {
+  now: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  sessions: <path d="M5 6.5h14M5 12h14M5 17.5h9" />,
+  usage: (
+    <>
+      <ellipse cx="12" cy="6.5" rx="7" ry="2.8" />
+      <path d="M5 6.5v5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-5M5 11.5v5.5c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-5.5" />
+    </>
+  ),
+  health: <path d="M3.5 12h4l2.5-6 4 12 2.5-6h4" />,
+  badges: <path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5v1.5a3 3 0 0 0 3 3M16 6h3v1.5a3 3 0 0 1-3 3M12 13v4M8.5 20h7" />,
+};
+
 /** Brand, page navigation, usage limits and the profile menu: the one fixed bar of the app. */
 export function AppHeader({
   page,
@@ -69,6 +89,9 @@ export function AppHeader({
             onClick={() => onPageChange(p.id)}
             title={`${p.label} (${i + 1})`}
           >
+            <svg className="app-nav-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+              {NAV_ICONS[p.id]}
+            </svg>
             {p.label}
             {p.id === "sessions" && <span className="app-nav-count mono tabular">{sessionCount}</span>}
             {p.id === "health" && healthIssues > 0 && (

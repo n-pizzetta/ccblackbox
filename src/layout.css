@@ -26,7 +26,8 @@
 .app-header {
   flex: none;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  /* the sides never shrink below their content: the nav moves off-center before anything overlaps */
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
   align-items: center;
   gap: 16px;
   height: 68px;
@@ -65,6 +66,11 @@
 }
 .app-nav-item:hover { color: var(--c-text); background: rgba(255, 255, 255, 0.05); }
 .app-nav-item.active { color: var(--c-text); font-weight: 600; background: var(--c-lens); box-shadow: var(--shadow-lens); }
+.app-nav-icon { flex: none; margin-left: -4px; }
+.app-nav-item.active .app-nav-icon { color: var(--c-cyan); }
+@media (max-width: 1240px) {
+  .app-nav-icon { display: none; }
+}
 /* counts read as plain numbers next to the label */
 .app-nav-count {
   font-family: var(--f-ui);
@@ -471,11 +477,14 @@
 }
 
 /* ---- Small screens: navigation on its own scrollable row ---- */
-@media (max-width: 900px) {
+/* below this the brand, nav and limits no longer fit on one line: the nav gets its own row */
+@media (max-width: 1080px) {
   .app-header { display: flex; flex-wrap: wrap; height: auto; gap: 10px 16px; padding-block: 12px 4px; }
   .app-header-right { margin-left: auto; }
   .app-nav { order: 3; width: 100%; overflow-x: auto; }
   .app-nav-item { padding: 0 12px; }
+}
+@media (max-width: 900px) {
   .scope-search { width: 100%; order: 5; }
   .scope-summary { margin-left: 0; }
 }
