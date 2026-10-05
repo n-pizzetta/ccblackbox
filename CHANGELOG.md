@@ -36,6 +36,7 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Changed
 
+- **Badge cards**: each badge is a foil collector card whose finish is the tier (matte bronze, silver and gold sheen, holographic platinum that follows the pointer), with a line-art glyph in place of the emoji. Every tier has its own name and glyph that grows with it (Marathon: 5K, 10K, Half marathon, then Marathon, from jog to finish tape). Locked badges are face down. Progress, targets and unlock dates moved from the card to its hover card.
 - Logo and favicon: the red recording dot is gone, leaving the session trace.
 - README: hero image, one animated demo per feature, and install via `/plugin`.
 - The session list is a sortable table (status glyph with one dot per outcome, project, flags, usage, active time, start) with day headers; its order drives ↑ / ↓ in the session view. The help explains its glyphs.
