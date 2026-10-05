@@ -6,6 +6,15 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Icons next to the page tabs (Now, Sessions, Usage, Health, Progress); the active one takes the accent colour.
+
+### Fixed
+
+- The Progress tab's count of new badges no longer shows a box behind the number.
+- The header no longer lets the page tabs cover the 5h / 7d limits on narrower windows.
+
 ### Planned
 
 - Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
