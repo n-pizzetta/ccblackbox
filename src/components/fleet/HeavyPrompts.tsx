@@ -79,7 +79,7 @@ export function HeavyPrompts({ sessions, onSelectSession, limit = 10 }: Props) {
               <span className="mono heavy-prompts-project">{r.session.project}</span>
               <span className="mono dim tabular">{formatClockFrom(r.session.startedAt, r.stat.t)}</span>
               <span className="mono heavy-prompts-preview">{p ? p.preview.slice(0, 80) : "—"}</span>
-              <span className="mono tabular right" style={{ color: "var(--c-amber)" }}>{formatCost(r.stat.cost)}</span>
+              <span className="mono tabular right" style={{ color: "var(--c-text)", fontWeight: 600 }}>{formatCost(r.stat.cost)}</span>
               <span className="mono tabular right">{formatTokens(r.stat.tokens.output)}</span>
               <span
                 className="mono tabular right"

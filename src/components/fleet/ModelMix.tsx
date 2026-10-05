@@ -85,7 +85,7 @@ export function ModelMix({ sessions }: Props) {
                 <span className="mono dim tabular right">{pct.toFixed(1)}% vol</span>
                 <span
                   className="mono tabular right"
-                  style={{ color: "var(--c-amber)" }}
+                  style={{ color: "var(--c-text)", fontWeight: 600 }}
                   title={isKnownModel(r.model) ? undefined : estimateHint([r.model])}
                 >
                   {isKnownModel(r.model) ? "" : "~"}{formatCost(r.cost)}

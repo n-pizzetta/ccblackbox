@@ -574,6 +574,55 @@ button.hot-card:hover { background: var(--c-bg-hover); }
   .hot-bar > span { animation: none; }
 }
 
+/* ---- Inside the cards ----
+   Mono is for ids, tool names and code; numbers and names read in the UI face, tabular.
+   Wells are a darker inset (no outline), lists are rows (no hairlines), bars are neutral
+   unless the colour is the data. */
+.page .mono:not(.tools-heatmap-name),
+.page .timeseries-axis,
+.page .timeseries-toggle button,
+.page .heavy-prompts-head { font-family: var(--f-ui); }
+.page .tabular { font-variant-numeric: tabular-nums; }
+.page .caps { text-transform: none; letter-spacing: 0; }
+
+.page .timeseries-wrap,
+.page .heavy-prompts {
+  background: rgba(0, 0, 0, 0.22);
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.page .heavy-prompts-head { font-size: var(--fs-md); color: var(--c-text-faint); background: none; border-bottom: none; }
+.page .heavy-prompts-row { border-bottom: none; border-radius: var(--radius); }
+.page .heavy-prompts-row:hover,
+.page .project-rollup-row:hover,
+.page .model-mix-row:hover { background: rgba(255, 255, 255, 0.05); border-radius: var(--radius); }
+
+.page .timeseries-toggle { height: 32px; padding: 3px; gap: 2px; background: var(--c-fill); border: none; border-radius: 16px; }
+.page .timeseries-toggle button { height: 26px; padding: 0 12px; font-size: var(--fs-md); font-weight: 500; border-radius: 13px; }
+.page .timeseries-toggle button.active { font-weight: 600; background: var(--c-lens); box-shadow: var(--shadow-lens); }
+
+.page .tools-heatmap-bar { background: rgba(233, 235, 239, 0.55); }
+
+.page .health-rule { border-top: none; }
+.page .health-session {
+  height: 28px;
+  padding: 0 12px;
+  font-family: var(--f-ui);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  color: var(--c-text-soft);
+  background: var(--c-fill);
+  border: none;
+  border-radius: 14px;
+}
+.page .health-session:hover,
+.page .health-session:focus-visible { color: var(--c-text); background: var(--c-bg-hover); }
+
+.page .anomaly-row { background: var(--c-bg-elevated); border: none; border-radius: var(--radius); box-shadow: inset 3px 0 0 var(--c-amber); }
+.page .anomaly-row.kind-lowcache { box-shadow: inset 3px 0 0 var(--c-violet); }
+.page .anomaly-row.kind-stuck { box-shadow: inset 3px 0 0 var(--c-red); }
+
 /* ---- Session view: Tools tab, one line per call ---- */
 .tool-seq-main {
   grid-template-columns: 64px 14px minmax(120px, 240px) minmax(0, 1fr) 60px 12px;
