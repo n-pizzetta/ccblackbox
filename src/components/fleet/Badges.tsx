@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type PointerEvent } from "react";
-import { TIER_LABEL, badgeKey, nextUp, type BadgeFamily, type BadgesPayload } from "../../utils/gamify";
+import { TIER_LABEL, badgeKey, nextUp, type BadgeFamily, type BadgeTier, type BadgesPayload } from "../../utils/gamify";
 import { BadgeGlyph } from "./BadgeGlyph";
 import "../../badges.css";
 
@@ -24,6 +24,13 @@ function tilt(e: PointerEvent<HTMLDivElement>) {
 function untilt(e: PointerEvent<HTMLDivElement>) {
   for (const p of ["--mx", "--my", "--rx", "--ry"]) e.currentTarget.style.removeProperty(p);
 }
+
+/** The logo's session trace, faint behind the glyph. */
+const trace = (
+  <svg className="badge-trace" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 40H25L31 22 40 56 47 34 52 44H100" vectorEffect="non-scaling-stroke" />
+  </svg>
+);
 
 /** The card shows the best tier reached, or the first one face down. */
 function shownTier(f: BadgeFamily) {
@@ -53,11 +60,7 @@ function FamilyCard({ f, fresh, tipId, onTip }: { f: BadgeFamily; fresh: boolean
         <div className="badge-frame" />
         <div className="badge-face">
           <div className="badge-art">
-            {best && (
-              <svg className="badge-trace" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">
-                <path d="M0 40H25L31 22 40 56 47 34 52 44H100" vectorEffect="non-scaling-stroke" />
-              </svg>
-            )}
+            {best && trace}
             <BadgeGlyph family={f.id} step={f.tiers.indexOf(shown)} fallback={f.icon} />
             <span className="badge-corners" />
           </div>
@@ -158,6 +161,26 @@ export function Badges({ data, fresh }: Props) {
   );
 }
 
+/** The next tier's card as a thumbnail, without its name, dimmed: a goal, not a win. */
+function MiniCard({ f, t }: { f: BadgeFamily; t: BadgeTier }) {
+  return (
+    <div className="badge-slot badge-mini" aria-hidden="true">
+      <div className={`badge-card tier-${t.tier}`}>
+        <div className="badge-frame" />
+        <div className="badge-face">
+          <div className="badge-art">
+            {trace}
+            <BadgeGlyph family={f.id} step={f.tiers.indexOf(t)} fallback={f.icon} />
+            <span className="badge-corners" />
+          </div>
+        </div>
+        {t.tier !== "bronze" && <div className="badge-foil" />}
+        <div className="badge-glare" />
+      </div>
+    </div>
+  );
+}
+
 /** The locked tiers closest to unlocking among good-practice families: always a visible next goal. */
 export function NextUp({ families, limit, onOpen }: { families: BadgeFamily[]; limit: number; onOpen?: () => void }) {
   const items = nextUp(families, limit);
@@ -167,7 +190,7 @@ export function NextUp({ families, limit, onOpen }: { families: BadgeFamily[]; l
       {items.map(({ family: f, tier: t }) => {
         const body = (
           <>
-            <BadgeGlyph className="next-up-glyph" family={f.id} step={f.tiers.indexOf(t)} fallback={f.icon} />
+            <MiniCard f={f} t={t} />
             <span className="next-up-main">
               <span className="next-up-name">
                 {f.name} <span className="next-up-tier">→ {t.name}</span>
