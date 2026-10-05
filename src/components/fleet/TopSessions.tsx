@@ -70,6 +70,12 @@ export function TopSessions({ sessions, onSelectSession, limit = 10, title = "To
                   className={`podium-card place-${PLACE_CLASS[i]}`}
                   onClick={() => onSelectSession(s.id)}
                 >
+                  {i === 0 && (
+                    <span className="podium-glint" aria-hidden="true">
+                      <span className="podium-glint-glow" />
+                      <span className="podium-glint-line" />
+                    </span>
+                  )}
                   <span className="mono podium-project">{s.project}</span>
                   <span className="podium-goal">{s.goal || "—"}</span>
                   <span className="podium-value tabular">{formatValue(category, value)}</span>

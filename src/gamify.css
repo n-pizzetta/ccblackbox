@@ -150,6 +150,73 @@
 .podium-rest-row:hover .podium-rest-bar > span { background: var(--c-cyan); }
 .podium-rest-value { text-align: right; font-size: var(--fs-md); }
 
+/* ---- Glint on the #1 card: a short gold highlight runs once around the frame, then rests.
+   A conic arc on a square that turns about the card's centre, seen through two cut-outs:
+   the line, a ring over the border (padding + mask), and its glow, a band fading 10px into
+   the card. Only transform and opacity change, so the compositor runs it: no layout, no
+   repaint, nothing on the main thread. ---- */
+.podium-glint {
+  position: absolute;
+  inset: -1px; /* on the border */
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  container-type: size;
+}
+.podium-glint > span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.podium-glint-line {
+  padding: 1.5px; /* the border and half a pixel inside */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.podium-glint-glow {
+  -webkit-mask:
+    linear-gradient(90deg, #000, transparent 10px calc(100% - 10px), #000),
+    linear-gradient(180deg, #000, transparent 10px calc(100% - 10px), #000);
+  mask:
+    linear-gradient(90deg, #000, transparent 10px calc(100% - 10px), #000),
+    linear-gradient(180deg, #000, transparent 10px calc(100% - 10px), #000);
+}
+.podium-glint > span::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  width: calc(hypot(100cqw, 100cqh) + 4px); /* past the diagonal: turning, the square still covers the card */
+  aspect-ratio: 1;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: podium-glint 7s linear 1s infinite;
+}
+.podium-glint-line::before {
+  background: conic-gradient(
+    transparent 0deg 270deg,
+    color-mix(in srgb, var(--medal) 50%, transparent) 325deg,
+    color-mix(in srgb, var(--medal) 45%, white) 352deg,
+    transparent 360deg
+  );
+}
+.podium-glint-glow::before {
+  background: conic-gradient(
+    transparent 0deg 300deg,
+    color-mix(in srgb, var(--medal) 22%, transparent) 348deg,
+    transparent 360deg
+  );
+}
+/* one lap in 4.2s, fading in and out, then 2.8s of rest */
+@keyframes podium-glint {
+  0% { transform: translate(-50%, -50%) rotate(0deg); opacity: 0; }
+  8%, 52% { opacity: 0.9; }
+  60%, 100% { transform: translate(-50%, -50%) rotate(360deg); opacity: 0; }
+}
+
 /* ---- Tier colours (badge cards, Next up, toasts) ---- */
 .tier-bronze, .tone-bronze { --tier: var(--medal-bronze); }
 .tier-silver, .tone-silver { --tier: var(--medal-silver); }
@@ -292,6 +359,9 @@ button.next-up-item:hover { background: var(--c-bg-hover); }
 }
 @media (prefers-reduced-motion: reduce) {
   .podium-card, .hero-track > span, .badge-track > span, .podium-rest-bar > span, .league-bar > span { animation: none; }
+  /* the glint holds still: no arc, a gold edge brightest on top */
+  .podium-glint > span::before { animation: none; }
+  .podium-glint-line { background: linear-gradient(180deg, color-mix(in srgb, var(--medal) 60%, transparent), transparent 80%); }
   .toast.achievement, .toast-icon { animation: none; }
   .xp-gain { animation-name: xp-fade; }
   .profile-xpbar > span { transition: none; }
