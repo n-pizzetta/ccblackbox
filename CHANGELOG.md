@@ -6,6 +6,10 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Open a running session's terminal** (macOS). *Open terminal* in the session view, and a `›_` chip on live rows in the table and on the Now page, bring the terminal running that session to the front. In Ghostty 1.3+ it focuses the exact window, tab and split, matched on the session title Claude Code shows in the terminal title, with a short-lived title marker on the session's tty when titles don't tell terminals apart. Other terminal apps are brought to the front as a whole. New route: `POST /api/sessions/:id/focus` (#65).
+
 ### Planned
 
 - Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).

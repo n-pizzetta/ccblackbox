@@ -54,7 +54,7 @@ Context fill, cumulative API value and tokens per turn, with compactions, prompt
 
 ### Live View
 
-Running sessions show up in real time with the current tool, context fill and prompt-cache countdown, plus a *keep going / compact / clear* verdict and its reasons.
+Running sessions show up in real time with the current tool, context fill and prompt-cache countdown, plus a *keep going / compact / clear* verdict and its reasons. On macOS, *Open terminal* brings the session's terminal to the front: the exact window, tab and split in Ghostty, the app itself elsewhere.
 
 </td>
 <td width="60%">
@@ -241,6 +241,7 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the parser internals, component m
 
 - Cold start re-parses every session (a few seconds with several hundred sessions).
 - Live-session detection uses `ps`, so on Windows running sessions show as crashed. Windows is otherwise untested.
+- *Open terminal* is macOS only. It picks the exact tab in Ghostty 1.3+ only, and not inside tmux, zellij or screen.
 - Test coverage is thin: only the parser has tests (`pnpm test`).
 - Codex sessions have no context-quality score, ghost detection, file-history diffs or `/insights` outcome (Claude Code only). They are kept out of Claude's 5h window, badges and the Claude-specific health rules, and the usage-limits pill shows Claude's limits only.
 
