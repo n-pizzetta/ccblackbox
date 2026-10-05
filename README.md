@@ -118,7 +118,7 @@ Empty sessions and sessions whose Claude Code process died are flagged. Get the 
 
 **2. Open the dashboard.** `/marey:replay` parses `~/.claude` and opens `localhost:3333`.
 
-**3. Connect your limits** *(recommended)*. `/marey:limits` turns on the real 5h and 7-day limits and the context advice. Re-run it after updating Marey; `/marey:limits --uninstall` undoes it.
+**3. Connect your limits** *(recommended)*. `/marey:limits` turns on the real 5h and 7-day limits and the context advice; `/marey:limits --uninstall` undoes it.
 
 Needs Node 20+ on your `PATH`.
 
@@ -137,6 +137,12 @@ Without it, the dashboard still shows tokens and cost for an inferred 5h window,
 </details>
 
 The plugin also registers a `PostToolUse` hook that records fine-grained tool sequences to `~/.claude/marey/cache/{sessionId}.jsonl`, so sessions can be replayed call by call.
+
+### Updating
+
+Turn on auto-update once: `/plugin` → **Marketplaces** → `marey` → **Enable auto-update** (it's off by default for marketplaces outside Anthropic's). Claude Code then fetches new versions shortly after you start a session and tells you to run `/reload-plugins`. Without auto-update: `/plugin` → **Installed** → `marey` → **Update now** (or `claude plugin update marey@marey`), then `/reload-plugins`.
+
+Then run `/marey:replay`. If the dashboard from the previous version is still running, it is stopped and the new one takes its place, and the status line wrapper installed by `/marey:limits` is refreshed on the way: nothing to restart or re-install by hand.
 
 ### Upgrading from ccblackbox
 
