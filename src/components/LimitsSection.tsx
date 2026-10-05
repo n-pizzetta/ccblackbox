@@ -24,12 +24,12 @@ export function LimitsSection() {
       </div>
       {!connected && (
         <p className="profile-hint">
-          Run <code>/ccblackbox:limits</code> in Claude Code to show your real 5h and 7-day limits.
+          Run <code>/marey:limits</code> in Claude Code to show your real 5h and 7-day limits.
         </p>
       )}
       {connected && !contextLive && (
         <p className="profile-hint">
-          Context advice is waiting: re-run <code>/ccblackbox:limits</code>, then send a message.
+          Context advice is waiting: re-run <code>/marey:limits</code>, then send a message.
         </p>
       )}
     </>

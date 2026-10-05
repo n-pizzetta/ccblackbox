@@ -36,7 +36,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { toastError } from "./utils/toast";
 
 const POLL_MS = 5000;
-const STORAGE_KEY = "ccblackbox:state";
+const STORAGE_KEY = "marey:state";
 
 const FILTER_IDS: FilterId[] = ["all", "live", "ghost", "friction", "failed", "lowquality", "claude", "codex"];
 const RANGE_IDS: Range[] = ["today", "7d", "30d", "all"];
@@ -194,11 +194,11 @@ function App() {
     const hmrActive = !!hot;
     const id = hmrActive ? null : setInterval(refresh, POLL_MS);
     const onPush = () => refresh();
-    if (hot) hot.on("ccblackbox:sessions-updated", onPush);
+    if (hot) hot.on("marey:sessions-updated", onPush);
     return () => {
       cancelled = true;
       if (id) clearInterval(id);
-      if (hot?.off) hot.off("ccblackbox:sessions-updated", onPush);
+      if (hot?.off) hot.off("marey:sessions-updated", onPush);
     };
   }, []);
 

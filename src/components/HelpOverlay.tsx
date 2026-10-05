@@ -130,7 +130,7 @@ export function HelpOverlay({ onClose }: Props) {
 
         <section className="help-section help-footer">
           <span className="mono dim">
-            ccblackbox · flight recorder for Claude Code &amp; Codex sessions
+            Marey · flight recorder for Claude Code &amp; Codex sessions
           </span>
         </section>
       </div>

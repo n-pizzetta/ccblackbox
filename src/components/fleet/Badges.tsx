@@ -141,7 +141,7 @@ export function Badges({ data, fresh }: Props) {
     <div className="fleet-block">
       <div className="section-title">
         <span>Badges</span>
-        <span className="dim mono tabular" title="Each tier counts as one badge. Only sessions started after ccblackbox first ran count. Ignores the range and filters.">
+        <span className="dim mono tabular" title="Each tier counts as one badge. Only sessions started after Marey first ran count. Ignores the range and filters.">
           {unlocked}/{total}{since ? ` · since ${since}` : ""}
         </span>
       </div>

@@ -46,10 +46,10 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
   }, []);
   useEffect(() => {
     const onWindow = () => setWindowStart(loadWindowStart());
-    window.addEventListener("ccblackbox:window-changed", onWindow);
+    window.addEventListener("marey:window-changed", onWindow);
     window.addEventListener("storage", onWindow);
     return () => {
-      window.removeEventListener("ccblackbox:window-changed", onWindow);
+      window.removeEventListener("marey:window-changed", onWindow);
       window.removeEventListener("storage", onWindow);
     };
   }, []);

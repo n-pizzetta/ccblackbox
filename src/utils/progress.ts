@@ -3,7 +3,7 @@ import { TIER_LABEL, unlockedKeys, type BadgeFamily, type BadgesPayload, type Ti
 import { toastAchievement } from "./toast";
 import { useDocumentVisible } from "./visibility";
 
-const STORAGE_KEY = "ccblackbox:progress";
+const STORAGE_KEY = "marey:progress";
 
 /** Unlocks already announced by a toast, unlocks already seen on the Progress page, last level announced. */
 type Seen = { notified: string[]; viewed: string[]; level: number };
