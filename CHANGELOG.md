@@ -6,6 +6,21 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Planned
+
+- Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
+- Sub-Agent Tree component.
+- Cross-Session Patterns component.
+- Delta vs `~/.claude/usage-data/report.html` view.
+- Tests: parser unit tests around `mapFrictions`, `linkClearedChains`,
+  `reassignLiveToChainTail`, plugin-cache merge.
+- CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
+  macOS/Linux).
+- Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
+  with mtime invalidation, so cold start doesn't re-parse the full set.
+
+## [0.5.0] — 2026-10-05
+
 ### Added
 
 - Icons next to the page tabs (Now, Sessions, Usage, Health, Progress); the active one takes the accent colour.
@@ -22,19 +37,6 @@ versioning follows [SemVer](https://semver.org/).
 - The header no longer lets the page tabs cover the 5h / 7d limits on narrower windows.
 - Badge cards' shadow follows their rounded corners: the radius was sized from the window instead of the card.
 - **Now: the 5h window panel no longer jumps or swaps its top session every few seconds.** Every running Claude Code session's status line overwrote the limits with its own last-known ones (an idle session holds a lower %, a window that reset days ago, or none), so the panel flipped between the real window and an inferred one, changed its ranking unit and resized. The server now keeps the freshest limits (later reset, then higher %), which also steadies the header gauge and the burn-spike banner. The ranking no longer depends on the limits, ties break on the id, and a session only overtakes another by more than 1% of the window.
-
-### Planned
-
-- Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
-- Sub-Agent Tree component.
-- Cross-Session Patterns component.
-- Delta vs `~/.claude/usage-data/report.html` view.
-- Tests: parser unit tests around `mapFrictions`, `linkClearedChains`,
-  `reassignLiveToChainTail`, plugin-cache merge.
-- CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
-  macOS/Linux).
-- Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
-  with mtime invalidation, so cold start doesn't re-parse the full set.
 
 ## [0.4.0] — 2026-10-05
 
