@@ -2,6 +2,9 @@ export type Outcome = "fully_achieved" | "mostly_achieved" | "partially_achieved
 
 export type GhostKind = "empty" | "crashed";
 
+/** Coding agent that wrote the session: Claude Code (~/.claude) or Codex (~/.codex). */
+export type Agent = "claude" | "codex";
+
 export type FrictionKind =
   | "wrong_approach"
   | "buggy_code"
@@ -48,6 +51,8 @@ export interface SessionQuality {
 
 export interface Session {
   id: string;
+  /** Absent in mock data and older payloads: Claude Code. */
+  agent?: Agent;
   project: string;
   cwd: string;
   startedAt: string;
@@ -92,8 +97,10 @@ export interface Session {
   /** The transcript is gone: numbers come from /insights session-meta (no cache tokens). */
   transcriptMissing?: boolean;
   lastEventAt?: string;
-  /** Claude Code version from the transcript (last seen). */
+  /** Claude Code or Codex CLI version from the transcript (last seen). */
   version?: string;
+  /** Context window reported by the agent (Codex only); else inferred from the peak. */
+  contextWindow?: number;
   /** Running sessions: when the Claude Code process started (pid file). */
   processStartedAt?: string;
   runningTool?: { tool: string; preview: string; t: number } | null;

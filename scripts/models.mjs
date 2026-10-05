@@ -1,12 +1,13 @@
 /**
- * Single source of truth for Claude model names and public API pricing,
- * shared by the parser (Node) and the dashboard (bundled by Vite).
+ * Single source of truth for model names and public API pricing (Claude for
+ * Claude Code, GPT for Codex), shared by the parser (Node) and the dashboard
+ * (bundled by Vite).
  *
- * Prices are USD per million tokens (Anthropic first-party API rates).
- * Cache writes are derived from the input rate: 1.25x (5-minute TTL),
+ * Prices are USD per million tokens (Anthropic and OpenAI first-party API
+ * rates). Cache writes are derived from the input rate: 1.25x (5-minute TTL),
  * 2x (1-hour TTL). Cache reads vary by model, so they are listed.
  *
- * When Anthropic ships a model: add a row here. Unknown ids still get a
+ * When Anthropic or OpenAI ships a model: add a row here. Unknown ids still get a
  * readable name (see normalizeModel) and the latest price of their family.
  */
 export const MODELS = {
@@ -23,6 +24,17 @@ export const MODELS = {
   "sonnet-5":   { label: "Sonnet 5",   in: 2,  out: 10, cacheRead: 0.2 },
   "sonnet-4.6": { label: "Sonnet 4.6", in: 3,  out: 15, cacheRead: 0.3 },
   "haiku-4.5":  { label: "Haiku 4.5",  in: 1,  out: 5,  cacheRead: 0.1 },
+  // OpenAI rows: developers.openai.com/api/docs/models/<id>. Prompts over 272k
+  // input tokens and fast mode cost more; not modelled (no tier in rollouts).
+  "gpt-6-astra":   { label: "GPT-6 Astra",   in: 10,  out: 50,  cacheRead: 1 },
+  "gpt-6-sol":     { label: "GPT-6 Sol",     in: 2,   out: 10,  cacheRead: 0.2 },
+  "gpt-6-luna":    { label: "GPT-6 Luna",    in: 0.1, out: 0.5, cacheRead: 0.01 },
+  // Promotional price "at least through November 21, 2026"; list price is $5 / $30.
+  "gpt-5.6-sol":   { label: "GPT-5.6 Sol",   in: 4,   out: 20,  cacheRead: 0.4 },
+  "gpt-5.6-terra": { label: "GPT-5.6 Terra", in: 2,   out: 12,  cacheRead: 0.2 },
+  "gpt-5.6-luna":  { label: "GPT-5.6 Luna",  in: 0.2, out: 1.2, cacheRead: 0.02 },
+  "gpt-5.5":       { label: "GPT-5.5",       in: 5,   out: 30,  cacheRead: 0.5 },
+  "gpt-5.4":       { label: "GPT-5.4",       in: 2.5, out: 15,  cacheRead: 0.25 },
 };
 
 const BUILTIN = Object.fromEntries(Object.entries(MODELS).map(([k, v]) => [k, { ...v }]));
@@ -36,6 +48,9 @@ const FAMILY_LATEST = {
   opus: "opus-5.5",
   sonnet: "sonnet-5.5",
   haiku: "haiku-4.5",
+  gpt: "gpt-5.4",
+  // Codex's internal models (codex-auto-review): priced like GPT, not like the default.
+  codex: "gpt-5.4",
 };
 
 /**
@@ -86,6 +101,8 @@ export function priceFor(model) {
 export function modelLabel(model) {
   if (!model) return "unknown";
   if (MODELS[model]) return MODELS[model].label;
+  if (model.startsWith("gpt-")) return `GPT-${model.slice(4)}`;
+  if (model.startsWith("codex-")) return `Codex ${model.slice(6).replace(/-/g, " ")}`;
   const [family, version] = model.split("-");
   return version ? `${family[0].toUpperCase()}${family.slice(1)} ${version}` : model;
 }
