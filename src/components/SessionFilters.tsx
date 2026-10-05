@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "../types";
 import { projectColor } from "../utils/fleetStats";
 
-export type FilterId = "all" | "live" | "ghost" | "friction" | "failed" | "lowquality";
+export type FilterId = "all" | "live" | "ghost" | "friction" | "failed" | "lowquality" | "claude" | "codex";
 
 // `sessions` is the time-scoped (inRange) set. Counts are computed from this pre-filter
 // baseline so an active filter never zeroes out its siblings.
@@ -15,6 +15,18 @@ interface Props {
 }
 
 type Item = { id: FilterId; label: string; count: number; tip: string };
+
+/** Chip labels, also for a persisted filter whose item is hidden in the current range. */
+const FILTER_LABELS: Record<FilterId, string> = {
+  all: "All sessions",
+  live: "Live",
+  ghost: "Ghosts",
+  friction: "Friction",
+  failed: "Low outcome",
+  lowquality: "Low quality",
+  claude: "Claude Code",
+  codex: "Codex",
+};
 
 const OUTCOME_LEGEND: Array<{ color: string; label: string }> = [
   { color: "var(--c-green)", label: "achieved / live" },
@@ -29,9 +41,10 @@ function statusItems(sessions: Session[]): Item[] {
   for (const s of sessions) if (s.ghost) ghostByKind[s.ghostKind ?? "empty"] += 1;
   const ghostCount = ghostByKind.crashed + ghostByKind.empty;
   const anyQuality = sessions.some((s) => s.quality);
+  const codexCount = sessions.filter((s) => s.agent === "codex").length;
   return [
     { id: "all", label: "All sessions", count: sessions.length, tip: "" },
-    { id: "live", label: "Live", count: sessions.filter((s) => s.live).length, tip: "Sessions with a running claude process" },
+    { id: "live", label: "Live", count: sessions.filter((s) => s.live).length, tip: "Claude Code: running process · Codex: task in progress" },
     {
       id: "ghost",
       label: "Ghosts",
@@ -52,6 +65,13 @@ function statusItems(sessions: Session[]): Item[] {
           count: sessions.filter((s) => s.quality && s.quality.score < 70).length,
           tip: "Context quality score < 70 (context fill, stale reads, bloated results, compactions, duplicates)",
         }]
+      : []),
+    // Agent filters only matter once both agents have sessions.
+    ...(codexCount > 0 && codexCount < sessions.length
+      ? [
+          { id: "claude" as FilterId, label: "Claude Code", count: sessions.length - codexCount, tip: "Sessions from Claude Code (~/.claude)" },
+          { id: "codex" as FilterId, label: "Codex", count: codexCount, tip: "Sessions from Codex (~/.codex)" },
+        ]
       : []),
   ];
 }
@@ -84,7 +104,8 @@ export function SessionFilters({ filter, onFilterChange, projectFilter, onProjec
     return [...counts.entries()].sort(([, a], [, b]) => b - a);
   }, [sessions]);
 
-  const activeStatus = filter !== "all" ? items.find((i) => i.id === filter) : undefined;
+  const activeStatus =
+    filter !== "all" ? items.find((i) => i.id === filter) ?? { id: filter, label: FILTER_LABELS[filter], count: 0, tip: "" } : undefined;
   const activeCount = (activeStatus ? 1 : 0) + (projectFilter ? 1 : 0);
 
   return (

@@ -68,7 +68,7 @@ export function TopBar({
         <BrandMark size={40} />
         <div className="brand-words">
           <h1 className="brand-title"><span className="brand-cc">CC</span>blackbox</h1>
-          <span className="brand-tag">flight recorder for Claude Code</span>
+          <span className="brand-tag">flight recorder for Claude Code &amp; Codex</span>
         </div>
       </div>
       <div className="topline-right">

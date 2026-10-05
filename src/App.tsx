@@ -22,7 +22,7 @@ import { toastError } from "./utils/toast";
 const POLL_MS = 5000;
 const STORAGE_KEY = "ccblackbox:state";
 
-const FILTER_IDS: FilterId[] = ["all", "live", "ghost", "friction", "failed", "lowquality"];
+const FILTER_IDS: FilterId[] = ["all", "live", "ghost", "friction", "failed", "lowquality", "claude", "codex"];
 const RANGE_IDS: Range[] = ["today", "7d", "30d", "all"];
 /** Sessions that can be compared side by side. Not applied to the ghost bulk-delete selection. */
 const MAX_COMPARE = 3;
@@ -183,6 +183,8 @@ function App() {
     if (filter === "friction") return s.frictions.length > 0;
     if (filter === "failed") return !s.ghost && (s.outcome === "not_achieved" || s.outcome === "partially_achieved");
     if (filter === "lowquality") return !!s.quality && s.quality.score < 70;
+    if (filter === "codex") return s.agent === "codex";
+    if (filter === "claude") return s.agent !== "codex";
     return true;
   });
   // Aggregates only count what was spent inside the range (per turn).

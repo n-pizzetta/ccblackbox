@@ -219,9 +219,8 @@ export function SessionDetail({
   const c = outcomeColor(session.outcome);
 
   const shellEscape = (s: string) => (/^[A-Za-z0-9_@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`);
-  const resumeCmd = session.cwd
-    ? `cd ${shellEscape(session.cwd)} && claude --resume ${session.id}`
-    : `claude --resume ${session.id}`;
+  const resume = session.agent === "codex" ? `codex resume ${session.id}` : `claude --resume ${session.id}`;
+  const resumeCmd = session.cwd ? `cd ${shellEscape(session.cwd)} && ${resume}` : resume;
   const copyResume = async () => {
     try {
       await navigator.clipboard.writeText(resumeCmd);
@@ -318,6 +317,8 @@ export function SessionDetail({
                 title={
                   session.outcome === "in_progress"
                     ? "Session is currently running. Outcome is set to 'in progress' while live; an outcome is assessed later when /insights analyzes it."
+                    : session.agent === "codex"
+                    ? "Outcome unknown: /insights only analyzes Claude Code sessions."
                     : session.outcome === "unknown"
                     ? "Outcome unknown: /insights hasn't analyzed this session yet (it assesses sessions in batch). Run /insights in Claude Code to fill it in."
                     : "Outcome assessed by /insights from the transcript. Subjective: 'fully / mostly / partially / not' achieved. Not a hard metric — useful as a rough signal."
@@ -377,7 +378,7 @@ export function SessionDetail({
             className="footer-id-copy"
             onClick={copyResume}
             title={resumeCopied ? "Copied!" : `Copy resume command\n${resumeCmd}`}
-            aria-label="Copy claude --resume command"
+            aria-label="Copy resume command"
           >
             {resumeCopied ? "✓ copied" : session.id}
           </button>
@@ -933,7 +934,9 @@ function OverviewTab({
         </div>
       ) : (
         session.outcome === "unknown" || session.outcome === "in_progress" ? (
-          <div className="clean-row dim">Frictions not analyzed yet · run /insights in Claude Code</div>
+          <div className="clean-row dim">
+            {session.agent === "codex" ? "Frictions not analyzed · /insights only covers Claude Code" : "Frictions not analyzed yet · run /insights in Claude Code"}
+          </div>
         ) : (
           <div className="clean-row">
             <span style={{ color: "var(--c-green)" }}>✓</span> Clean session · no friction detected
@@ -1678,7 +1681,11 @@ function FilesTab({ session }: { session: Session }) {
         <div className="placeholder">
           No file history recorded for this session.
           <div className="mono dim" style={{ marginTop: 6 }}>
-            Claude Code writes versions to <code>~/.claude/file-history/{"{sessionId}"}/</code> only when it edits files.
+            {session.agent === "codex" ? (
+              "Codex keeps no file snapshots: the count above comes from its patches."
+            ) : (
+              <>Claude Code writes versions to <code>~/.claude/file-history/{"{sessionId}"}/</code> only when it edits files.</>
+            )}
           </div>
         </div>
       </div>
