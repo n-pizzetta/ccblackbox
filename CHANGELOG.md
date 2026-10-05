@@ -27,7 +27,7 @@ versioning follows [SemVer](https://semver.org/).
 - One type scale (nine sizes, `--fs-xs` to `--fs-3xl`), sentence-case sans labels, mono only for values and code; about 260 CSS rules for removed markup are gone.
 - Session view: one line per tool call in fixed columns, one chip style in the header, tool and file counts on the tabs, Export as a labeled button.
 - On phones the Sessions page scrolls as a whole, and the limits and the profile chip get their own header row.
-- The level now comes from XP earned by how sessions were run (commits, tests, lint, context score, good-practice badges) instead of tokens spent. XP is kept per session in `badges.json`, so the level no longer drops when old transcripts are cleaned up or a session crashes. Level titles no longer borrow job titles.
+- The level now comes from XP earned by how Claude Code sessions were run (commits, tests, lint, context score, good-practice badges) instead of tokens spent. XP is kept per session in `badges.json`, so the level no longer drops when old transcripts are cleaned up or a session crashes. Level titles no longer borrow job titles.
 - Context hygiene only counts ended sessions.
 - Toasts stay while hovered, focused or in a background tab.
 - The header streak follows the badge rule: a quiet weekend no longer resets it.

@@ -120,6 +120,17 @@ test("a live session's early context score doesn't unlock Context hygiene", () =
   assert.ok(state.unlocked["hygiene:bronze"]);
 });
 
+test("Codex sessions earn no XP but keep the streak alive", () => {
+  const now = monday().getTime();
+  const state = xpOnlyState(now);
+  const work = { agent: "codex", commits: 1, shell: { prs: 0, tests: 1, lints: 1, infra: 0 } };
+  const out = computeBadges([session("cx", now - HOUR, work)], state, now);
+  assert.equal(state.xp.cx, undefined);
+  assert.equal(out.level.xp, 0);
+  assert.equal(out.level.today, 0);
+  assert.deepEqual(out.streak, { current: 1, activeToday: true, atRisk: false });
+});
+
 test("only good-practice badges add XP", () => {
   const now = monday().getTime();
   const state = freshState(now);

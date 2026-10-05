@@ -176,8 +176,9 @@ export const BADGE_COUNT = FAMILIES.reduce((a, f) => a + f.targets.length, 0);
 /* ---- XP and level ---- */
 
 /**
- * XP rewards how a session was run, never how much it spent. Unlike badges it
- * counts sessions from before the first launch, so the level is real on day one.
+ * XP rewards how a session was run, never how much it spent. Like badges, only
+ * Claude Code sessions earn it; unlike badges, sessions from before the first
+ * launch count, so the level is real on day one.
  * Calibrated on real history so shipping and checks (commit, tests, lint) make
  * most of it: nearly every session reaches 5 turns and a context score of 90.
  */
@@ -307,6 +308,8 @@ export function computeBadges(allSessions, state, now = Date.now()) {
     if (s.ghost) continue;
     const acts = activity(s);
     for (const ts of acts) days.add(dayKey(ts));
+    // The streak is activity with any agent; XP is banked for good, so Codex (no context score) earns none.
+    if (s.agent === "codex") continue;
     const earned = sessionXp(s);
     // A live session banks what can only go up (so a crash keeps it); its context point stays provisional.
     const bankable = s.live ? sessionXp(s, false) : earned;
