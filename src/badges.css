@@ -11,7 +11,8 @@
 .badge-card.tier-gold { --tier-hi: #fff3bd; --tier-lo: #97661a; }
 .badge-card.tier-platinum { --tier-hi: #f0feff; --tier-lo: #2d7a8e; }
 
-.badge-slot { position: relative; min-width: 0; perspective: 700px; }
+/* The slot is a container too, so the card's own radius and shadow scale with its width. */
+.badge-slot { position: relative; min-width: 0; container-type: inline-size; perspective: 700px; }
 
 .badge-card {
   /* pointer position (0-100) and tilt, set while hovered */
