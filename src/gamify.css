@@ -259,10 +259,7 @@ button.next-up-item:hover { background: var(--c-bg-hover); }
   pointer-events: none;
   animation: xp-float 2.4s var(--t-slow) both;
 }
-.app-nav-count.new {
-  color: var(--medal-gold);
-  background: color-mix(in srgb, var(--medal-gold) 16%, transparent);
-}
+.app-nav-count.new { font-weight: 600; color: var(--medal-gold); }
 
 /* ---- Achievement toast (Toaster) ---- */
 .toast.achievement {
