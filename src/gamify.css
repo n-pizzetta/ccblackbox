@@ -1,5 +1,5 @@
-/* Progression: XP chip, achievement toasts, Next up, podium, badges, project league.
-   Kept out of App.css on purpose. */
+/* Progression: XP chip, achievement toasts, Next up, podium, project league.
+   Kept out of App.css on purpose; the badge cards are in badges.css. */
 
 :root {
   --medal-gold: #f5c451;
@@ -191,55 +191,12 @@
   text-shadow: 0 0 3px rgba(0, 0, 0, 0.95), 0 1px 8px rgba(0, 0, 0, 0.9);
 }
 
-/* ---- Badges ---- */
-.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
-.badge {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 8px 10px;
-  text-align: center;
-  border: 1px solid var(--c-hairline);
-  border-radius: var(--radius-lg);
-  background: var(--c-bg);
-}
-.badge-icon { font-size: var(--fs-2xl); line-height: 1; }
-.badge-name { font-size: var(--fs-md); font-weight: 500; color: var(--c-text-soft); }
-.badge-state { font-size: var(--fs-xs); color: var(--c-text-faint); }
-.badge-track { width: 70%; height: 4px; margin: 2px 0; }
-.badge.unlocked {
-  border-color: color-mix(in srgb, var(--tier) 40%, var(--c-hairline));
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 9%, var(--c-bg-panel)), var(--c-bg));
-}
-.badge.unlocked .badge-name { color: var(--c-text); }
-.tier-bronze, .pip-bronze, .tone-bronze { --tier: var(--medal-bronze); }
-.tier-silver, .pip-silver, .tone-silver { --tier: var(--medal-silver); }
-.tier-gold, .pip-gold, .tone-gold { --tier: var(--medal-gold); }
-.tier-platinum, .pip-platinum, .tone-platinum { --tier: var(--medal-platinum); }
+/* ---- Tier colours (badge cards, Next up, toasts) ---- */
+.tier-bronze, .tone-bronze { --tier: var(--medal-bronze); }
+.tier-silver, .tone-silver { --tier: var(--medal-silver); }
+.tier-gold, .tone-gold { --tier: var(--medal-gold); }
+.tier-platinum, .tone-platinum { --tier: var(--medal-platinum); }
 .tone-level { --tier: var(--c-cyan); }
-.badge-pips { display: flex; gap: 4px; }
-.badge-pip { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--c-text-ghost); }
-.badge-pip.on { background: var(--tier); border-color: var(--tier); }
-.badge.locked .badge-icon { filter: grayscale(1); opacity: 0.4; }
-.badge.locked .badge-name { color: var(--c-text-dim); }
-.badge.fresh {
-  border-color: var(--tier);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tier) 35%, transparent), 0 0 18px color-mix(in srgb, var(--tier) 22%, transparent);
-}
-.badge.fresh .badge-icon { animation: badge-pop 600ms var(--t-slow) both; }
-.badge-new {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  padding: 0 5px;
-  font-size: var(--fs-xs);
-  line-height: 15px;
-  color: var(--c-bg);
-  background: var(--tier);
-  border-radius: 999px;
-}
 
 /* ---- Next up (Now page, Progress page) ---- */
 .next-up { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -257,7 +214,7 @@
   transition: border-color var(--t-fast), background var(--t-fast);
 }
 button.next-up-item:hover { border-color: color-mix(in srgb, var(--tier) 55%, var(--c-hairline)); background: var(--c-bg-panel); }
-.next-up-icon { font-size: var(--fs-xl); line-height: 1; }
+.next-up-glyph { flex: none; width: 28px; height: 28px; color: var(--tier); }
 .next-up-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .next-up-name { font-size: var(--fs-base); font-weight: 500; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .next-up-tier { font-size: var(--fs-sm); font-weight: 400; color: var(--tier); }
@@ -372,7 +329,7 @@ button.next-up-item:hover { border-color: color-mix(in srgb, var(--tier) 55%, va
   .podium-card.place-first { animation: none; box-shadow: 0 -8px 30px rgba(255, 100, 25, 0.28); }
   .place-first .podium-goal, .place-first .podium-value { filter: none; }
   .podium-card, .hero-track > span, .badge-track > span, .podium-rest-bar > span, .league-bar > span { animation: none; }
-  .badge.fresh .badge-icon, .toast.achievement, .toast-icon { animation: none; }
+  .toast.achievement, .toast-icon { animation: none; }
   .xp-gain { animation-name: xp-fade; }
   .profile-xpbar > span { transition: none; }
 }

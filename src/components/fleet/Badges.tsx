@@ -1,40 +1,108 @@
+import { useEffect, useId, useState, type PointerEvent } from "react";
 import { TIER_LABEL, badgeKey, nextUp, type BadgeFamily, type BadgesPayload } from "../../utils/gamify";
+import { BadgeGlyph } from "./BadgeGlyph";
+import "../../badges.css";
 
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 const fmt = (n: number, unit: string | null) => `${compact.format(n)}${unit ? ` ${unit}` : ""}`;
 
-function tooltip(f: BadgeFamily): string {
-  const lines = f.tiers.map((t) => {
-    const done = t.unlockedAt ? ` ✓ ${new Date(t.unlockedAt).toLocaleDateString()}` : "";
-    return `${TIER_LABEL[t.tier]}: ${fmt(t.target, f.unit)}${done}`;
-  });
-  return [`${f.name}: ${f.hint}`, f.window === "30d" ? "Rolling 30 days." : "", ...lines].filter(Boolean).join("\n");
+const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Tilts the card toward the pointer and moves the foil with it. */
+function tilt(e: PointerEvent<HTMLDivElement>) {
+  if (e.pointerType !== "mouse" || reducedMotion()) return;
+  const card = e.currentTarget;
+  const r = card.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width;
+  const y = (e.clientY - r.top) / r.height;
+  card.style.setProperty("--mx", String(x * 100));
+  card.style.setProperty("--my", String(y * 100));
+  card.style.setProperty("--ry", `${(x - 0.5) * 16}deg`);
+  card.style.setProperty("--rx", `${(0.5 - y) * 16}deg`);
 }
 
-function FamilyCard({ f, fresh }: { f: BadgeFamily; fresh: boolean }) {
-  const best = f.tiers.filter((t) => t.unlockedAt).at(-1)?.tier ?? null;
-  const next = f.tiers.find((t) => !t.unlockedAt);
+function untilt(e: PointerEvent<HTMLDivElement>) {
+  for (const p of ["--mx", "--my", "--rx", "--ry"]) e.currentTarget.style.removeProperty(p);
+}
+
+/** The card shows the best tier reached, or the first one face down. */
+function shownTier(f: BadgeFamily) {
+  const best = f.tiers.filter((t) => t.unlockedAt).at(-1) ?? null;
+  return { best, shown: best ?? f.tiers[0] };
+}
+
+type Tip = { f: BadgeFamily; rect: DOMRect };
+
+function FamilyCard({ f, fresh, tipId, onTip }: { f: BadgeFamily; fresh: boolean; tipId: string | undefined; onTip: (tip: Tip | null) => void }) {
+  const { best, shown } = shownTier(f);
+  const show = (el: HTMLElement) => onTip({ f, rect: el.getBoundingClientRect() });
   return (
-    <div className={`badge ${best ? `unlocked tier-${best}` : "locked"}${fresh ? " fresh" : ""}`} title={tooltip(f)}>
-      {fresh && <span className="badge-new mono">new</span>}
-      <span className="badge-icon" aria-hidden="true">{f.icon}</span>
-      <span className="badge-name">{f.name}</span>
-      <span className="badge-pips" aria-label={best ? `${TIER_LABEL[best]} reached` : "No tier yet"}>
+    <div className="badge-slot">
+      <div
+        className={`badge-card ${best ? `tier-${best.tier}` : "locked"}${fresh ? " fresh" : ""}`}
+        role="img"
+        tabIndex={0}
+        aria-label={best ? `${shown.name}: ${TIER_LABEL[best.tier]} ${f.name}` : `${f.name}: locked`}
+        aria-describedby={tipId}
+        onPointerMove={tilt}
+        onPointerEnter={(e) => show(e.currentTarget)}
+        onPointerLeave={(e) => { untilt(e); onTip(null); }}
+        onFocus={(e) => show(e.currentTarget)}
+        onBlur={() => onTip(null)}
+      >
+        <div className="badge-frame" />
+        <div className="badge-face">
+          <div className="badge-art">
+            {best && (
+              <svg className="badge-trace" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0 40H25L31 22 40 56 47 34 52 44H100" vectorEffect="non-scaling-stroke" />
+              </svg>
+            )}
+            <BadgeGlyph family={f.id} step={f.tiers.indexOf(shown)} fallback={f.icon} />
+            <span className="badge-corners" />
+          </div>
+          <div className="badge-name">{shown.name}</div>
+        </div>
+        {best && best.tier !== "bronze" && <div className="badge-foil" />}
+        {best && <div className="badge-glare" />}
+        {fresh && <span className="badge-new mono">new</span>}
+      </div>
+    </div>
+  );
+}
+
+/** Every tier with its target and unlock date, then progress toward the next one. */
+function BadgeTip({ tip, id }: { tip: Tip; id: string }) {
+  const { f, rect } = tip;
+  const next = f.tiers.find((t) => !t.unlockedAt);
+  // Below the card in the top half of the screen, above it in the bottom half; kept inside the viewport.
+  const width = Math.min(272, window.innerWidth - 16);
+  const left = Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8);
+  const style = rect.top > window.innerHeight / 2 ? { left, bottom: window.innerHeight - rect.top + 8 } : { left, top: rect.bottom + 8 };
+  return (
+    <div className="badge-tip" id={id} role="tooltip" style={style}>
+      <div className="badge-tip-name">{f.name}</div>
+      <p className="badge-tip-hint">{f.hint}{f.window === "30d" ? " · rolling 30 days" : ""}</p>
+      <ul className="badge-tip-tiers">
         {f.tiers.map((t) => (
-          <span key={t.tier} className={`badge-pip pip-${t.tier}${t.unlockedAt ? " on" : ""}`} />
+          <li key={t.tier} className={`tier-${t.tier}${t.unlockedAt ? " done" : ""}`} title={TIER_LABEL[t.tier]}>
+            <span className="badge-tip-dot" />
+            <span>{t.name}</span>
+            <span className="badge-tip-target mono tabular">{fmt(t.target, f.unit)}</span>
+            <span className="badge-tip-date mono tabular">{t.unlockedAt ? new Date(t.unlockedAt).toLocaleDateString() : "–"}</span>
+          </li>
         ))}
-      </span>
+      </ul>
       {next ? (
-        <>
+        <div className={`badge-tip-next tier-${next.tier}`}>
+          <span>Next: {next.name}</span>
+          <span className="mono tabular">{fmt(next.progress, null)}/{fmt(next.target, f.unit)}</span>
           <span className="badge-track" aria-hidden="true">
             <span style={{ width: `${(next.progress / next.target) * 100}%` }} />
           </span>
-          <span className="badge-state mono tabular">
-            {fmt(next.progress, null)}/{fmt(next.target, f.unit)}
-          </span>
-        </>
+        </div>
       ) : (
-        <span className="badge-state mono">maxed</span>
+        <div className="badge-tip-next">Every tier earned</div>
       )}
     </div>
   );
@@ -47,6 +115,20 @@ interface Props {
 }
 
 export function Badges({ data, fresh }: Props) {
+  const [tip, setTip] = useState<Tip | null>(null);
+  const tipId = useId();
+  // A fixed hover card would drift from its card on scroll: close it instead.
+  useEffect(() => {
+    if (!tip) return;
+    const close = () => setTip(null);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, { capture: true });
+      window.removeEventListener("resize", close);
+    };
+  }, [tip]);
+
   const families = data.families.filter((f) => f.available);
   const total = families.reduce((a, f) => a + f.tiers.length, 0);
   const unlocked = families.reduce((a, f) => a + f.tiers.filter((t) => t.unlockedAt).length, 0);
@@ -56,15 +138,22 @@ export function Badges({ data, fresh }: Props) {
     <div className="fleet-block">
       <div className="section-title">
         <span>Badges</span>
-        <span className="dim mono tabular" title="Only sessions started after ccblackbox first ran count. Ignores the range and filters.">
+        <span className="dim mono tabular" title="Each tier counts as one badge. Only sessions started after ccblackbox first ran count. Ignores the range and filters.">
           {unlocked}/{total}{since ? ` · since ${since}` : ""}
         </span>
       </div>
       <div className="badges">
         {families.map((f) => (
-          <FamilyCard key={f.id} f={f} fresh={f.tiers.some((t) => fresh.has(badgeKey(f, t)))} />
+          <FamilyCard
+            key={f.id}
+            f={f}
+            fresh={f.tiers.some((t) => fresh.has(badgeKey(f, t)))}
+            tipId={tip?.f.id === f.id ? tipId : undefined}
+            onTip={setTip}
+          />
         ))}
       </div>
+      {tip && <BadgeTip tip={tip} id={tipId} />}
     </div>
   );
 }
@@ -78,10 +167,10 @@ export function NextUp({ families, limit, onOpen }: { families: BadgeFamily[]; l
       {items.map(({ family: f, tier: t }) => {
         const body = (
           <>
-            <span className="next-up-icon" aria-hidden="true">{f.icon}</span>
+            <BadgeGlyph className="next-up-glyph" family={f.id} step={f.tiers.indexOf(t)} fallback={f.icon} />
             <span className="next-up-main">
               <span className="next-up-name">
-                {f.name} <span className="next-up-tier">→ {TIER_LABEL[t.tier]}</span>
+                {f.name} <span className="next-up-tier">→ {t.name}</span>
               </span>
               <span className="badge-track" aria-hidden="true">
                 <span style={{ width: `${(t.progress / t.target) * 100}%` }} />
@@ -92,7 +181,7 @@ export function NextUp({ families, limit, onOpen }: { families: BadgeFamily[]; l
             </span>
           </>
         );
-        const title = `${f.name}: ${f.hint}${f.window === "30d" ? " (rolling 30 days)" : ""}`;
+        const title = `${t.name} (${TIER_LABEL[t.tier]} ${f.name}): ${f.hint}${f.window === "30d" ? " (rolling 30 days)" : ""}`;
         return onOpen ? (
           <button key={f.id} className={`next-up-item tier-${t.tier}`} title={title} onClick={onOpen}>{body}</button>
         ) : (

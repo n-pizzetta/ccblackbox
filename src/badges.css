@@ -1,0 +1,213 @@
+/* Badge cards: foil collector cards, one per family, showing the best tier reached.
+   The tier is only the finish (matte bronze, silver and gold sheen, holographic platinum)
+   and its name; progress lives in the hover card. Sizes inside a card are in cqw (1% of the
+   card width) so it scales as a unit: set the width on the grid, never inside the card. */
+
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 14px 12px; }
+
+/* Highlight and shadow of each metal, around --tier (set in gamify.css). */
+.badge-card.tier-bronze { --tier-hi: #f6c9a4; --tier-lo: #7b4826; }
+.badge-card.tier-silver { --tier-hi: #fbfdff; --tier-lo: #6c7988; }
+.badge-card.tier-gold { --tier-hi: #fff3bd; --tier-lo: #97661a; }
+.badge-card.tier-platinum { --tier-hi: #f0feff; --tier-lo: #2d7a8e; }
+
+.badge-slot { position: relative; min-width: 0; perspective: 700px; }
+
+.badge-card {
+  /* pointer position (0-100) and tilt, set while hovered */
+  --mx: 46;
+  --my: 24;
+  --rx: 0deg;
+  --ry: 0deg;
+  container-type: inline-size;
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border-radius: 9.2cqw;
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 350ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 350ms;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(0, 0, 0, 0.6);
+  outline: none;
+}
+.badge-card:hover {
+  transition: transform 80ms linear, box-shadow 350ms; /* follow the pointer tightly, relax slowly */
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(0, 0, 0, 0.6);
+}
+.badge-card:focus-visible { box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-cyan); }
+
+.badge-frame { position: absolute; inset: 0; border-radius: 9.2cqw; }
+
+.badge-face {
+  position: absolute;
+  inset: 1.5cqw;
+  display: flex;
+  flex-direction: column;
+  padding: 5.2cqw 5.6cqw 5cqw;
+  overflow: hidden;
+  border-radius: 7.8cqw;
+  background: linear-gradient(180deg, #151d28, #0b1117);
+}
+
+.badge-art {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 5.5cqw;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 5cqw;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--tier) 22%, #0f151d), #090d13 74%);
+}
+
+.badge-glyph {
+  position: relative;
+  width: 40cqw;
+  height: 40cqw;
+  color: var(--tier);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--tier) 45%, transparent));
+}
+
+/* The logo's session trace, faint behind the glyph. */
+.badge-trace {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--tier);
+  stroke-opacity: 0.2;
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+
+.badge-corners { position: absolute; inset: 2.4cqw; pointer-events: none; }
+
+/* Breaks on a balanced line ("Half / marathon") rather than truncating. */
+.badge-name {
+  font: 600 11.5cqw/1.08 var(--f-display);
+  letter-spacing: -0.01em;
+  color: var(--c-text);
+  text-wrap: balance;
+}
+
+/* ---- Finishes ---- */
+.badge-card:not(.locked) .badge-frame { background: linear-gradient(140deg, var(--tier-hi), var(--tier) 32%, var(--tier-lo) 62%, var(--tier)); }
+.badge-card.tier-platinum .badge-frame { background: linear-gradient(140deg, #e9fbff, var(--c-cyan) 28%, var(--c-violet) 56%, var(--c-pink) 78%, var(--c-teal)); }
+.badge-card:not(.locked) .badge-face { box-shadow: inset 0 0 0 0.5cqw rgba(255, 255, 255, 0.07); }
+.badge-card:not(.locked) .badge-art {
+  box-shadow: inset 0 0 0 0.5cqw color-mix(in srgb, var(--tier) 45%, #1a222c), inset 0 0 12px color-mix(in srgb, var(--tier) 14%, transparent);
+}
+/* Four corner ticks in the tier colour. */
+.badge-card:not(.locked) .badge-corners {
+  --tick: linear-gradient(var(--tier), var(--tier));
+  opacity: 0.8;
+  background:
+    var(--tick) 0 0 / 5cqw 0.55cqw no-repeat, var(--tick) 0 0 / 0.55cqw 5cqw no-repeat,
+    var(--tick) 100% 0 / 5cqw 0.55cqw no-repeat, var(--tick) 100% 0 / 0.55cqw 5cqw no-repeat,
+    var(--tick) 0 100% / 5cqw 0.55cqw no-repeat, var(--tick) 0 100% / 0.55cqw 5cqw no-repeat,
+    var(--tick) 100% 100% / 5cqw 0.55cqw no-repeat, var(--tick) 100% 100% / 0.55cqw 5cqw no-repeat;
+}
+.badge-card.tier-platinum .badge-glyph { filter: drop-shadow(0 0 6px rgba(143, 227, 240, 0.7)); }
+
+/* Foil: a band twice the card's width whose centre follows the pointer. Bronze stays matte. */
+.badge-foil, .badge-glare { position: absolute; inset: 0; border-radius: 9.2cqw; pointer-events: none; }
+.badge-card.tier-silver .badge-foil {
+  background: linear-gradient(112deg, transparent 36%, rgba(255, 255, 255, 0.2) 48%, transparent 62%) calc(var(--mx) * 1%) 0 / 200% 100% no-repeat;
+  mix-blend-mode: screen;
+}
+.badge-card.tier-gold .badge-foil {
+  background: linear-gradient(112deg, transparent 36%, rgba(255, 226, 140, 0.3) 47%, rgba(255, 170, 60, 0.14) 54%, transparent 64%) calc(var(--mx) * 1%) 0 / 200% 100% no-repeat;
+  mix-blend-mode: screen;
+}
+.badge-card.tier-platinum .badge-foil {
+  background:
+    linear-gradient(112deg, transparent 34%, rgba(76, 194, 255, 0.5) 41%, rgba(176, 132, 255, 0.6) 47%, rgba(255, 126, 182, 0.5) 53%, rgba(94, 234, 212, 0.5) 59%, transparent 66%) calc(var(--mx) * 1%) 0 / 200% 100% no-repeat,
+    repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0 0.5px, transparent 0.5px 3px);
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+.badge-glare {
+  background: radial-gradient(circle at calc(var(--mx) * 1%) calc(var(--my) * 1%), rgba(255, 255, 255, 0.14), transparent 46%);
+  mix-blend-mode: overlay;
+  opacity: 0.8;
+}
+.badge-card.tier-bronze .badge-glare { opacity: 0.35; }
+
+/* ---- Locked: face down, the first tier's glyph debossed into a lattice back ---- */
+.badge-card.locked { --tier: var(--c-hairline-strong); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(0, 0, 0, 0.6); }
+.badge-card.locked .badge-frame { background: linear-gradient(140deg, rgba(76, 194, 255, 0.38), rgba(176, 132, 255, 0.22) 60%, rgba(176, 132, 255, 0.38)); }
+.badge-card.locked .badge-face {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 6px),
+    linear-gradient(180deg, #10161e, #0a0f15);
+}
+.badge-card.locked .badge-art { background: none; box-shadow: inset 0 0 0 0.5cqw rgba(255, 255, 255, 0.05); }
+.badge-card.locked .badge-art::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.45), transparent 70%); }
+.badge-card.locked .badge-glyph {
+  color: #05080c; /* the deboss: dark ink, a light lip below, a dark lip above */
+  filter: drop-shadow(0 0.7cqw 0 rgba(255, 255, 255, 0.09)) drop-shadow(0 -0.4cqw 0 rgba(0, 0, 0, 0.8));
+}
+.badge-card.locked .badge-name { color: var(--c-text-dim); }
+
+/* ---- Unlocked since the last visit ---- */
+.badge-card.fresh { animation: badge-pop 600ms var(--t-slow) both; }
+.badge-card.fresh::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: calc(9.2cqw + 4px);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tier) 60%, transparent), 0 0 18px color-mix(in srgb, var(--tier) 30%, transparent);
+  pointer-events: none;
+}
+.badge-new {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  z-index: 1;
+  padding: 0 6px;
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  color: var(--c-bg);
+  background: var(--tier);
+  border-radius: 999px;
+}
+
+.badge-glyph-emoji { display: grid; place-items: center; font-size: 30cqw; line-height: 1; filter: none; }
+.next-up-glyph.badge-glyph-emoji { font-size: var(--fs-xl); }
+
+/* ---- Hover card: the only place progress shows ---- */
+.badge-tip {
+  position: fixed;
+  z-index: 60;
+  width: min(272px, calc(100vw - 16px));
+  padding: 12px 14px;
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-hairline-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+}
+.badge-tip-name { font-size: var(--fs-base); font-weight: 600; color: var(--c-text); }
+.badge-tip-hint { margin-top: 2px; font-size: var(--fs-sm); line-height: 1.4; color: var(--c-text-dim); }
+.badge-tip-tiers { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 5px 10px; align-items: center; margin-top: 10px; list-style: none; font-size: var(--fs-md); }
+.badge-tip-tiers li { display: contents; color: var(--c-text-faint); }
+.badge-tip-tiers li.done { color: var(--c-text-soft); }
+.badge-tip-dot { width: 7px; height: 7px; border-radius: 2px; background: var(--tier); opacity: 0.35; }
+.badge-tip-tiers li.done .badge-tip-dot { opacity: 1; }
+.badge-tip-target, .badge-tip-date { font-size: var(--fs-sm); text-align: right; }
+.badge-tip-next { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--c-hairline-strong); font-size: var(--fs-sm); color: var(--c-text-dim); }
+.badge-tip-next .badge-track { grid-column: 1 / -1; width: 100%; height: 4px; margin: 2px 0 0; }
+.badge-tip-next .badge-track > span { background: var(--tier); animation: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .badge-card.tier-platinum .badge-foil { animation: badge-holo 6s ease-in-out infinite alternate; }
+}
+@keyframes badge-holo {
+  from { background-position: calc(var(--mx) * 1% + 12%) 0, 0 0; }
+  to { background-position: calc(var(--mx) * 1% - 12%) 0, 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge-card { transition: none; }
+  .badge-card.fresh { animation: none; }
+}
