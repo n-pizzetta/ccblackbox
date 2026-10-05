@@ -1,20 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "../../types";
-import {
-  firstEventAfter,
-  FIVE_HOUR_MS,
-  OTHER_COLOR,
-  PROJECT_PALETTE,
-  projectColor,
-  resolveWindowStartMs,
-} from "../../utils/fleetStats";
+import { firstEventAfter, FIVE_HOUR_MS, resolveWindowStartMs } from "../../utils/fleetStats";
 import { windowBreakdown } from "../../utils/windowBreakdown";
-import { useStickyRank } from "../../utils/stickyRank";
 import { loadWindowStart, saveWindowStart } from "../../utils/windowState";
-import { formatCost, formatDuration, formatTokens } from "../../utils/format";
+import { formatCost, formatTokens } from "../../utils/format";
 import type { RateLimits } from "../../utils/rateLimits";
-import { KpiRow } from "../Kpi";
-import { HotSpots } from "./HotSpots";
+import { KpiRow, type KpiItem } from "../Kpi";
+import { WindowConsumers } from "./WindowConsumers";
 
 interface Props {
   sessions: Session[];
@@ -22,22 +14,23 @@ interface Props {
   onSelectSession: (id: string) => void;
 }
 
-/** Each project's session-list color, unless an earlier one in the card took it: then the next free one. */
-function distinctColors(projects: string[]): string[] {
-  const used = new Set<string>();
-  return projects.map((p) => {
-    let color = p.startsWith("other (") ? OTHER_COLOR : projectColor(p);
-    if (used.has(color)) color = PROJECT_PALETTE.find((c) => !used.has(c)) ?? OTHER_COLOR;
-    used.add(color);
-    return color;
-  });
-}
-
 function formatClock(ms: number): string {
   const d = new Date(ms);
-  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}:${d.getSeconds().toString().padStart(2, "0")}`;
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
+/** Hours and minutes only: the panel refreshes every 5 s and seconds would flicker. */
+function formatLeft(ms: number): string {
+  const m = Math.max(0, Math.floor(ms / 60_000));
+  if (m < 1) return "under 1m";
+  const h = Math.floor(m / 60);
+  return h > 0 ? `${h}h ${(m % 60).toString().padStart(2, "0")}m` : `${m}m`;
+}
+
+/**
+ * The current 5h window, in reading order: how much of the limit is used and when it resets,
+ * then what is using it. While the window is idle, today's biggest consumers.
+ */
 export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [windowStart, setWindowStart] = useState<number | null>(() => loadWindowStart());
@@ -79,199 +72,64 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
   );
   const pct = limits?.fiveHour ? limits.fiveHour.usedPct / 100 : null;
   const data = useMemo(() => (fromMs !== null ? windowBreakdown(sessions, fromMs, now) : null), [sessions, fromMs, now]);
-  const weigh = data?.weigh ?? "cost";
-  // A session only overtakes another by more than 1% of the window, so near ties don't swap on every poll.
-  const rankedSessions = useStickyRank(data?.sessions ?? [], (r) => r.s.id, (r) => r[weigh], (data?.total[weigh] ?? 0) / 100);
-  const totalTokens = data?.total.tokens ?? 0;
-  // While the window is idle, the hot spots fall back to today so the page still says what consumed most.
+  const active = fromMs !== null && data !== null && data.total.tokens > 0;
+  // While the window is idle, the consumers fall back to today so the page still says what used most.
   const today = useMemo(
-    () => (totalTokens === 0 ? windowBreakdown(sessions, new Date(now).setHours(0, 0, 0, 0), now) : null),
-    [totalTokens, sessions, now],
+    () => (active ? null : windowBreakdown(sessions, new Date(now).setHours(0, 0, 0, 0), now)),
+    [active, sessions, now],
   );
-  const elapsed = fromMs !== null ? now - fromMs : 0;
-  const sessionEnd = fromMs !== null ? fromMs + FIVE_HOUR_MS : 0;
-  const resetIn = fromMs !== null ? Math.max(0, sessionEnd - now) : 0;
 
-  // Share of the window's burn in the ranking unit; with real limits, of the used 5h %
-  // pro rata (an estimate: Anthropic weights usage per model).
-  const shareOf = (tokens: number, cost: number): number => {
-    const total = data?.total[weigh] ?? 0;
-    const part = total > 0 ? (weigh === "cost" ? cost : tokens) / total : 0;
-    return part * (pct ?? 1) * 100;
-  };
-  const shareSuffix = pct !== null ? "of 5h limit (est.)" : "of window";
-
-  const topSessions = rankedSessions.slice(0, 5);
-  const topPrompts = data?.prompts.slice(0, 5) ?? [];
-  const toolsBreakdown = data?.tools.slice(0, 6) ?? [];
-  const projectSplit = useMemo(() => {
-    const all = data?.projects ?? [];
-    const top = all.slice(0, 5);
-    const rest = all.slice(5);
-    if (rest.length > 0) {
-      top.push({
-        project: `other (${rest.length})`,
-        tokens: rest.reduce((a, r) => a + r.tokens, 0),
-        cost: rest.reduce((a, r) => a + r.cost, 0),
-      });
-    }
-    return top;
-  }, [data]);
-
-  if (fromMs === null || !data || totalTokens === 0) {
+  // One card in both states, so going idle or active changes its content, never the card.
+  if (!active) {
     return (
       <div className="fleet-block five-hour-session five-hour-idle">
         <div className="section-title">
           <span>Current 5h window</span>
           <span className="dim">{fromMs === null ? "Idle · waiting for the first message" : "Idle · no Claude Code activity in the last 5h"}</span>
         </div>
-        {today && <HotSpots data={today} scope="today" limitPct={null} onSelectSession={onSelectSession} />}
+        {today && <WindowConsumers key="today" data={today} scope="today" limitPct={null} onSelectSession={onSelectSession} />}
       </div>
     );
   }
 
-  const projectsTotal = projectSplit.reduce((a, p) => a + p[weigh], 0);
-  const projectColors = distinctColors(projectSplit.map((p) => p.project));
+  const endMs = fromMs + FIVE_HOUR_MS;
+  const estimated = realStart === null;
+  const tiles: KpiItem[] = [
+    pct !== null
+      ? {
+          label: "Limit used",
+          value: `${Math.round(pct * 100)}%`,
+          sub: "of the 5h limit",
+          tone: pct >= 0.95 ? "red" : pct >= 0.8 ? "amber" : undefined,
+        }
+      : {
+          label: "Limit used",
+          value: "—",
+          sub: "not connected",
+          title: "Run /marey:limits in Claude Code to connect your real 5h and 7-day limits",
+        },
+    {
+      label: "Resets in",
+      value: formatLeft(endMs - now),
+      sub: `at ${formatClock(endMs)}${estimated ? " · estimated" : ""}`,
+      title: estimated ? "Estimated from your first message after the previous window: the limits are not connected" : undefined,
+    },
+    {
+      label: "API value",
+      value: formatCost(data.total.cost),
+      sub: `${formatTokens(data.total.tokens)} tokens`,
+      title: "What this window's tokens would cost at API prices: a relative weight, not a bill",
+    },
+  ];
 
   return (
     <div className="fleet-block five-hour-session">
       <div className="section-title">
         <span>Current 5h window</span>
-        <span className="dim mono tabular">started {formatClock(fromMs)}</span>
+        <span className="dim tabular">{formatClock(fromMs)} – {formatClock(endMs)}</span>
       </div>
-
-      <KpiRow
-        items={[
-          { label: "Tokens", value: formatTokens(totalTokens), sub: "all kinds, in this window" },
-          { label: "API value", value: formatCost(data.total.cost), sub: pct !== null ? `${Math.round(pct * 100)}% of the 5h limit used` : "limit not reported" },
-          { label: "Elapsed", value: formatDuration(elapsed), sub: "of 5h" },
-          { label: "Resets in", value: formatDuration(resetIn), sub: `at ${formatClock(sessionEnd)}` },
-        ]}
-      />
-
-      <HotSpots data={{ ...data, sessions: rankedSessions }} scope="window" limitPct={pct} onSelectSession={onSelectSession} />
-
-      <div className="five-hour-grid">
-        {/* Top sessions */}
-        <div className="five-hour-card">
-          <div className="five-hour-card-title">
-            Top sessions <span className="five-hour-card-sub">· % {shareSuffix}</span>
-          </div>
-          {topSessions.length === 0 ? (
-            <div className="placeholder mono dim">—</div>
-          ) : (
-            <div className="five-hour-rows">
-              {topSessions.map((r) => {
-                const share = shareOf(r.tokens, r.cost);
-                return (
-                  <button key={r.s.id} className="five-hour-row" onClick={() => onSelectSession(r.s.id)}>
-                    <span className="mono five-hour-row-name" title={r.s.goal || r.s.project}>{r.s.goal || r.s.project}</span>
-                    <span className="mono dim five-hour-row-sub">{r.s.project}</span>
-                    <span className="mono tabular right">{formatTokens(r.tokens)}</span>
-                    <span className="mono dim tabular right" title={`${share.toFixed(2)}% ${shareSuffix}`}>
-                      {share < 10 ? share.toFixed(1) : share.toFixed(0)}%
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Top prompts */}
-        <div className="five-hour-card">
-          <div className="five-hour-card-title">Top prompts</div>
-          {topPrompts.length === 0 ? (
-            <div className="placeholder mono dim">—</div>
-          ) : (
-            <div className="five-hour-rows">
-              {topPrompts.map((r) => {
-                const p = r.session.prompts?.[r.stat.promptIdx];
-                return (
-                  <button
-                    key={`${r.session.id}-${r.stat.promptIdx}`}
-                    className="five-hour-row"
-                    onClick={() => onSelectSession(r.session.id)}
-                  >
-                    <span className="mono five-hour-row-name" title={p?.preview}>{p?.preview.slice(0, 60) || "—"}</span>
-                    <span className="mono dim five-hour-row-sub">{r.session.project}</span>
-                    <span className="mono tabular right" style={{ color: "var(--c-amber)" }}>{formatCost(r.stat.cost)}</span>
-                    <span className="mono dim tabular right">{r.stat.turnCount}t</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Tools */}
-        <div className="five-hour-card">
-          <div className="five-hour-card-title">Tools</div>
-          {toolsBreakdown.length === 0 ? (
-            <div className="placeholder mono dim">—</div>
-          ) : (
-            <div className="five-hour-tools">
-              {(() => {
-                const max = Math.max(...toolsBreakdown.map((t) => t.calls));
-                return toolsBreakdown.map((t) => {
-                  const pctW = (t.calls / max) * 100;
-                  return (
-                    <div key={t.tool} className="five-hour-tool-row">
-                      <span className="mono five-hour-tool-name" title={t.tool}>{t.tool}</span>
-                      <div className="five-hour-tool-bar-wrap">
-                        <div className="five-hour-tool-bar" style={{ width: `${pctW}%` }} />
-                      </div>
-                      <span className="mono tabular right">{t.calls}</span>
-                      <span className="mono dim tabular right">{formatCost(t.cost)}</span>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
-          )}
-        </div>
-
-        {/* Projects */}
-        <div className="five-hour-card">
-          <div className="five-hour-card-title">
-            Projects <span className="five-hour-card-sub">· % {shareSuffix}</span>
-          </div>
-          {projectSplit.length === 0 ? (
-            <div className="placeholder mono dim">—</div>
-          ) : (
-            <>
-              <div className="five-hour-project-bar">
-                {projectSplit.map((p, i) => {
-                  const w = projectsTotal > 0 ? (p[weigh] / projectsTotal) * 100 : 0;
-                  return (
-                    <div
-                      key={p.project}
-                      className="five-hour-project-seg"
-                      style={{ flex: w, background: projectColors[i] }}
-                      title={`${p.project}: ${formatTokens(p.tokens)} · ${formatCost(p.cost)} (${w.toFixed(0)}% of the ${weigh === "cost" ? "API value" : "tokens"})`}
-                    />
-                  );
-                })}
-              </div>
-              <div className="five-hour-project-list">
-                {projectSplit.map((p, i) => {
-                  const share = shareOf(p.tokens, p.cost);
-                  return (
-                    <div key={p.project} className="five-hour-project-row" title={`${p.project}: ${share.toFixed(2)}% ${shareSuffix}`}>
-                      <span className="five-hour-project-swatch" style={{ background: projectColors[i] }} />
-                      <span className="mono five-hour-project-name">{p.project}</span>
-                      <span className="mono tabular right">{formatTokens(p.tokens)}</span>
-                      <span className="mono dim tabular right">
-                        {share < 10 ? share.toFixed(1) : share.toFixed(0)}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      <KpiRow items={tiles} />
+      <WindowConsumers key="window" data={data} scope="window" limitPct={pct} onSelectSession={onSelectSession} />
     </div>
   );
 }

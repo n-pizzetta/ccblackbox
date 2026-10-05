@@ -161,8 +161,9 @@ The wrapper appends a short segment to the status line (`ctx ━━━───�
 
 The 5h window in the UI (`fleet/FiveHourSession.tsx`, `utils/fleetStats.ts`):
 
-- With real limits: window start = `resetsAt − 5h`; the used % is real. Per-session / per-prompt shares of that % are attributed pro rata to estimated cost (an approximation).
-- Without: the window is inferred locally. The first turn after the previous window expired anchors a new window, persisted in `localStorage` (`marey:window-start`, `utils/windowState.ts`); shares are by tokens.
+- With real limits: window start = `resetsAt − 5h`; the used % is real. The start is also saved as the local anchor, so a moment without limits continues the same window.
+- Without: the window is inferred locally. The first turn after the previous window expired anchors a new window, persisted in `localStorage` (`marey:window-start`, `utils/windowState.ts`), and the reset time is marked as estimated.
+- Either way, shares are of the window's API value (`windowBreakdown`'s `weigh`; tokens only when nothing in it is priced), so the ranking never depends on whether the limits were read.
 - `utils/burnTracker.ts` samples the real 5h % every 5 s (1 h buffer) and raises a spike banner when it climbs 4+ points within 5 minutes (critical at 10). It is inactive until limits are connected. `SpikeAnalysisOverlay` + `SpikeHeuristics` explain the spike from sessions, prompts and tools in that interval.
 
 ### Badges (`scripts/badges.mjs`)
@@ -291,13 +292,13 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 | `Toaster` | Error toasts (`toastError`) and achievement toasts (`toastAchievement`: tier-colored, with a View action). |
 
 `pages/` (one question each) compose `fleet/`:
-- **Now**: `LiveTicker` (one line of live burn), `FiveHourSession` (current 5h window: headline tiles, `HotSpots`, then per-session / prompt / tool / project lists; all sessions, ignoring the scope), a **Next up** strip (level, today's XP, streak and the three closest good-practice badges), then live sessions, or the latest ones when none runs.
+- **Now**: `LiveTicker` (one line of live burn), `FiveHourSession` (current 5h window: limit used, reset and API value as tiles, then `WindowConsumers`; all sessions, ignoring the scope), a **Next up** strip (level, today's XP, streak and the three closest good-practice badges), then live sessions, or the latest ones when none runs.
 - **Sessions**: the table, and `SessionCompare` beside it in compare mode (up to 3), or `BulkGhostBar` when the ghost filter is on.
 - **Usage**: `TokenTimeSeries`, then `ProjectRollup`, `ModelMix` and `ToolsHeatmap` side by side, then `HeavyPrompts`.
 - **Health**: `HealthCheck` (rule checklist, score in its heading), `AnomalyFlags`.
 - **Progress** (page id `badges`, key 5): level, next level, today's XP and streak, the XP rules, **Next up** (six), `Badges` (foil cards, unseen unlocks flagged "new"), then `TopSessions` as all-time records (podium, `FireCanvas`).
 
-`HotSpots` puts the biggest consumers first: the heaviest session as a hero card (with #2 and #3), then the leading prompt, project and tool. It uses the lists' order and unit: sessions and projects are ranked and shown as a share of the 5h limit (estimated by API value) when limits are connected, else as a share of the window's tokens. Prompt and tool are in API value, the tool ranked by its estimated cost rather than its calls. A prompt started before the window only counts its turns inside it. The heat measures concentration, as a warning rather than a trophy: neutral for a lone session, amber when one of several takes half, red with a "one session is using N%" line when one of three or more takes three quarters. While the window is idle it shows today's consumers instead. Both read `utils/windowBreakdown.ts` (`windowBreakdown(sessions, from, to, weigh)`). Project colors in the card follow the session list, and a clash in the card takes the next free color.
+`WindowConsumers` says what used the window: one bar split by project (filled to the used 5h % when the limits are connected, so the full bar is the limit) with its legend, then the five heaviest sessions and prompts. Every share is of the window's API value (tokens when nothing is priced), and a prompt started before the window only counts its turns inside it. Rows keep the order shown last time unless one overtakes another by more than 1% of the window (`useStickyRank`, `utils/stickyRank.ts`), so near ties don't swap on every poll; equal weights break on the id. When one of three or more sessions takes three quarters, an amber "one session is using N%" line says so. While the window is idle the same card shows today's consumers. Data from `utils/windowBreakdown.ts` (`windowBreakdown(sessions, from, to)`). Project colors follow the session list, and a clash in the card takes the next free color.
 
 `BurnSpikeBanner` (+ `SpikeAnalysisOverlay`, `SpikeHeuristics`) shows above any page.
 

@@ -1,6 +1,6 @@
 import type { Session } from "../types";
 import { aggregateByPrompt, type PromptStats } from "./aggregateByPrompt";
-import { costOfTokens, sumTokens, tokensInWindow } from "./fleetStats";
+import { sumTokens, tokensInWindow } from "./fleetStats";
 
 export type Burn = { tokens: number; cost: number };
 
@@ -11,7 +11,7 @@ export type Burn = { tokens: number; cost: number };
  */
 export type Weigh = "tokens" | "cost";
 
-/** What burned in a time window, per session, prompt, tool and project, heaviest first; ties by id or name. */
+/** What burned in a time window, per session, prompt and project, heaviest first; ties by id or name. */
 export type WindowBreakdown = {
   total: Burn;
   weigh: Weigh;
@@ -19,8 +19,6 @@ export type WindowBreakdown = {
   sessions: Array<{ s: Session } & Burn>;
   /** By API value, counting only each prompt's turns inside the window. */
   prompts: Array<{ session: Session; stat: PromptStats }>;
-  /** By calls; a turn's tokens and cost are split evenly between its tools. */
-  tools: Array<{ tool: string; calls: number } & Burn>;
   /** By `weigh`. */
   projects: Array<{ project: string } & Burn>;
 };
@@ -31,7 +29,6 @@ export function windowBreakdown(sessions: Session[], fromMs: number, toMs: numbe
   const all = tokensInWindow(sessions, fromMs, toMs);
   const rows: WindowBreakdown["sessions"] = [];
   const prompts: WindowBreakdown["prompts"] = [];
-  const tools = new Map<string, { calls: number } & Burn>();
   const projects = new Map<string, Burn>();
 
   for (const s of sessions) {
@@ -48,27 +45,12 @@ export function windowBreakdown(sessions: Session[], fromMs: number, toMs: numbe
       p.cost += burn.cost;
       projects.set(key, p);
     }
-    if (!s.turns?.length) continue;
+    if (!s.turns?.length || !s.prompts?.length) continue;
 
+    // A prompt started before the window only counts the turns that ran inside it.
     const inWindow = s.turns.filter((t) => startMs + t.t >= fromMs && startMs + t.t <= toMs);
-    if (s.prompts?.length) {
-      // A prompt started before the window only counts the turns that ran inside it.
-      for (const stat of aggregateByPrompt(inWindow, s.model, s.prompts)) {
-        if (stat.cost > 0) prompts.push({ session: s, stat });
-      }
-    }
-
-    for (const t of inWindow) {
-      if (t.tools.length === 0) continue;
-      const tokensEach = sumTokens(t.tokens) / t.tools.length;
-      const costEach = costOfTokens(t.model ?? s.model, t.tokens) / t.tools.length;
-      for (const tool of t.tools) {
-        const cur = tools.get(tool) ?? { calls: 0, tokens: 0, cost: 0 };
-        cur.calls += 1;
-        cur.tokens += tokensEach;
-        cur.cost += costEach;
-        tools.set(tool, cur);
-      }
+    for (const stat of aggregateByPrompt(inWindow, s.model, s.prompts)) {
+      if (stat.cost > 0) prompts.push({ session: s, stat });
     }
   }
 
@@ -79,7 +61,6 @@ export function windowBreakdown(sessions: Session[], fromMs: number, toMs: numbe
     weigh,
     sessions: rows.sort((a, b) => heavier(a, b) || byName(a.s.id, b.s.id)),
     prompts: prompts.sort((a, b) => b.stat.cost - a.stat.cost || byName(a.session.id, b.session.id) || a.stat.promptIdx - b.stat.promptIdx),
-    tools: [...tools.entries()].map(([tool, v]) => ({ tool, ...v })).sort((a, b) => b.calls - a.calls || byName(a.tool, b.tool)),
     projects: [...projects.entries()].map(([project, v]) => ({ project, ...v })).sort((a, b) => heavier(a, b) || byName(a.project, b.project)),
   };
 }
