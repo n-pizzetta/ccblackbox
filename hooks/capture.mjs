@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * ccblackbox PostToolUse / Stop hook.
+ * Marey PostToolUse / Stop hook.
  *
  * Appends a single JSONL line per tool call (and per session stop) to
- * ~/.claude/ccblackbox/cache/{sessionId}.jsonl. The dashboard reads these
+ * ~/.claude/marey/cache/{sessionId}.jsonl. The dashboard reads these
  * sharded files to surface live, fine-grained tool sequences that the native
  * Claude Code session-meta files only have aggregate counts for.
  *
@@ -11,12 +11,12 @@
  * Output: must exit 0 quickly. We write best-effort and stay silent on stdout.
  */
 
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdir, appendFile } from "node:fs/promises";
+import { dataDir } from "../scripts/data-dir.mjs";
 
 // Honors CLAUDE_CONFIG_DIR, like Claude Code.
-const CACHE_DIR = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "ccblackbox", "cache");
+const CACHE_DIR = join(dataDir(), "cache");
 const STOP_FLAG = process.argv.includes("--stop");
 const TIMEOUT_MS = 1500;
 const SESSION_ID_RE = /^[a-f0-9-]{36}$/i;

@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
- * ccblackbox status line wrapper.
+ * Marey status line wrapper.
  *
  * Claude Code pipes a JSON payload to the status line command on every
  * refresh. It is the only place the real usage limits (`rate_limits`: 5-hour
  * and 7-day windows, as shown by `/usage`) are exposed, so this wrapper:
- *   1. records `rate_limits` to ~/.claude/ccblackbox/limits.json (and, when they
+ *   1. records `rate_limits` to ~/.claude/marey/limits.json (and, when they
  *      change, appends them to limits-history.jsonl, used to calibrate "% of window"),
  *   2. writes a sanitized per-session snapshot (context size, prompt-cache state) to
- *      ~/.claude/ccblackbox/live/<session_id>.json for the dashboard,
+ *      ~/.claude/marey/live/<session_id>.json for the dashboard,
  *   3. hands the untouched payload to the user's previous status line command
  *      (saved by install-statusline.mjs), or prints a minimal line if none, and appends
  *      a short context / cache segment with a "compact? clear?" hint. Turn that segment
- *      off with {"verdict": false} in ~/.claude/ccblackbox/statusline.json.
+ *      off with {"verdict": false} in ~/.claude/marey/statusline.json.
  *
- * Installed to ~/.claude/ccblackbox/statusline.mjs by install-statusline.mjs.
+ * Installed to ~/.claude/marey/statusline.mjs by install-statusline.mjs.
  * Must stay fast and never fail: the status line renders on every turn.
  */
 import { appendFileSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
@@ -23,7 +23,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 // Honors CLAUDE_CONFIG_DIR, like Claude Code.
-const DIR = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "ccblackbox");
+const DIR = join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "marey");
 const LIMITS = join(DIR, "limits.json");
 const HISTORY = join(DIR, "limits-history.jsonl");
 const LIVE = join(DIR, "live");

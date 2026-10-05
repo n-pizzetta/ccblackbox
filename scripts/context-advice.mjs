@@ -27,7 +27,7 @@ const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 /**
  * Sanitized snapshot of the payload: no paths, no prompts. This is what the wrapper writes to
- * ~/.claude/ccblackbox/live/<session_id>.json and what the dashboard reads.
+ * ~/.claude/marey/live/<session_id>.json and what the dashboard reads.
  */
 export function toSnapshot(payload, now = Date.now()) {
   const sessionId = payload?.session_id;

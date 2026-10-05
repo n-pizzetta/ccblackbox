@@ -1,5 +1,5 @@
 /**
- * ccblackbox API, shared by the production server (scripts/serve.mjs) and the
+ * Marey API, shared by the production server (scripts/serve.mjs) and the
  * Vite dev middleware (vite.config.ts) so both expose the same routes with the
  * same checks.
  *
@@ -15,9 +15,11 @@ import { promises as fsp, watch, existsSync, statSync, createReadStream } from "
 import { readdir } from "node:fs/promises";
 import { parseAllSessions, readLimits, readLiveContext, summarizeSession } from "./parse-sessions.mjs";
 import { badgeStatePath, computeBadges, loadBadgeState, saveBadgeState } from "./badges.mjs";
+import { dataDir } from "./data-dir.mjs";
 
 // Honors CLAUDE_CONFIG_DIR, like Claude Code.
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
+const DATA = dataDir(CLAUDE);
 const PROJECTS = join(CLAUDE, "projects");
 const STALE = join(CLAUDE, "sessions", ".stale");
 const FILE_HISTORY = join(CLAUDE, "file-history");
@@ -55,7 +57,7 @@ async function updateBadges(sessions) {
     if (changed) await saveBadgeState(BADGES_FILE, badgeState);
     cache.badges = badges;
   } catch (err) {
-    console.error("[ccblackbox] badges error:", err);
+    console.error("[marey] badges error:", err);
   }
 }
 
@@ -81,10 +83,10 @@ async function runParser() {
     const dt = Date.now() - t0;
     const live = sessions.filter((s) => s.live).length;
     const ghost = sessions.filter((s) => s.ghost).length;
-    console.log(`[ccblackbox] parsed ${sessions.length} sessions (${live} live, ${ghost} ghost) in ${dt}ms`);
+    console.log(`[marey] parsed ${sessions.length} sessions (${live} live, ${ghost} ghost) in ${dt}ms`);
     onParsed();
   } catch (err) {
-    console.error("[ccblackbox] parse error:", err);
+    console.error("[marey] parse error:", err);
   } finally {
     parsing = false;
     lastParseAt = Date.now();
@@ -115,14 +117,14 @@ function watchClaude() {
     join(CLAUDE, "sessions"),
     join(CLAUDE, "usage-data", "session-meta"),
     join(CLAUDE, "usage-data", "facets"),
-    join(CLAUDE, "ccblackbox", "cache"),
+    join(DATA, "cache"),
   ];
   for (const dir of dirs) {
     try {
       watch(dir, { recursive: false }, scheduleParse);
-      console.log(`[ccblackbox] watching ${dir}`);
+      console.log(`[marey] watching ${dir}`);
     } catch (err) {
-      console.warn(`[ccblackbox] could not watch ${dir}: ${err.message}`);
+      console.warn(`[marey] could not watch ${dir}: ${err.message}`);
     }
   }
 }
@@ -182,7 +184,7 @@ async function deleteGhost(sessionId) {
       catch (e) { errors.push(`subagents: ${e.message}`); }
     }
   }
-  for (const p of [join(STALE, `${sessionId}.json`), join(CLAUDE, "ccblackbox", "cache", `${sessionId}.jsonl`)]) {
+  for (const p of [join(STALE, `${sessionId}.json`), join(DATA, "cache", `${sessionId}.jsonl`)]) {
     try { await fsp.unlink(p); removed.push(p); } catch { /* may not exist */ }
   }
   return { removed, errors };
