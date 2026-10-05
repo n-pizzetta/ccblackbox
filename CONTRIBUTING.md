@@ -17,11 +17,11 @@ pnpm dev            # dashboard on http://localhost:5173, reading your ~/.claude
 You don't need to expose your own sessions to develop, take screenshots or file a bug. Generate a fake Claude config dir and point the app at it:
 
 ```sh
-pnpm seed:demo                                   # writes .demo-claude/ (git-ignored)
-CLAUDE_CONFIG_DIR="$PWD/.demo-claude" pnpm dev   # or pnpm serve
+pnpm seed:demo                                   # writes .demo-claude/ and .demo-codex/ (git-ignored)
+CLAUDE_CONFIG_DIR="$PWD/.demo-claude" CODEX_HOME="$PWD/.demo-codex" pnpm dev   # or pnpm serve
 ```
 
-`CLAUDE_CONFIG_DIR` is Claude Code's own variable for relocating `~/.claude`; the parser, API, hook and status line all honor it. Extend [`scripts/seed-demo.mjs`](scripts/seed-demo.mjs) when you need a new shape of data (a tool, a model, an edge case).
+`CLAUDE_CONFIG_DIR` is Claude Code's own variable for relocating `~/.claude`; the parser, API, hook and status line all honor it. `CODEX_HOME` does the same for `~/.codex`: set both, or your real Codex sessions show up next to the demo data. Extend [`scripts/seed-demo.mjs`](scripts/seed-demo.mjs) when you need a new shape of data (a tool, a model, an edge case).
 
 ## How changes ship
 

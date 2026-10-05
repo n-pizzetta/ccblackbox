@@ -14,6 +14,8 @@ const FAMILY_COLOR: Record<string, string> = {
   opus: "var(--c-violet)",
   sonnet: "var(--c-cyan)",
   haiku: "var(--c-teal)",
+  gpt: "var(--c-lime)",
+  codex: "var(--c-lime)",
 };
 const colorOf = (model: string) => FAMILY_COLOR[modelFamily(model)] ?? "var(--c-text-faint)";
 

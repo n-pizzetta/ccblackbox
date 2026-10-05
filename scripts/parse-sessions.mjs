@@ -15,6 +15,16 @@ import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createQualityTracker } from "./quality.mjs";
+import {
+  addTokens,
+  countShellKinds,
+  emptyTokens,
+  firstLineSummary,
+  IDLE_CAP_MS,
+  longestRun,
+  toolKey,
+} from "./transcript-utils.mjs";
+import { CODEX, codexRootOf, indexCodexRollouts, isCodexLive, isCodexRunning, parseCodexRollout } from "./codex.mjs";
 import { costOf, DEFAULT_MODEL, isKnownModel, normalizeModel, priceFor, setModelOverrides } from "./models.mjs";
 
 // `pnpm parse` dump. Never under public/ or dist/: it holds real prompts and paths.
@@ -30,51 +40,10 @@ const PROJECTS_DIR = join(CLAUDE, "projects");
 const FILE_HISTORY_DIR = join(CLAUDE, "file-history");
 const PLUGIN_CACHE_DIR = join(CLAUDE, "ccblackbox", "cache");
 
-/** Tool name used for counts: MCP tools are grouped per server (`mcp__github__x` → `mcp:github`). */
-const toolKey = (name) => (name.startsWith("mcp__") ? `mcp:${name.split("__")[1] || "unknown"}` : name);
-
-/** Gaps longer than this between two transcript events count as idle, not active time. */
-const IDLE_CAP_MS = 5 * 60_000;
-/** A pause up to this long doesn't end a continuous work stretch (same as RUN_GAP_MS in badges.mjs). */
-const RUN_GAP_MS = 15 * 60_000;
-
 /** User-role lines that are not prompts the user typed. */
 const NON_PROMPT_RE = /^\s*(<(command-|local-command-|task-notification|system-reminder)|\[Request interrupted|Caveat:)/;
 
 const SUBAGENT_TOOLS = new Set(["Agent", "Task"]);
-
-/**
- * Bash command kinds counted for badges. Matched on the head of each segment
- * (split on && ; | and newlines), so `echo "npm test"` is not a test run.
- */
-const RUNNER = String.raw`((npx|bunx|pnpm(\s+(exec|dlx))?|yarn|uv\s+run|poetry\s+run)\s+)?`;
-const SHELL_KINDS = {
-  prs: /^gh\s+pr\s+create\b/,
-  tests: new RegExp(
-    String.raw`^${RUNNER}(vitest|jest|pytest|mocha|playwright\s+test|rspec|phpunit)\b` +
-      String.raw`|^(pnpm|npm|yarn|bun)\s+(run\s+)?test\b|^(cargo|go|deno|bun|mix|dotnet|swift)\s+test\b` +
-      String.raw`|^python3?\s+-m\s+(pytest|unittest)\b|^make\s+test\b`,
-  ),
-  lints: new RegExp(
-    String.raw`^${RUNNER}(eslint|tsc|ruff|biome|oxlint|mypy|pyright|stylelint|prettier\s+--check)\b` +
-      String.raw`|^(pnpm|npm|yarn|bun)\s+(run\s+)?(lint|typecheck|type-check|build|check)\b` +
-      String.raw`|^cargo\s+(clippy|check|build)\b|^go\s+(vet|build)\b`,
-  ),
-  infra: /^(docker|docker-compose|podman|kubectl|helm|terraform|tofu|pulumi|gcloud|aws|az|orb|orbctl|flyctl|vercel|wrangler)\b/,
-};
-
-function countShellKinds(command, into) {
-  const hit = new Set();
-  for (const raw of command.split(/\n|&&|\|\||;|\|/)) {
-    const head = raw
-      .trim()
-      .replace(/^\(+\s*/, "")
-      .replace(/^(\w+=\S*\s+)+/, "")
-      .replace(/^((rtk(\s+proxy)?|time|sudo|command|exec)\s+)+/, "");
-    for (const [kind, re] of Object.entries(SHELL_KINDS)) if (re.test(head)) hit.add(kind);
-  }
-  for (const kind of hit) into[kind] += 1;
-}
 
 const costFor = costOf;
 /** Priced per turn when available, so sessions that switch models cost right. */
@@ -266,29 +235,15 @@ async function readHistoryBySession() {
   return bySession;
 }
 
-function firstLineSummary(s) {
-  if (!s) return "";
-  const trimmed = s.trim();
-  const firstLine = trimmed.split("\n").find((l) => l.trim()) ?? trimmed;
-  return firstLine.slice(0, 120);
-}
-
-const emptyTokens = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cacheWrite5m: 0, cacheWrite1h: 0 });
-
-function addTokens(into, t) {
-  for (const k of Object.keys(into)) into[k] += t[k] ?? 0;
-  return into;
-}
-
 /** Parsed transcripts keyed by path, reused while the file's mtime and size are unchanged. */
 const transcriptCache = new Map();
 
-async function readTranscriptFile(path, { sidechain = false } = {}) {
+async function readTranscriptFile(path, { sidechain = false, agent = "claude" } = {}) {
   let st;
   try { st = await fspStat(path); } catch { return null; }
   const cached = transcriptCache.get(path);
   if (cached && cached.mtimeMs === st.mtimeMs && cached.size === st.size) return cached.data;
-  const data = await parseTranscriptFile(path, sidechain);
+  const data = agent === "codex" ? await parseCodexRollout(path) : await parseTranscriptFile(path, sidechain);
   transcriptCache.set(path, { mtimeMs: st.mtimeMs, size: st.size, data });
   return data;
 }
@@ -514,18 +469,6 @@ async function parseTranscriptFile(path, sidechain) {
   };
 }
 
-/** Longest stretch of activity where no pause exceeds RUN_GAP_MS. */
-function longestRun(timestamps) {
-  const ts = timestamps.filter(Boolean).sort((a, b) => a - b);
-  let best = 0;
-  let from = ts[0];
-  for (let i = 1; i < ts.length; i++) {
-    if (ts[i] - ts[i - 1] > RUN_GAP_MS) from = ts[i];
-    else best = Math.max(best, ts[i] - from);
-  }
-  return best;
-}
-
 function relativizeEvents(absEvents, startedAt) {
   return absEvents
     .map((e) => ({
@@ -701,11 +644,15 @@ function satisfactionOf(facet) {
  * only written when /insights runs, so they only enrich the qualitative
  * fields (goal, summary, outcome, satisfaction, frictions).
  */
-async function buildSession(id, { entry, meta, facet, live, dead, history, now }) {
-  const t = entry ? await readTranscriptFile(entry.path) : null;
+/** A Codex sub-agent rollout merged into its parent, like a Claude subagents/ transcript. */
+const asSidechain = (t) => ({ ...t, turns: t.turns.map((tu) => ({ ...tu, sidechain: true })) });
+
+async function buildSession(id, { entry, meta, facet, live, dead, history, now, codexChildren = [] }) {
+  const agent = entry?.agent ?? "claude";
+  const t = entry ? await readTranscriptFile(entry.path, { agent }) : null;
   if (!t && !meta && !live) return null;
   if (t && !t.firstTs && !meta && !live) return null;
-  const subs = entry ? await readSubagents(entry, id) : [];
+  const subs = agent === "codex" ? codexChildren.map(asSidechain) : entry ? await readSubagents(entry, id) : [];
 
   const metaStart = meta?.start_time ? new Date(meta.start_time).getTime() : null;
   const startedAtMs = t?.firstTs ?? metaStart ?? live?.startedAt ?? now;
@@ -737,11 +684,13 @@ async function buildSession(id, { entry, meta, facet, live, dead, history, now }
   const pluginCache = await readPluginCache(id, startedAtMs);
   const totalTools = Object.values(toolCounts).reduce((a, b) => a + b, 0);
   const empty = !!t && t.userMessages === 0 && totalTools === 0;
-  const ghostKind = isLive ? null : dead ? "crashed" : empty ? "empty" : null;
+  // Ghost actions (reveal, delete) only know Claude Code's projects/ layout.
+  const ghostKind = isLive || agent !== "claude" ? null : dead ? "crashed" : empty ? "empty" : null;
   const outcome = isLive ? "in_progress" : mapOutcome(facet?.outcome);
 
   return {
     id,
+    agent,
     project: projectName(t?.cwd ?? meta?.project_path ?? live?.cwd),
     cwd: t?.cwd ?? meta?.project_path ?? live?.cwd ?? "",
     startedAt: new Date(startedAtMs).toISOString(),
@@ -752,7 +701,7 @@ async function buildSession(id, { entry, meta, facet, live, dead, history, now }
     model,
     outcome,
     satisfaction: satisfactionOf(facet),
-    goal: (facet?.underlying_goal || customTitle || live?.name || firstPrompt.slice(0, 140) || "Session"),
+    goal: (facet?.underlying_goal || customTitle || entry?.title || t?.title || live?.name || firstPrompt.slice(0, 140) || "Session"),
     summary: facet?.brief_summary || (firstPrompt ? firstPrompt.slice(0, 220) : "No prompt captured."),
     customTitle,
     messages: t ? t.assistantMessages + t.userMessages : (meta?.user_message_count ?? 0) + (meta?.assistant_message_count ?? 0),
@@ -762,16 +711,17 @@ async function buildSession(id, { entry, meta, facet, live, dead, history, now }
     baselineCostUsd: baselineCostFor(model, tokens),
     frictions: isLive ? [] : mapFrictions(facet),
     timeline: t ? relativizeEvents(t.absEvents, startedAtMs) : meta ? metaTimeline(meta, startedAtMs) : [],
-    subAgents: subs.length || (toolCounts.Agent ?? 0) + (toolCounts.Task ?? 0),
-    filesChanged: fileHistory.length || meta?.files_modified || 0,
+    subAgents: subs.length || (toolCounts.Agent ?? 0) + (toolCounts.Task ?? 0) + (toolCounts.spawn_agent ?? 0),
+    filesChanged: fileHistory.length || t?.filesChanged || meta?.files_modified || 0,
     commits: t ? t.commits : meta?.git_commits ?? 0,
     ...(t ? { shell: t.shell } : {}),
     live: isLive,
-    ...(live ? { pid: live.pid, processStartedAt: new Date(live.startedAt).toISOString() } : {}),
+    ...(live?.pid ? { pid: live.pid, processStartedAt: new Date(live.startedAt).toISOString() } : {}),
     ...(ghostKind ? { ghost: true, ghostKind } : {}),
     ...(!t ? { transcriptMissing: true } : {}),
     quality: t?.quality ?? null,
     ...(t?.version ? { version: t.version } : {}),
+    ...(t?.contextWindow ? { contextWindow: t.contextWindow } : {}),
     fileHistory,
     prompts: relativizePrompts(t?.prompts ?? [], startedAtMs),
     toolSequence: mergeToolSequences(relativizeToolSequence(t?.toolSequence ?? [], startedAtMs), pluginCache.entries),
@@ -944,13 +894,15 @@ function markUnpriced(s) {
 }
 
 /**
- * Parses every Claude Code session reachable from ~/.claude/. Returns
+ * Parses every Claude Code session reachable from ~/.claude/, and every Codex
+ * session under ~/.codex/ (scripts/codex.mjs). Returns
  * { sessions (newest first), errors (unreadable session-meta files),
  * modelOverrides }. Used by scripts/api.mjs and by `pnpm parse`.
  */
 export async function parseAllSessions() {
   const modelOverrides = await loadModelOverrides();
-  if (!existsSync(PROJECTS_DIR) && !existsSync(META_DIR) && !existsSync(LIVE_DIR)) {
+  const codexIndex = await indexCodexRollouts();
+  if (!existsSync(PROJECTS_DIR) && !existsSync(META_DIR) && !existsSync(LIVE_DIR) && codexIndex.size === 0) {
     return { sessions: [], errors: [], modelOverrides };
   }
 
@@ -985,6 +937,27 @@ export async function parseAllSessions() {
     });
     if (s) all.push(s);
   }
+  // Codex: an id already built from ~/.claude wins. Sub-agent rollouts are merged into their root.
+  const built = new Set(all.map((s) => s.id));
+  const codexParsed = new Map();
+  for (const [id, entry] of codexIndex) {
+    if (built.has(id)) continue;
+    const t = await readTranscriptFile(entry.path, { agent: "codex" });
+    if (t) codexParsed.set(id, t);
+  }
+  const codexChildren = new Map();
+  for (const id of codexParsed.keys()) {
+    const root = codexRootOf(id, codexParsed);
+    if (root !== id) codexChildren.set(root, [...(codexChildren.get(root) ?? []), codexParsed.get(id)]);
+  }
+  const codexRunning = codexParsed.size > 0 && isCodexRunning();
+  for (const [id, t] of codexParsed) {
+    if (codexRootOf(id, codexParsed) !== id) continue;
+    const entry = codexIndex.get(id);
+    const live = (await isCodexLive(entry.path, t, codexRunning, now)) ? { isLive: true, cwd: t.cwd } : undefined;
+    const s = await buildSession(id, { entry, live, dead: false, history, now, codexChildren: codexChildren.get(id) });
+    if (s) all.push(s);
+  }
   all.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
 
   linkClearedChains(all);
@@ -1002,6 +975,7 @@ export async function parseAllSessions() {
 export function summarizeSession(s) {
   return {
     id: s.id,
+    agent: s.agent,
     project: s.project,
     cwd: s.cwd,
     startedAt: s.startedAt,
@@ -1031,6 +1005,7 @@ export function summarizeSession(s) {
     lastEventAt: s.lastEventAt,
     runningTool: s.runningTool ?? null,
     version: s.version,
+    contextWindow: s.contextWindow,
     processStartedAt: s.processStartedAt,
     quality: s.quality
       ? { score: s.quality.score, grade: s.quality.grade, fillPct: s.quality.fillPct, band: s.quality.band, wasteTokens: s.quality.wasteTokens, compactions: s.quality.compactions, signals: [] }
@@ -1051,7 +1026,7 @@ export function summarizeSession(s) {
 async function main() {
   const { sessions, errors } = await parseAllSessions();
   if (sessions.length === 0 && !existsSync(META_DIR) && !existsSync(LIVE_DIR)) {
-    console.error(`[parse-sessions] no Claude data at ${CLAUDE}`);
+    console.error(`[parse-sessions] no Claude data at ${CLAUDE} and no Codex data at ${CODEX}`);
     process.exit(1);
   }
   await mkdir(dirname(OUT), { recursive: true });

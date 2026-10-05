@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Session } from "../types";
 import type { Range } from "../utils/range";
 import { useBurnTracker, type Spike } from "../utils/burnTracker";
@@ -56,7 +56,9 @@ export function FleetDashboard({
   onSelectSession,
 }: Props) {
   const limits = useRateLimits();
-  const burn = useBurnTracker(allSessions, limits);
+  // The 5h window, burn rate and spikes are Claude's usage limits: Codex has its own.
+  const claudeSessions = useMemo(() => allSessions.filter((s) => s.agent !== "codex"), [allSessions]);
+  const burn = useBurnTracker(claudeSessions, limits);
   const [analysisSpike, setAnalysisSpike] = useState<Spike | null>(null);
   const [tab, setTab] = useState<Tab>(loadTab);
 
@@ -142,7 +144,7 @@ export function FleetDashboard({
             <span className="fleet-group-note">All sessions · ignores filters and range</span>
             <LiveTicker sessions={allSessions} />
           </div>
-          <FiveHourSession sessions={allSessions} limits={limits} onSelectSession={onSelectSession} />
+          <FiveHourSession sessions={claudeSessions} limits={limits} onSelectSession={onSelectSession} />
           <div className="fleet-group-label">
             <span className="fleet-group-name">In the selected range</span>
             <span className="fleet-group-note">{rangeNote}</span>
@@ -168,7 +170,7 @@ export function FleetDashboard({
       {analysisSpike && (
         <SpikeAnalysisOverlay
           spike={analysisSpike}
-          sessions={sessions}
+          sessions={sessions.filter((s) => s.agent !== "codex")}
           onClose={() => setAnalysisSpike(null)}
           onSelectSession={(id) => {
             setAnalysisSpike(null);

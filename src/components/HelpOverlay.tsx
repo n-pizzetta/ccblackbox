@@ -13,8 +13,8 @@ const SHORTCUTS: Array<[string, string]> = [
 ];
 
 const GLYPHS: Array<{ glyph: React.ReactNode; label: string; kind: string }> = [
-  { glyph: <span className="glyph glyph-live" />, label: "Live", kind: "Session with a running claude process" },
-  { glyph: <span className="glyph glyph-ghost" />, label: "Ghost", kind: "Empty session, or its Claude Code process died" },
+  { glyph: <span className="glyph glyph-live" />, label: "Live", kind: "Claude Code: running process · Codex: task in progress" },
+  { glyph: <span className="glyph glyph-ghost" />, label: "Ghost", kind: "Empty session, or its Claude Code process died (Claude Code only)" },
   { glyph: <span className="glyph glyph-friction">△</span>, label: "Friction", kind: "Friction points flagged by /insights" },
   { glyph: <span className="glyph glyph-failed" />, label: "Low outcome", kind: "Rated partially / not achieved by /insights" },
   { glyph: <span className="glyph glyph-lowquality">◐</span>, label: "Low quality", kind: "Context quality score < 70" },
@@ -112,7 +112,7 @@ export function HelpOverlay({ onClose }: Props) {
 
         <section className="help-section help-footer">
           <span className="mono dim">
-            ccblackbox · flight recorder for Claude Code sessions
+            ccblackbox · flight recorder for Claude Code &amp; Codex sessions
           </span>
         </section>
       </div>

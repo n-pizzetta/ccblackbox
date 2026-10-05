@@ -253,6 +253,9 @@ export function SessionList({
                         >
                           {s.project}
                         </button>
+                        {s.agent === "codex" && (
+                          <span className="agent-tag" title="Codex session (~/.codex)">codex</span>
+                        )}
                         <span>{formatRelative(s.startedAt)}</span>
                       </div>
                       {snapshots.get(s.id) && <ContextLine snap={snapshots.get(s.id)!} now={now} />}

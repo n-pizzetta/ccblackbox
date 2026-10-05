@@ -66,7 +66,7 @@ export function buildSessionTimeline(session: Session, nowOffsetMs?: number): Se
     const ctx = tu.tokens.input + tu.tokens.cacheRead + tu.tokens.cacheWrite;
     if (ctx > peak) peak = ctx;
   }
-  const window = peak > STANDARD_WINDOW ? LARGE_WINDOW : STANDARD_WINDOW;
+  const window = session.contextWindow ?? (peak > STANDARD_WINDOW ? LARGE_WINDOW : STANDARD_WINDOW);
 
   let cumCost = 0;
   let prevCtx: number | null = null;

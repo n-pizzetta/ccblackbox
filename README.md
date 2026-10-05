@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <strong>The flight recorder for your Claude Code sessions.</strong><br/>
+  <strong>The flight recorder for your Claude Code and Codex sessions.</strong><br/>
   Replay every turn, see where the tokens went, and spot the sessions that went sideways — all from data already on your disk.
 </p>
 
@@ -20,7 +20,7 @@
   <img src="./docs/readme/hero.png" alt="The ccblackbox dashboard, with a Claude Code terminal in front showing the context and prompt-cache segment ccblackbox adds to the status line (synthetic demo data)" width="960" />
 </p>
 
-`ccblackbox` reads the session data Claude Code already writes under `~/.claude/` and turns it into a local dashboard. The data is already there. Nothing visualizes it. This does.
+`ccblackbox` reads the session data Claude Code already writes under `~/.claude/` (and Codex under `~/.codex/`) and turns it into a local dashboard. The data is already there. Nothing visualizes it. This does.
 
 ## Features
 
@@ -99,6 +99,8 @@ Empty sessions and sessions whose Claude Code process died are flagged. Get the 
 </tr>
 </table>
 
+**Codex sessions** from the Codex CLI and IDE extension show up next to Claude Code ones, tagged `codex`, with their tokens, GPT pricing, prompts, commands, patches and timeline. A Claude Code / Codex filter appears once both have sessions.
+
 <p align="center"><sub>All screenshots use synthetic data from <code>pnpm seed:demo</code>.</sub></p>
 
 ---
@@ -160,12 +162,13 @@ node scripts/install-statusline.mjs   # optional: real usage limits (see above)
 | Session metadata, tool counts, tokens, cost | `~/.claude/usage-data/` |
 | Versioned snapshots of files edited via Claude Code | `~/.claude/file-history/` |
 | Live session state | `~/.claude/sessions/` |
+| Codex rollouts and thread names (or under `$CODEX_HOME` when set) | `~/.codex/sessions/`, `~/.codex/archived_sessions/`, `~/.codex/session_index.jsonl` |
 
 The server only listens on `127.0.0.1` and refuses state-changing requests from other websites. The optional `pnpm parse` dump is written to `~/.claude/ccblackbox/sessions.json`, never inside the repo.
 
 ## Pricing
 
-Costs are estimates at Anthropic's public API rates (no batch or negotiated discounts; on a Pro/Max plan they are an API-equivalent value, not what you pay). The table lives in [`scripts/models.mjs`](./scripts/models.mjs) and every turn is priced with its own model.
+Costs are estimates at Anthropic's and OpenAI's public API rates (no batch or negotiated discounts; on a Pro/Max plan they are an API-equivalent value, not what you pay). The table lives in [`scripts/models.mjs`](./scripts/models.mjs) and every turn is priced with its own model.
 
 A model missing from the table still gets a readable name and is priced like the latest model of its family. Costs that include it are marked `~` in the dashboard. To fix one without waiting for a release, add it to `~/.claude/ccblackbox/models.json` (prices in USD per million tokens; picked up on the next refresh):
 
@@ -219,6 +222,7 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the parser internals, component m
 - Cold start re-parses every session (a few seconds with several hundred sessions).
 - Live-session detection uses `ps`, so on Windows running sessions show as crashed. Windows is otherwise untested.
 - Test coverage is thin: only the parser has tests (`pnpm test`).
+- Codex sessions have no context-quality score, ghost detection, file-history diffs or `/insights` outcome (Claude Code only). They are kept out of Claude's 5h window, badges and the Claude-specific health rules, and the usage-limits pill shows Claude's limits only.
 
 ---
 

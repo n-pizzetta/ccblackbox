@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 /**
- * Generates a fake Claude config dir (what ~/.claude holds) with realistic,
- * fully synthetic data, for screenshots and for developing without exposing
- * real sessions.
+ * Generates a fake Claude config dir (what ~/.claude holds) and a fake Codex
+ * home (what ~/.codex holds) with realistic, fully synthetic data, for
+ * screenshots and for developing without exposing real sessions.
  *
- *   pnpm seed:demo                                    # writes .demo-claude/
- *   CLAUDE_CONFIG_DIR="$PWD/.demo-claude" pnpm dev    # or: pnpm serve
+ *   pnpm seed:demo                                    # writes .demo-claude/ and .demo-codex/
+ *   CLAUDE_CONFIG_DIR="$PWD/.demo-claude" CODEX_HOME="$PWD/.demo-codex" pnpm dev    # or: pnpm serve
  *
  * Deterministic (seeded) except for timestamps, which are relative to now so
  * the "today", 7d and 5h views are populated.
  */
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const CLAUDE = resolve(process.argv[2] ?? ".demo-claude");
+const CODEX = resolve(process.argv[3] ?? join(dirname(CLAUDE), ".demo-codex"));
 const NOW = Date.now();
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -187,10 +188,216 @@ writeFileSync(join(CLAUDE, "ccblackbox", "limits.json"), JSON.stringify({
 // Badges count from the first launch; backdate it so the demo history counts.
 writeFileSync(join(CLAUDE, "ccblackbox", "badges.json"), JSON.stringify({ version: 1, startedAt: new Date(NOW - 365 * 24 * HOUR).toISOString(), unlocked: {} }));
 
+/**
+ * One Codex rollout. `legacy` mimics older CLIs (user_message events, direct
+ * function calls, token_count only); otherwise newer ones (UserMessage items,
+ * code-mode `exec` scripts whose tool calls are logged as items, one
+ * token_usage_record per response). `extras` adds the edge cases the parser
+ * must handle: failures without an exit code, MCP calls (built-in and real),
+ * a prompt re-sent quickly, a command that outlives its script, a sub-agent.
+ */
+function codexRollout({ id, cwd, start, prompts, model, legacy, extras = false, child = null }) {
+  const lines = [];
+  let t = start;
+  let ordinal = 0;
+  const stamp = () => new Date(t).toISOString();
+  const push = (type, payload) => lines.push({ timestamp: stamp(), ordinal: ordinal++, type, payload });
+  const total = { input_tokens: 0, cached_input_tokens: 0, cache_write_input_tokens: 0, output_tokens: 0, reasoning_output_tokens: 0, total_tokens: 0 };
+  let ctx = int(9_000, 16_000);
+  const respond = () => {
+    const usage = { input_tokens: ctx, cached_input_tokens: Math.floor(ctx * 0.9 / 128) * 128, cache_write_input_tokens: 0, output_tokens: int(80, 1_500), reasoning_output_tokens: int(0, 300) };
+    usage.total_tokens = usage.input_tokens + usage.output_tokens;
+    for (const k of Object.keys(total)) total[k] += usage[k];
+    if (!legacy) push("token_usage_record", { session_id: id, usage });
+    const info = { total_token_usage: { ...total }, last_token_usage: usage, model_context_window: 258_400 };
+    push("event_msg", { type: "token_count", info });
+    // Codex often repeats the last token_count: the parser must not count it twice.
+    if (rand() < 0.3) push("event_msg", { type: "token_count", info });
+    ctx += int(1_000, 6_000);
+  };
+  const item = (turnId, it) => push("event_msg", { type: "item_completed", turn_id: turnId, item: it });
+  const command = (cmd, failed, pid = String(int(10_000, 99_999))) => ({ type: "CommandExecution", process_id: pid, command: ["/bin/zsh", "-lc", cmd], status: failed ? "failed" : "completed", exit_code: failed ? 1 : 0, aggregated_output: failed ? "Error: 1 test failed" : "ok" });
+  const scriptOutput = (callId, text) => push("response_item", { type: "custom_tool_call_output", call_id: callId, output: [{ type: "input_text", text: "Script completed\nOutput:\n" }, { type: "input_text", text }] });
+
+  push("session_meta", {
+    id,
+    session_id: child?.rootId ?? id,
+    timestamp: stamp(),
+    cwd,
+    originator: "codex-tui",
+    cli_version: legacy ? "0.122.0" : "0.154.0",
+    model_provider: "openai",
+    ...(child ? { parent_thread_id: child.parentId, thread_source: "subagent", source: { subagent: { thread_spawn: { parent_thread_id: child.parentId, depth: 1 } } } } : {}),
+  });
+  const turnIds = [];
+  prompts.forEach((text, n) => {
+    const turnId = uuid();
+    turnIds.push(turnId);
+    push("turn_context", { turn_id: turnId, cwd, model });
+    push("event_msg", { type: "task_started", turn_id: turnId, model_context_window: 258_400 });
+    // The VS Code extension wraps the first prompt in IDE context.
+    const raw = n === 0 && legacy ? `# Context from my IDE setup:\n\n## Active file: src/app.ts\n\n## My request for Codex:\n${text}\n` : text;
+    if (legacy) push("event_msg", { type: "user_message", message: raw });
+    else item(turnId, { type: "UserMessage", content: [{ type: "text", text: raw }] });
+    if (child) {
+      t += int(3, 20) * 1000;
+      push("response_item", { type: "message", role: "assistant", content: [{ type: "output_text", text: "ok" }] });
+      respond();
+      push("event_msg", { type: "task_complete", turn_id: turnId });
+      return;
+    }
+    for (let i = 0; i < int(2, 6); i++) {
+      t += int(3, 30) * 1000;
+      const callId = `call_${hex(24)}`;
+      const cmd = pick(["pnpm test", "rg -n TODO src", "git status --short", "pnpm lint", "sed -n '1,120p' src/app.ts"]);
+      const failed = rand() < 0.1;
+      if (legacy) {
+        if (rand() < 0.3) {
+          const file = pick(["src/app.ts", "src/routes.ts", "README.md"]);
+          push("response_item", { type: "custom_tool_call", status: "completed", call_id: callId, name: "apply_patch", input: `*** Begin Patch\n*** Update File: ${file}\n@@\n-a\n+b\n*** End Patch` });
+          respond();
+          push("event_msg", { type: "patch_apply_end", call_id: callId, success: true, changes: { [`${cwd}/${file}`]: { type: "update" } } });
+          push("response_item", { type: "custom_tool_call_output", call_id: callId, output: JSON.stringify({ output: `Success. Updated the following files:\nM ${file}\n`, metadata: { exit_code: 0 } }) });
+        } else {
+          push("response_item", { type: "function_call", name: "exec_command", call_id: callId, arguments: JSON.stringify({ cmd, workdir: cwd }) });
+          respond();
+          push("event_msg", { type: "exec_command_end", call_id: callId, exit_code: failed ? 1 : 0 });
+          push("response_item", { type: "function_call_output", call_id: callId, output: `Process exited with code ${failed ? 1 : 0}\nOutput:\n${failed ? "Error: 1 test failed" : "ok"}` });
+        }
+      } else {
+        push("response_item", { type: "custom_tool_call", status: "completed", call_id: callId, name: "exec", input: `await tools.exec_command({cmd: ${JSON.stringify(cmd)}})` });
+        respond();
+        item(turnId, command(cmd, failed));
+        if (rand() < 0.3) item(turnId, { type: "FileChange", changes: { [`${cwd}/src/${pick(["app", "routes", "store"])}.ts`]: { type: "update" } }, status: "completed", stdout: "Success." });
+        scriptOutput(callId, failed ? "Error: 1 test failed" : "ok");
+      }
+    }
+    if (extras && n === 0) {
+      t += 5_000;
+      if (legacy) {
+        // Calls that never ran or that the user stopped: no exit line, no exec_command_end.
+        for (const output of ["exec_command failed for `/bin/zsh -lc 'uv run pytest -q'`: CreateProcess { message: \"Codex(Sandbox(Denied { output: ExecToolCallOutput { exit_code: 2 } }))\" }", "aborted by user after 12.0s"]) {
+          const callId = `call_${hex(24)}`;
+          push("response_item", { type: "function_call", name: "exec_command", call_id: callId, arguments: JSON.stringify({ cmd: "uv run pytest -q" }) });
+          respond();
+          push("response_item", { type: "function_call_output", call_id: callId, output });
+        }
+        // Codex's own resource tool (names the server it queries) and a real MCP call, whose end comes after the response.
+        const builtin = `call_${hex(24)}`;
+        push("response_item", { type: "function_call", name: "list_mcp_resources", call_id: builtin, arguments: "{}" });
+        push("event_msg", { type: "mcp_tool_call_end", call_id: builtin, invocation: { server: "docs", tool: "list_mcp_resources", arguments: {} }, result: { Err: "resources/list failed: unknown MCP server 'docs'" } });
+        respond();
+        push("response_item", { type: "function_call_output", call_id: builtin, output: "resources/list failed: unknown MCP server 'docs'" });
+        const mcp = `call_${hex(24)}`;
+        push("response_item", { type: "function_call", name: "linear__list_issues", call_id: mcp, arguments: JSON.stringify({ team: "core" }) });
+        respond();
+        push("event_msg", { type: "mcp_tool_call_end", call_id: mcp, invocation: { server: "linear", tool: "list_issues", arguments: { team: "core" } }, result: { Ok: { content: [{ type: "text", text: "[]" }], isError: false } } });
+        push("response_item", { type: "function_call_output", call_id: mcp, output: "[]" });
+      } else {
+        // A build that outlives its script (yield_time_ms): it completes after the script's output.
+        const callId = `call_${hex(24)}`;
+        const pid = String(int(10_000, 99_999));
+        push("response_item", { type: "custom_tool_call", status: "completed", call_id: callId, name: "exec", input: "await tools.exec_command({cmd: \"pnpm build\", yield_time_ms: 10000})" });
+        respond();
+        scriptOutput(callId, `{"i":0,"status":"fulfilled","value":{"wall_time_seconds":10.0,"session_id":${pid},"output":"> vite build"}}`);
+        t += 4_000;
+        item(turnIds.at(-1), command("pnpm build", true, pid));
+        // A sub-agent, spawned and awaited from a script.
+        const spawn = `call_${hex(24)}`;
+        push("response_item", { type: "custom_tool_call", status: "completed", call_id: spawn, name: "exec", input: "const a = await tools.spawn_agent({message: \"Survey the tests\"}); await tools.wait({targets: [a.id]})" });
+        respond();
+        item(turnIds.at(-1), { type: "CollabAgentToolCall", tool: "spawn_agent", status: "completed", prompt: "Survey the tests", receiver_agents: [{ agent_nickname: "Ada" }] });
+        item(turnIds.at(-1), { type: "CollabAgentToolCall", tool: "wait", status: "completed", receiver_agents: [{ agent_nickname: "Ada" }] });
+        scriptOutput(spawn, "ok");
+        // Scripts that ran no tool count as `exec`. One prints data that looks like a session id,
+        // matching the pid of a later command: that command must not be credited to it.
+        const echoed = String(int(10_000, 99_999));
+        for (const [input, output] of [["const rows = data.filter(Boolean);\nreturn rows.length;", "3"], ["return JSON.stringify({ session_id: echoed });", `{"session_id": ${echoed}}`]]) {
+          const js = `call_${hex(24)}`;
+          push("response_item", { type: "custom_tool_call", status: "completed", call_id: js, name: "exec", input });
+          respond();
+          scriptOutput(js, output);
+        }
+        const next = `call_${hex(24)}`;
+        push("response_item", { type: "custom_tool_call", status: "completed", call_id: next, name: "exec", input: "await tools.exec_command({cmd: \"git status --short\"})" });
+        respond();
+        item(turnIds.at(-1), command("git status --short", false, echoed));
+        scriptOutput(next, "ok");
+        // A test run cut short: its command never completes, the script still ran a tool.
+        const cut = `call_${hex(24)}`;
+        push("response_item", { type: "custom_tool_call", status: "completed", call_id: cut, name: "exec", input: "await tools.exec_command({cmd: \"pnpm test\", yield_time_ms: 10000})" });
+        respond();
+        scriptOutput(cut, `{"i":0,"status":"fulfilled","value":{"wall_time_seconds":10.0,"session_id":${int(10_000, 99_999)},"output":""}}`);
+        // A web search and an image view from a script.
+        const look = `call_${hex(24)}`;
+        push("response_item", { type: "custom_tool_call", status: "completed", call_id: look, name: "exec", input: "await tools.web_search({q: \"vite build cache\"}); await tools.view_image({path: \"shot.png\"})" });
+        respond();
+        item(turnIds.at(-1), { type: "Extension", kind: "web.search", query: "vite build cache", status: "completed" });
+        item(turnIds.at(-1), { type: "ImageView", path: `${cwd}/shot.png`, status: "completed" });
+        scriptOutput(look, "ok");
+      }
+    }
+    t += int(5, 30) * 1000;
+    push("response_item", { type: "message", role: "assistant", content: [{ type: "output_text", text: "Done: the change is in and the tests pass." }] });
+    respond();
+    push("event_msg", { type: "task_complete", turn_id: turnId });
+    // The same prompt re-sent right after an interrupted turn is a second prompt, not a duplicate.
+    if (extras && legacy && n === 0) {
+      for (let k = 0; k < 2; k++) {
+        t += 2_000;
+        const again = uuid();
+        push("turn_context", { turn_id: again, cwd, model });
+        push("event_msg", { type: "task_started", turn_id: again });
+        push("event_msg", { type: "user_message", message: "continue" });
+        t += 1_000;
+        push("event_msg", { type: "turn_aborted", turn_id: again, reason: "interrupted" });
+      }
+    }
+    t += int(30, 600) * 1000;
+  });
+  return lines;
+}
+
+rmSync(CODEX, { recursive: true, force: true });
+// Slugs from Codex 0.154's model catalog (~/.codex/models_cache.json).
+const CODEX_MODELS = ["gpt-5.4", "gpt-5.6-luna", "gpt-6-astra", "gpt-5.6-terra"];
+const threadNames = [];
+const writeRollout = (id, start, lines) => {
+  const date = new Date(start);
+  const pad = (n) => String(n).padStart(2, "0");
+  const dir = join(CODEX, "sessions", String(date.getFullYear()), pad(date.getMonth() + 1), pad(date.getDate()));
+  writeJsonl(join(dir, `rollout-${date.toISOString().slice(0, 19).replace(/:/g, "-")}-${id}.jsonl`), lines);
+};
+let codexCount = 0;
+for (let day = 6; day >= 0; day -= 2) {
+  const project = pick(projectNames);
+  const cwd = `/Users/demo/dev/${project}`;
+  const id = uuid();
+  const start = NOW - day * 24 * HOUR - int(1, 8) * HOUR;
+  const legacy = day >= 4;
+  const extras = day === 6 || day === 2;
+  const prompts = [pick(PROJECTS[project]), ...Array.from({ length: int(1, 3) }, () => pick(FOLLOW_UPS))];
+  writeRollout(id, start, codexRollout({ id, cwd, start, prompts, model: pick(CODEX_MODELS), legacy, extras }));
+  // Codex 0.154 names threads in session_index.jsonl only.
+  if (!legacy) threadNames.push({ id, thread_name: prompts[0].split(" ").slice(0, 4).join(" "), updated_at: new Date(start).toISOString() });
+  if (extras && !legacy) {
+    // The spawned sub-agent writes its own rollout; session_id is the root thread.
+    const childId = uuid();
+    writeRollout(childId, start + 60_000, codexRollout({ id: childId, cwd, start: start + 60_000, prompts: ["Survey the tests"], model: "gpt-5.6-luna", legacy: false, child: { rootId: id, parentId: id } }));
+  }
+  codexCount++;
+}
+// A sub-agent whose parent rollout is gone stays a session of its own.
+const orphanId = uuid();
+writeRollout(orphanId, NOW - 3 * HOUR, codexRollout({ id: orphanId, cwd: "/Users/demo/dev/docs-site", start: NOW - 3 * HOUR, prompts: ["Check the broken links"], model: "gpt-5.6-luna", legacy: false, child: { rootId: uuid(), parentId: uuid() } }));
+codexCount++;
+writeFileSync(join(CODEX, "session_index.jsonl"), threadNames.map((l) => JSON.stringify(l)).join("\n") + "\n");
+
 function mkdirp(dir) {
   mkdirSync(dir, { recursive: true });
   return dir;
 }
 
 console.log(`[seed-demo] wrote ${sessionCount} synthetic sessions to ${CLAUDE}`);
-console.log(`[seed-demo] run: CLAUDE_CONFIG_DIR="${CLAUDE}" pnpm dev`);
+console.log(`[seed-demo] wrote ${codexCount} synthetic Codex sessions to ${CODEX}`);
+console.log(`[seed-demo] run: CLAUDE_CONFIG_DIR="${CLAUDE}" CODEX_HOME="${CODEX}" pnpm dev`);

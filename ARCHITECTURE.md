@@ -1,6 +1,6 @@
 # Architecture
 
-`ccblackbox` is a local dashboard for Claude Code sessions, shipped both as an npm package (`npx ccblackbox`) and as a Claude Code plugin (`/ccblackbox:replay`). A Node server parses the files Claude Code already writes under `~/.claude/`, keeps the result in memory and serves it to a React single-page app over a small local API.
+`ccblackbox` is a local dashboard for Claude Code and Codex sessions, shipped both as an npm package (`npx ccblackbox`) and as a Claude Code plugin (`/ccblackbox:replay`). A Node server parses the files Claude Code already writes under `~/.claude/` (and Codex under `~/.codex/`, §3), keeps the result in memory and serves it to a React single-page app over a small local API.
 
 There is no database, no network access beyond loopback, and no runtime dependency besides Node's standard library on the server side.
 
@@ -22,6 +22,7 @@ There is no database, no network access beyond loopback, and no runtime dependen
                     │
                     ▼
       scripts/parse-sessions.mjs  ── parseAllSessions() / summarizeSession()
+      scripts/codex.mjs           ── ~/.codex/sessions/**/rollout-*.jsonl → same shape
       scripts/models.mjs          ── pricing table, shared with the UI
                     │
                     ▼
@@ -47,7 +48,7 @@ There is no database, no network access beyond loopback, and no runtime dependen
 
 ## 2. Data sources
 
-All paths are relative to the Claude config dir: `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set (as in Claude Code). `pnpm seed:demo` writes a synthetic one to `.demo-claude/` for development (`CLAUDE_CONFIG_DIR="$PWD/.demo-claude" pnpm dev`).
+All paths are relative to the Claude config dir: `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set (as in Claude Code). `pnpm seed:demo` writes a synthetic one to `.demo-claude/`, plus a Codex home to `.demo-codex/`, for development (`CLAUDE_CONFIG_DIR="$PWD/.demo-claude" CODEX_HOME="$PWD/.demo-codex" pnpm dev`).
 
 ### Read (owned by Claude Code, never modified except where noted)
 
@@ -61,6 +62,8 @@ All paths are relative to the Claude config dir: `~/.claude`, or `$CLAUDE_CONFIG
 | `usage-data/report.html` | The `/insights` report, proxied at `/usage-report.html`. |
 | `file-history/<id>/<hash>@v<n>` | File snapshots for the Files tab and diffs. |
 | `history.jsonl` | Fallback first prompt when neither transcript nor meta has one. |
+
+Codex (`~/.codex`, or `$CODEX_HOME`), also read-only: `sessions/YYYY/MM/DD/rollout-<ts>-<id>.jsonl`, `archived_sessions/` and `session_index.jsonl` (thread names). See "Codex rollouts" in §3.
 
 ### Written
 
@@ -93,9 +96,10 @@ Used as a library by `scripts/api.mjs`, and as a CLI (`pnpm parse`) that writes 
 5. `collectLive()` expands each alive pid file to its `/clear` chain (sibling transcripts in the same project dir with the same `custom-title`, modified later); only the newest in the chain is marked live.
 6. Meta files are read; one without `session_id` or `start_time` is reported in `errors` (surfaced as a badge in the top bar with a Trash action).
 7. `buildSession()` runs for the union of transcript ids, meta ids and live ids.
-8. Post-passes: `linkClearedChains()` sets `clearedFrom` / `clearedInto` (same `cwd` + `customTitle`), `reassignLiveToChainTail()` moves the live flag to the chain tail, `markUnpriced()` lists models without a pricing row.
+8. Codex rollouts (`indexCodexRollouts()`, see "Codex rollouts" below) are parsed, skipping ids already built from `~/.claude`. Sub-agent rollouts are merged into their root session (`codexRootOf`); every other rollout goes through the same `buildSession()` with `agent: "codex"`.
+9. Post-passes: `linkClearedChains()` sets `clearedFrom` / `clearedInto` (same `cwd` + `customTitle`), `reassignLiveToChainTail()` moves the live flag to the chain tail, `markUnpriced()` lists models without a pricing row.
 
-Sessions are returned sorted by `startedAt` descending.
+Sessions are returned sorted by `startedAt` descending. Helpers shared by both parsers (`countShellKinds`, `longestRun`, token sums) live in `scripts/transcript-utils.mjs`.
 
 ### Transcript parsing (`parseTranscriptFile`)
 
@@ -111,30 +115,26 @@ Sessions are returned sorted by `startedAt` descending.
 
 `readTranscriptFile` caches parsed results in `transcriptCache`, keyed by path and invalidated when `mtime` or `size` changes, so periodic re-parses only re-read transcripts that grew.
 
-### Sub-agents
+### Codex rollouts (`scripts/codex.mjs`)
 
-`readSubagents()` parses `<project>/<sessionId>/subagents/*.jsonl` in sidechain mode: their turns (flagged `sidechain`), tokens and tool counts are merged into the parent session; they contribute no prompts and no tool-sequence rows.
+`parseCodexRollout()` returns the same intermediate shape as `parseTranscriptFile`, so `buildSession` handles both. Formats seen from Codex 0.12x to 0.154 are supported:
 
-### Session assembly (`buildSession`)
-
-- Numbers come from the transcript + sub-agents. When the transcript is missing, the session is built from session-meta (`transcriptMissing: true`; tokens are only meta's input/output totals; timeline is meta's prompt timestamps).
-- Qualitative fields from `/insights` facets: `outcome`, `satisfaction` (0.5 when absent), `goal`, `summary`, `frictions`. Without facets, goal falls back to custom title → live name → first prompt.
-- `model` is the dominant model by output tokens.
-- **Ghost** = not live and either dead-process (`ghostKind: "crashed"`: pid file exists but process gone, or id in `.stale/`) or empty (`"empty"`: transcript with no user prompt and no tool call).
-- The plugin cache (`~/.claude/ccblackbox/cache/<id>.jsonl`) is merged into `toolSequence`, dropping plugin entries that duplicate a transcript entry within 500 ms; `pluginCapture` summarizes it.
-- `summarizeSession()` strips heavy fields for the list endpoint but keeps lightweight `turns` and `prompts` (timestamps, tokens, previews) needed by fleet aggregations.
-
-### Other exports
-
-- `readLimits()` normalizes `limits.json` into `{ capturedAt, fiveHour, sevenDay }` with `usedPct` and `resetsAt` (ms). A window whose `resetsAt` is in the past is reported as 0% used.
-
----
+- **Turns**: one per model response. Newer rollouts write a `token_usage_record` per response; older ones only `event_msg/token_count`, often repeated, so a count whose `total_token_usage` didn't change is skipped. OpenAI counts cached tokens inside `input_tokens` and reasoning inside `output_tokens`: `input` = `input_tokens − cached − cache writes`, `cacheRead` = `cached_input_tokens` (cache writes are assumed to be inside `input_tokens` too; they are 0 in every rollout seen so far). The model comes from the latest `turn_context`.
+- **Prompts**: `event_msg/user_message` (older) or `item_completed` `UserMessage` items (newer). A prompt is only dropped as a duplicate when the same text arrives from the other kind within 5 s, so the same prompt sent twice still counts twice. The VS Code extension's IDE-context wrapper is cut at `## My request for Codex:`. Environment / instruction messages in `response_item` are not prompts.
+- **Tools**: `function_call` / `custom_tool_call` / `local_shell_call` / `web_search_call` with their outputs. Errors: non-zero exit code (`exec_command_end`, `Process exited with code N`, patch metadata), failed patch, MCP error, and calls that never ran or were stopped (output starting with `exec_command failed for` or `aborted by user`). Shell commands are classified at call time, like Claude's (a denied `pytest` still counts as a test run).
+- **MCP**: calls are regrouped as `mcp:<server>` from `mcp_tool_call_end` in the counts, the turn's tool list, the timeline and the tool sequence (as `mcp__<server>__<tool>`), whichever order the end event and the response's usage arrive in. Codex's own resource tools (`list_mcp_resources`, `list_mcp_resource_templates`, `read_mcp_resource`) keep their names: their `server` is the one they query.
+- **Code mode** (models whose catalog entry is `code_mode_only`: GPT-6 and GPT-5.6): the model sends an `exec` script whose tool calls are logged as items (`CommandExecution`, `FileChange`, `Extension`, `ImageView`, `*Call` such as `CollabAgentToolCall`; messages and reasoning are items too and are ignored). They count as the tool calls, on the script's turn. A command still running when the script returns is listed in its output as `exec_command`'s yield result (`"wall_time_seconds":…,"session_id":N`, the pattern is anchored on that shape so data a script prints can't match); its item arrives later with that `process_id` and is attributed to the same script. The script itself counts (preview: its first line) when it ran nothing, or when the commands it left running never completed (interrupted turn, rollout cut). `McpToolCall` items are mapped to `mcp:<server>` from their `server` / `tool` fields, a shape assumed from the binary (none seen in a rollout yet).
+- **Sub-agents**: a spawned agent writes its own rollout (`session_meta.thread_source: "subagent"`, `session_id` = root thread, `parent_thread_id`). It is merged into its root session like a Claude `subagents/` transcript (tokens, turns flagged `sidechain`, tool counts; no prompts, no tool-sequence rows) and counted in `subAgents`; `spawn_agent` produces an `agent` timeline event. A sub-agent whose parent rollout is missing stays a session of its own.
+- **Files changed**: paths from `patch_apply_end`, patch headers and `FileChange` items. **Title**: `~/.codex/session_index.jsonl` (last entry per id; Codex 0.154 only writes names there), else `thread_name_updated` in the rollout. Used as the goal; not a `customTitle`, so no `/clear` chains.
+- **Live**: a task started without `task_complete` / `turn_aborted`, a rollout written in the last 30 minutes, a running `codex` process and, when `lsof` is available (run asynchronously, only for those candidates), a codex process holding the rollout open (Codex keeps it open while a task runs). Without `lsof`, any running codex process (such as the IDE extension's server) is enough.
+- **Not available**: context-quality score, ghosts (ghost actions only know `~/.claude/projects`), file-history snapshots, `/insights` fields, compaction counts. `contextWindow` comes from `model_context_window` and replaces the 200k / 1M guess in the Timeline tab.
+- `codex resume <id>` replaces `claude --resume` in the session view.
 
 ## 4. Pricing and models (`scripts/models.mjs`)
 
 A single table shared by the parser (Node) and the UI (imported by Vite; types in `scripts/models.d.mts`).
 
-- `MODELS`: `label`, `in`, `out`, `cacheRead` in USD per million tokens (public API rates). Cache writes are derived: 1.25× input (5-minute TTL), 2× input (1-hour TTL).
+- `MODELS`: `label`, `in`, `out`, `cacheRead` in USD per million tokens (public API rates; Claude models for Claude Code, GPT models for Codex from `developers.openai.com/api/docs/models/<id>`, unknown `gpt-*` and `codex-*` ids falling back to `gpt-5.4`). OpenAI's long-context rate (prompts over 272k input tokens) and fast mode are not modelled: rollouts don't record a tier. Cache writes are derived: 1.25× input (5-minute TTL), 2× input (1-hour TTL).
 - `normalizeModel()`: `claude-opus-5-5[1m]` → `opus-5.5`, date suffixes stripped, bare aliases (`opus`, `sonnet[1m]`) mapped to the family's latest model (`FAMILY_LATEST`), `<synthetic>` → `null`.
 - `priceFor()`: unknown ids fall back to the family's latest price, then to `DEFAULT_MODEL`; `isKnownModel()` flags these as estimates (`unpricedModels` on the session, shown with a hint in the UI).
 - `costOf()`: bills `cacheWrite1h` at the 1h rate and the remaining cache writes at the 5m rate.
@@ -147,7 +147,7 @@ Costs are API-equivalent estimates; they are not what a subscription plan bills.
 
 ## 5. Usage limits and the 5-hour window
 
-Claude Code exposes the real limits (`rate_limits.five_hour` / `seven_day`, as in `/usage`) only in the JSON it pipes to the status line command. So:
+Claude Code exposes the real limits (`rate_limits.five_hour` / `seven_day`, as in `/usage`) only in the JSON it pipes to the status line command. Everything in this section is about Claude's limits: Codex sessions are left out of the 5h window, the burn tracker and the spike analysis (`FleetDashboard`). So:
 
 1. `/ccblackbox:limits` runs [`scripts/install-statusline.mjs`](scripts/install-statusline.mjs): copies [`scripts/statusline.mjs`](scripts/statusline.mjs) to `~/.claude/ccblackbox/statusline.mjs` (stable path across plugin updates), saves the current `statusLine` to `statusline.json`, and points `settings.json` at the wrapper.
 2. On every status line refresh the wrapper writes `limits.json`, then pipes the untouched payload to the user's previous status line command, or prints a minimal `model · 5h n% · 7d n%` line if there was none.
@@ -169,6 +169,7 @@ The 5h window in the UI (`fleet/FiveHourSession.tsx`, `utils/fleetStats.ts`):
 
 Computed server-side after every parse (`updateBadges` in the API), because they need full sessions (`shell`, `timeline`, `turns`) that the list payload omits. `fleet/Badges.tsx` fetches `/api/badges` whenever the session list changes.
 
+- **Only Claude Code sessions count**: Codex tools and models don't map onto the families (Editor, Researcher, model tourist…), and unlocks are permanent. The profile chip's level and activity streak (`utils/gamify.ts`) are overall activity and count every agent.
 - **Only sessions started after the first launch count** (`badges.json` `startedAt`). History stays in every other view; badges start from zero so they feel earned and don't depend on how much transcript history Claude Code kept (`cleanupPeriodDays`).
 - **Unlocks are permanent**: stored with their date, so they survive transcript cleanup and 30-day windows sliding past them.
 - **Families**: one metric per family, tiers only raise the target, so a lower tier can never be harder than a higher one. Some families have 2 or 3 tiers; `oneshot` starts at gold.
@@ -196,7 +197,7 @@ Grades: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, else F. The list payload keeps t
 
 The **Health** tab is a checklist of rules over the sessions in the selected range (ghosts excluded, except for the housekeeping rule). Each rule passes, warns or fails against a threshold written next to it, explains why it matters and what to do, and links up to 5 sessions behind a miss. Rules without data (for example outcomes before `/insights` ran) show as n/a and don't count. The Rankings hero shows the result (`passed / total`).
 
-Rules: context quality, context headroom, compactions, prompt cache, startup cost (median first-turn context: system prompt, CLAUDE.md, memory, skills and MCP tools), outcomes, friction, forgotten sessions (process running over 24h, from the pid file's `startedAt`) and housekeeping (ghosts). Adding one means appending a function to `RULES`.
+Rules: context quality, context headroom, compactions, prompt cache, startup cost (median first-turn context: system prompt, CLAUDE.md, memory, skills and MCP tools; this rule and the cache rule only count Claude Code sessions, the others need data Codex sessions don't have), outcomes, friction, forgotten sessions (process running over 24h, from the pid file's `startedAt`) and housekeeping (ghosts). Adding one means appending a function to `RULES`.
 
 ---
 
@@ -263,7 +264,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 
 | Component | Role |
 |---|---|
-| `SessionFilters` | Filters button + popover (status filters with counts, ghosts split by crashed / empty; project list; outcome-bar legend) and the removable chips of the active filters. Clicking a project pill on a session row filters on that project. |
+| `SessionFilters` | Filters button + popover (status filters with counts, ghosts split by crashed / empty, Claude Code / Codex when both are present; project list; outcome-bar legend) and the removable chips of the active filters. Clicking a project pill on a session row filters on that project. |
 | `LimitsPill` | The 5h and 7-day usage windows (fill, elapsed-time tick, reset countdown); rendered in the top bar and in the session view so they are always on screen. |
 | `units` (`utils/units.ts`, `UnitSetting`) | Display unit for usage: **tokens** (fresh = input + output + cache writes; cached reads are shown apart) or **API value** ($ at API prices, read as a relative weight, since a subscription is limited by the 5h / 7d windows rather than dollars). Persisted in `localStorage` (`ccblackbox:unit`), set from the profile menu. Rankings by weight (podium "Heaviest", project league) use API value. The podium "Longest" ranks by `longestRunMs` (longest main-thread stretch with no pause over 15 min), not `durationMs`, which adds up to 5 min per gap and so favors sessions left open for days. |
 | `ParseErrors` / `ProfileMenu` | Top-bar badge listing unreadable session-meta files with a Trash action (only shown when there are some). Profile chip (data status dot, level, streak) opening a menu: level progress, links to the Health and Rankings tabs (`utils/openTab.ts` event, since `FleetDashboard` owns the tab), usage unit, data status and insights report, `LimitsSection`, keyboard shortcuts, bug report link. The top bar keeps only what is read constantly: limits, range and this chip. |
@@ -299,7 +300,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 | `pnpm serve` | `node scripts/serve.mjs` (default port 3333; `--port`, `--no-open`). Also the `ccblackbox` bin. If the port is taken it assumes an instance is running, opens it and exits. |
 | `pnpm parse` | One-off parse to `~/.claude/ccblackbox/sessions.json`. |
 | `pnpm lint`, `pnpm typecheck` | ESLint, `tsc -b --noEmit`. |
-| `pnpm seed:demo` | Writes synthetic data to `.demo-claude/` (`scripts/seed-demo.mjs`). |
+| `pnpm seed:demo` | Writes synthetic data to `.demo-claude/` and `.demo-codex/` (`scripts/seed-demo.mjs`). |
 
 - `dist/` is committed (`!dist/` in `.gitignore`); rebuild and commit it with UI changes.
 - npm `files`: `dist` (minus `sessions.json`), `scripts`, `hooks`, `commands`, `.claude-plugin`, `ARCHITECTURE.md`. Runtime dependencies are only needed for the bundle; the server uses the Node standard library. Node ≥ 20.
@@ -309,7 +310,9 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 ## 11. Known limitations
 
 - **Live detection needs `ps`.** `isClaudePidAlive` shells out to `ps`, which does not exist on Windows; there, running sessions are not detected and their pid files make them look crashed.
-- **Transcript changes are picked up by polling.** `projects/` is not watched; updates arrive through the 10 s refresh or through a change in a watched dir (the plugin hook's cache writes trigger one on every tool call).
+- **Codex limits are not shown.** Codex reports its own 5h / weekly windows in `token_count.rate_limits`; the limits pill only shows Claude's.
+- **Codex live detection needs `lsof`** to tell which codex process writes a rollout. Without it, a killed CLI whose task was open shows as live for up to 30 minutes while another codex process (the IDE extension's server) runs. An open TUI waiting for the next prompt has no open task, so it is not live.
+- **Transcript changes are picked up by polling.** `projects/` and `~/.codex/sessions/` are not watched; updates arrive through the 10 s refresh or through a change in a watched dir (the plugin hook's cache writes trigger one on every tool call).
 - **`/clear` chains are heuristic.** They are linked by identical `custom-title` in the same project/cwd.
 - **Qualitative fields depend on `/insights`.** Without it, outcome is `unknown`, satisfaction defaults to 0.5, frictions are empty. Friction positions (`at`) are synthetic, not timestamps.
 - **Truncation.** Prompts, tool sequence and previews are capped; sub-agent tool calls appear in counts and turns but not in the tool sequence.
