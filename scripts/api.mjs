@@ -16,6 +16,7 @@ import { readdir } from "node:fs/promises";
 import { mergeLimits, parseAllSessions, readLimits, readLiveContext, summarizeSession } from "./parse-sessions.mjs";
 import { badgeStatePath, computeBadges, loadBadgeState, saveBadgeState } from "./badges.mjs";
 import { dataDir } from "./data-dir.mjs";
+import { focusSession } from "./focus-terminal.mjs";
 
 // Honors CLAUDE_CONFIG_DIR, like Claude Code.
 const CLAUDE = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
@@ -242,6 +243,20 @@ async function handleApi(req, res) {
       return res.end();
     }
     return send(res, 200, cache.listBody, JSON_TYPE);
+  }
+
+  const focusMatch = url.match(/^\/api\/sessions\/([a-f0-9-]{36})\/focus(?:\?|$)/i);
+  if (focusMatch) {
+    if (req.method !== "POST") return send(res, 405, "method not allowed");
+    const s = cache.byId.get(focusMatch[1]);
+    if (!s) return send(res, 404, "session not found");
+    if (!s.live || !s.pid || s.agent !== "claude") return send(res, 409, "not a running Claude Code session");
+    try {
+      const transcriptPath = await findTranscriptPath(s.id);
+      return sendJson(res, 200, await focusSession({ pid: s.pid, cwd: s.cwd, transcriptPath }));
+    } catch (e) {
+      return send(res, e.status ?? 500, e.message);
+    }
   }
 
   const sessionMatch = url.match(/^\/api\/sessions\/([a-f0-9-]{36})(?:\?|$)/i);
