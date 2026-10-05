@@ -175,7 +175,12 @@
 }
 
 .badge-glyph-emoji { display: grid; place-items: center; font-size: 30cqw; line-height: 1; filter: none; }
-.next-up-glyph.badge-glyph-emoji { font-size: var(--fs-xl); }
+
+/* ---- Next up: the next tier's card at thumbnail size, dimmed until won ---- */
+.badge-mini { flex: none; width: 56px; opacity: 0.6; transition: opacity var(--t-fast); }
+.badge-mini .badge-art { margin-bottom: 0; }
+.badge-mini .badge-card { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(0, 0, 0, 0.6); }
+button.next-up-item:hover .badge-mini { opacity: 0.85; }
 
 /* ---- Hover card: the only place progress shows ---- */
 .badge-tip {

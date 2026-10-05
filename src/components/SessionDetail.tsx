@@ -686,18 +686,20 @@ function OverviewTab({
         <div className="section-title">
           <span>User prompts</span>
           <div className="prompt-view-toggle">
-            <button
-              className={`tool-view-btn ${promptView === "timeline" ? "active" : ""}`}
-              onClick={() => setPromptView("timeline")}
-            >
-              Timeline
-            </button>
-            <button
-              className={`tool-view-btn ${promptView === "list" ? "active" : ""}`}
-              onClick={() => setPromptView("list")}
-            >
-              List
-            </button>
+            <span className="seg">
+              <button
+                className={`tool-view-btn ${promptView === "timeline" ? "active" : ""}`}
+                onClick={() => setPromptView("timeline")}
+              >
+                Timeline
+              </button>
+              <button
+                className={`tool-view-btn ${promptView === "list" ? "active" : ""}`}
+                onClick={() => setPromptView("list")}
+              >
+                List
+              </button>
+            </span>
             <span className="dim mono tabular" style={{ marginLeft: 10 }}>
               {prompts.length} prompts
               {totalVal > 0 && ` · ${fmtAxis(totalVal)} total`}
@@ -984,18 +986,20 @@ function ToolsTab({
           Tool calls <InfoDot title="Every tool Claude invoked during the session (Read, Edit, Bash, Grep, Glob, Write, Agent, etc.). Sequence view shows chronological calls with their result size; Summary view shows aggregate counts per tool. Click a row to expand the result preview." />
         </span>
         <div className="tool-view-toggle">
-          <button
-            className={`tool-view-btn ${view === "sequence" ? "active" : ""}`}
-            onClick={() => setView("sequence")}
-          >
-            Sequence
-          </button>
-          <button
-            className={`tool-view-btn ${view === "summary" ? "active" : ""}`}
-            onClick={() => setView("summary")}
-          >
-            Summary
-          </button>
+          <span className="seg">
+            <button
+              className={`tool-view-btn ${view === "sequence" ? "active" : ""}`}
+              onClick={() => setView("sequence")}
+            >
+              Sequence
+            </button>
+            <button
+              className={`tool-view-btn ${view === "summary" ? "active" : ""}`}
+              onClick={() => setView("summary")}
+            >
+              Summary
+            </button>
+          </span>
           <span className="dim mono tabular" style={{ marginLeft: 10 }}>
             {focus ? `${sequence.length} of ${total}` : `${total} total`}
           </span>

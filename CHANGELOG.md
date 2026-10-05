@@ -8,6 +8,8 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Changed
 
+- **Glass design**: a graphite palette and one glass element per view (the page navigation, or the tabs in the session view); everything else is flat or sits in one opaque card. The scope bar and header widgets are flat, headline figures share one card, table rows are rounded, numbers use the UI face with neutral amounts, and session panels get segmented toggles, neutral bars and quieter banners. The session view has a flat toolbar and a primary resume button.
+- **Next up** shows a mini card of the next tier instead of a glyph; the tier colour now lives only on that card.
 - **Badge cards**: each badge is a foil collector card whose finish is the tier (matte bronze, silver and gold sheen, holographic platinum that follows the pointer), with a line-art glyph in place of the emoji. Every tier has its own name and glyph that grows with it (Marathon: 5K, 10K, Half marathon, then Marathon, from jog to finish tape). Locked badges are face down. Progress, targets and unlock dates moved from the card to its hover card.
 
 ### Planned

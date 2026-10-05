@@ -65,11 +65,11 @@ export function ProjectRollup({ sessions, allSessions, range, limit = 6 }: Props
                 {unit === "tokens" ? (
                   <>
                     <span>{formatTokens(r.tokens)}</span>
-                    <span style={{ color: "var(--c-amber)" }}>{formatCost(r.cost)}</span>
+                    <span style={{ color: "var(--c-text)", fontWeight: 600 }}>{formatCost(r.cost)}</span>
                   </>
                 ) : (
                   <>
-                    <span style={{ color: "var(--c-amber)" }}>{formatCost(r.cost)}</span>
+                    <span style={{ color: "var(--c-text)", fontWeight: 600 }}>{formatCost(r.cost)}</span>
                     <span>{formatTokens(r.tokens)}</span>
                   </>
                 )}
