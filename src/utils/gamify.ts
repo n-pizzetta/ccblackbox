@@ -115,8 +115,8 @@ export type Tier = "bronze" | "silver" | "gold" | "platinum";
 
 export const TIER_LABEL: Record<Tier, string> = { bronze: "Bronze", silver: "Silver", gold: "Gold", platinum: "Platinum" };
 
-/** `xp` is what unlocking the tier adds to the level: 0 for volume and spend families. */
-export type BadgeTier = { tier: Tier; target: number; progress: number; unlockedAt: string | null; xp: number };
+/** `name` is the tier's own title (5K, 10K…). `xp` is what unlocking it adds to the level: 0 for volume and spend families. */
+export type BadgeTier = { tier: Tier; name: string; target: number; progress: number; unlockedAt: string | null; xp: number };
 
 export type BadgeFamily = {
   id: string;
