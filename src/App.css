@@ -2768,15 +2768,12 @@ summary:focus-visible {
   background: var(--c-bg-elevated);
 }
 
-/* ---- Now: idle 5h window on one line ---- */
+/* ---- Now: idle 5h window, a single title line above today's hot spots ---- */
 .page .five-hour-session .section-title {
   border-bottom: none;
   padding-bottom: 0;
 }
 .page .five-hour-idle {
-  flex-direction: row;
-  align-items: baseline;
-  justify-content: space-between;
   padding-block: 10px;
   font-size: var(--fs-md);
 }

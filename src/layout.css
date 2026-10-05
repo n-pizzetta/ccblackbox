@@ -475,6 +475,77 @@
 }
 .five-hour-card-sub { font-weight: 400; color: var(--c-text-faint); }
 
+/* ---- Now: hot spots (biggest consumers; heat is a warning, not a trophy) ---- */
+.hot-spots { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.five-hour-idle .hot-spots { margin: 8px 0 0; }
+.five-hour-idle .section-title { flex-wrap: wrap; }
+.five-hour-idle .section-title .dim { font-weight: 400; }
+.hot-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; }
+.hot-title { font-size: var(--fs-md); font-weight: 600; color: var(--c-text-soft); }
+.hot-alert { font-size: var(--fs-md); color: var(--c-amber); }
+.hot-grid { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: 10px; }
+.hot-label { font-size: var(--fs-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-text-faint); }
+.hot-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--c-text-dim); }
+.hot-bar { display: block; height: 4px; margin-top: 4px; background: var(--c-hairline-strong); border-radius: 999px; overflow: hidden; }
+.hot-bar > span { display: block; height: 100%; background: var(--heat); border-radius: inherit; transform-origin: left; animation: grow-x 600ms var(--t-slow) both; }
+
+.hot-hero {
+  --heat: var(--c-cyan);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--heat) 40%, var(--c-hairline));
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--heat) 14%, var(--c-bg-panel)), var(--c-bg-panel) 70%);
+  overflow: hidden;
+}
+.hot-hero.heat-warm { --heat: var(--c-amber); }
+.hot-hero.heat-hot { --heat: var(--c-red); box-shadow: 0 0 24px color-mix(in srgb, var(--heat) 18%, transparent); }
+.hot-hero-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 12px 14px 10px; text-align: left; }
+.hot-hero .hot-label { color: var(--heat); }
+.hot-hero-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-lg); font-weight: 600; color: var(--c-text); }
+.hot-hero-main:hover .hot-hero-name { text-decoration: underline; text-underline-offset: 3px; }
+.hot-share { font-size: var(--fs-md); color: var(--c-text-soft); }
+.hot-share b { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.02em; color: var(--heat); }
+.hot-runners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 8px 14px;
+  font-size: var(--fs-sm);
+  border-top: 1px solid color-mix(in srgb, var(--heat) 20%, var(--c-hairline));
+}
+.hot-runners button { display: inline-flex; gap: 6px; min-width: 0; max-width: 100%; color: var(--c-text-soft); }
+.hot-runner-name { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hot-runners button:hover .hot-runner-name { color: var(--c-text); text-decoration: underline; text-underline-offset: 3px; }
+
+.hot-card {
+  --heat: var(--c-text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+}
+button.hot-card:hover { border-color: var(--c-hairline-strong); background: var(--c-bg-elevated); }
+.hot-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-base); color: var(--c-text); }
+.hot-swatch { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 2px; vertical-align: middle; }
+
+@media (max-width: 1100px) {
+  .hot-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hot-hero { grid-column: 1 / -1; }
+}
+@media (max-width: 720px) {
+  .hot-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hot-bar > span { animation: none; }
+}
+
 /* ---- Session view: Tools tab, one line per call ---- */
 .tool-seq-main {
   grid-template-columns: 64px 14px minmax(120px, 240px) minmax(0, 1fr) 60px 12px;
