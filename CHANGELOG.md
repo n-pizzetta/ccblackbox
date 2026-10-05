@@ -6,13 +6,6 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
-### Changed
-
-- **Renamed to Marey.** The plugin is `marey@marey` and its commands are `/marey:replay` and `/marey:limits`; the repository is `n-pizzetta/marey`. Data moves from `~/.claude/ccblackbox/` to `~/.claude/marey/` on first run, with a link left at the old path so an installed status line keeps working; re-run `/marey:limits` to point it at the new folder. Browser settings carry over. See *Upgrading from ccblackbox* in the README.
-- **Glass design**: a graphite palette and one glass element per view (the page navigation, or the tabs in the session view); everything else is flat or sits in one opaque card. The scope bar and header widgets are flat, headline figures share one card, table rows are rounded, numbers use the UI face with neutral amounts, and session panels get segmented toggles, neutral bars and quieter banners. The session view has a flat toolbar and a primary resume button.
-- **Next up** shows a mini card of the next tier instead of a glyph; the tier colour now lives only on that card.
-- **Badge cards**: each badge is a foil collector card whose finish is the tier (matte bronze, silver and gold sheen, holographic platinum that follows the pointer), with a line-art glyph in place of the emoji. Every tier has its own name and glyph that grows with it (Marathon: 5K, 10K, Half marathon, then Marathon, from jog to finish tape). Locked badges are face down. Progress, targets and unlock dates moved from the card to its hover card.
-
 ### Planned
 
 - Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
@@ -25,6 +18,15 @@ versioning follows [SemVer](https://semver.org/).
   macOS/Linux).
 - Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
   with mtime invalidation, so cold start doesn't re-parse the full set.
+
+## [0.4.0] — 2026-10-05
+
+### Changed
+
+- **Renamed to Marey.** The plugin is `marey@marey` and its commands are `/marey:replay` and `/marey:limits`; the repository is `n-pizzetta/marey`. Data moves from `~/.claude/ccblackbox/` to `~/.claude/marey/` on first run, with a link left at the old path so an installed status line keeps working; re-run `/marey:limits` to point it at the new folder. Browser settings carry over. See *Upgrading from ccblackbox* in the README.
+- **Glass design**: a graphite palette and one glass element per view (the page navigation, or the tabs in the session view); everything else is flat or sits in one opaque card. The scope bar and header widgets are flat, headline figures share one card, table rows are rounded, numbers use the UI face with neutral amounts, and session panels get segmented toggles, neutral bars and quieter banners. The session view has a flat toolbar and a primary resume button.
+- **Next up** shows a mini card of the next tier instead of a glyph; the tier colour now lives only on that card.
+- **Badge cards**: each badge is a foil collector card whose finish is the tier (matte bronze, silver and gold sheen, holographic platinum that follows the pointer), with a line-art glyph in place of the emoji. Every tier has its own name and glyph that grows with it (Marathon: 5K, 10K, Half marathon, then Marathon, from jog to finish tape). Locked badges are face down. Progress, targets and unlock dates moved from the card to its hover card.
 
 ## [0.3.0] — 2026-10-05
 
