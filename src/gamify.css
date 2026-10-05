@@ -1,5 +1,5 @@
-/* Gamified dashboard: tabs, hero, podium, badges, project league.
-   Kept out of App.css on purpose; delete this file + its import to revert the look. */
+/* Progression: XP chip, achievement toasts, Next up, podium, badges, project league.
+   Kept out of App.css on purpose. */
 
 :root {
   --medal-gold: #f5c451;
@@ -194,6 +194,7 @@
 /* ---- Badges ---- */
 .badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
 .badge {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -213,15 +214,104 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 9%, var(--c-bg-panel)), var(--c-bg));
 }
 .badge.unlocked .badge-name { color: var(--c-text); }
-.tier-bronze, .pip-bronze { --tier: var(--medal-bronze); }
-.tier-silver, .pip-silver { --tier: var(--medal-silver); }
-.tier-gold, .pip-gold { --tier: var(--medal-gold); }
-.tier-platinum, .pip-platinum { --tier: var(--medal-platinum); }
+.tier-bronze, .pip-bronze, .tone-bronze { --tier: var(--medal-bronze); }
+.tier-silver, .pip-silver, .tone-silver { --tier: var(--medal-silver); }
+.tier-gold, .pip-gold, .tone-gold { --tier: var(--medal-gold); }
+.tier-platinum, .pip-platinum, .tone-platinum { --tier: var(--medal-platinum); }
+.tone-level { --tier: var(--c-cyan); }
 .badge-pips { display: flex; gap: 4px; }
 .badge-pip { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--c-text-ghost); }
 .badge-pip.on { background: var(--tier); border-color: var(--tier); }
 .badge.locked .badge-icon { filter: grayscale(1); opacity: 0.4; }
 .badge.locked .badge-name { color: var(--c-text-dim); }
+.badge.fresh {
+  border-color: var(--tier);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tier) 35%, transparent), 0 0 18px color-mix(in srgb, var(--tier) 22%, transparent);
+}
+.badge.fresh .badge-icon { animation: badge-pop 600ms var(--t-slow) both; }
+.badge-new {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 0 5px;
+  font-size: var(--fs-xs);
+  line-height: 15px;
+  color: var(--c-bg);
+  background: var(--tier);
+  border-radius: 999px;
+}
+
+/* ---- Next up (Now page, Progress page) ---- */
+.next-up { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 720px) { .next-up { grid-template-columns: minmax(0, 1fr); } }
+.next-up-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--c-bg);
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+button.next-up-item:hover { border-color: color-mix(in srgb, var(--tier) 55%, var(--c-hairline)); background: var(--c-bg-panel); }
+.next-up-icon { font-size: var(--fs-xl); line-height: 1; }
+.next-up-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.next-up-name { font-size: var(--fs-base); font-weight: 500; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.next-up-tier { font-size: var(--fs-sm); font-weight: 400; color: var(--tier); }
+.next-up-item .badge-track { width: 100%; }
+.next-up-item .badge-track > span { background: var(--tier); }
+.next-up-state { font-size: var(--fs-sm); color: var(--c-text-faint); }
+
+.streak-note { margin-right: 14px; font-size: var(--fs-md); color: var(--c-text-dim); }
+.streak-note.at-risk { color: var(--c-amber); }
+
+.xp-rules { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: var(--fs-sm); }
+.xp-rules b { font-weight: 600; color: var(--c-text-soft); }
+
+/* ---- Profile chip: XP bar, streak at risk, "+N XP" ---- */
+.profile-xpbar { width: 34px; height: 4px; background: var(--c-hairline-strong); border-radius: 999px; overflow: hidden; }
+.profile-xpbar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--c-cyan), var(--c-violet)); border-radius: inherit; transition: width 600ms var(--t-slow); }
+.profile-streak.at-risk { opacity: 0.45; filter: grayscale(0.6); }
+.profile-xp .at-risk { color: var(--c-amber); }
+.profile-head { width: 100%; text-align: left; border-radius: var(--radius-md); }
+.profile-head:hover .profile-head-level { color: var(--c-cyan); }
+.xp-gain {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 10px;
+  z-index: 5;
+  padding: 1px 7px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-cyan);
+  background: color-mix(in srgb, var(--c-cyan) 14%, var(--c-bg-panel));
+  border: 1px solid color-mix(in srgb, var(--c-cyan) 35%, transparent);
+  border-radius: 999px;
+  pointer-events: none;
+  animation: xp-float 2.4s var(--t-slow) both;
+}
+.app-nav-count.new {
+  color: var(--medal-gold);
+  background: color-mix(in srgb, var(--medal-gold) 16%, transparent);
+}
+
+/* ---- Achievement toast (Toaster) ---- */
+.toast.achievement {
+  align-items: center;
+  border-color: color-mix(in srgb, var(--tier) 40%, var(--c-hairline));
+  border-left: 3px solid var(--tier);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tier) 12%, var(--c-bg-elevated)), var(--c-bg-elevated) 60%);
+  animation: toast-in 320ms var(--t-slow) both;
+}
+.toast-icon { font-size: var(--fs-xl); line-height: 1; white-space: nowrap; animation: badge-pop 600ms var(--t-slow) 120ms both; }
+.toast-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.toast-title { font-weight: 600; color: var(--c-text); }
+.toast-sub { font-size: var(--fs-sm); color: var(--c-text-dim); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.toast-action { margin-left: auto; white-space: nowrap; }
+.toast-action + .toast-close { margin-left: 0; }
 
 /* ---- Project league ---- */
 .league { display: flex; flex-direction: column; gap: 4px; }
@@ -255,6 +345,21 @@
 .league-nums { display: flex; flex-direction: column; align-items: flex-end; font-size: var(--fs-md); }
 
 /* ---- Motion ---- */
+@keyframes badge-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes xp-float {
+  0% { opacity: 0; transform: translateY(6px); }
+  12% { opacity: 1; transform: none; }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
 @keyframes rise {
   from { opacity: 0; transform: translateY(18px) scaleY(0.92); transform-origin: bottom; }
   to { opacity: 1; transform: none; }
@@ -267,6 +372,13 @@
   .podium-card.place-first { animation: none; box-shadow: 0 -8px 30px rgba(255, 100, 25, 0.28); }
   .place-first .podium-goal, .place-first .podium-value { filter: none; }
   .podium-card, .hero-track > span, .badge-track > span, .podium-rest-bar > span, .league-bar > span { animation: none; }
+  .badge.fresh .badge-icon, .toast.achievement, .toast-icon { animation: none; }
+  .xp-gain { animation-name: xp-fade; }
+  .profile-xpbar > span { transition: none; }
+}
+@keyframes xp-fade {
+  0%, 75% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 @media (max-width: 720px) {  .podium { gap: 6px; }

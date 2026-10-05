@@ -241,7 +241,11 @@ test("leaves Codex sessions out of badges", async () => {
   const state = () => ({ version: 1, startedAt: new Date(0).toISOString(), unlocked: {} });
   const now = Date.now();
   assert.ok(codex.length > 0);
-  assert.deepEqual(computeBadges(parsed.sessions, state(), now), computeBadges(claude, state(), now));
+  const all = computeBadges(parsed.sessions, state(), now);
+  const claudeOnly = computeBadges(claude, state(), now);
+  // Badges and the level's XP ignore Codex; only the streak is overall activity and counts every agent.
+  assert.deepEqual(all.families, claudeOnly.families);
+  assert.deepEqual(all.level, claudeOnly.level);
 });
 
 test("prices every seeded Codex model", () => {

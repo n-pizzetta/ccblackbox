@@ -13,6 +13,10 @@ versioning follows [SemVer](https://semver.org/).
 - Session **Timeline** tab: context fill, cumulative API value and fresh tokens per turn over time, with compactions, prompts and failed tool calls marked. It loads when you open a session, for review after the fact.
 - Demo data (`pnpm seed:demo`) now includes compactions and failed tool calls.
 - **Codex support**: sessions from the Codex CLI and IDE extension (`~/.codex/sessions/`, `$CODEX_HOME`) are parsed next to Claude Code ones: tokens (cached input apart), GPT pricing (GPT-6 and GPT-5.6 families, GPT-5.5, GPT-5.4), prompts, commands, patches, MCP calls and failures, code-mode scripts (including commands that outlive their script), sub-agents merged into their parent, thread names, the timeline against the reported context window, and `codex resume` in the session view. Rows are tagged `codex`; a Claude Code / Codex filter shows when both are present. Codex sessions stay out of Claude's 5h window, badges and Claude-specific health rules. `pnpm seed:demo` also writes `.demo-codex/`.
+- **Progress** tab (key 5, was the profile menu's Badges page) with a count of unlocks you haven't seen.
+- Achievement toasts when a badge unlocks or you level up, wherever you are in the dashboard.
+- **Next up**: the badges closest to unlocking, limited to ones that reward good practice, on the Now page and the Progress page.
+- Header chip: XP bar, "+N XP" when XP comes in, and a dimmed flame when today's streak is still to be earned.
 
 ### Changed
 
@@ -23,6 +27,10 @@ versioning follows [SemVer](https://semver.org/).
 - One type scale (nine sizes, `--fs-xs` to `--fs-3xl`), sentence-case sans labels, mono only for values and code; about 260 CSS rules for removed markup are gone.
 - Session view: one line per tool call in fixed columns, one chip style in the header, tool and file counts on the tabs, Export as a labeled button.
 - On phones the Sessions page scrolls as a whole, and the limits and the profile chip get their own header row.
+- The level now comes from XP earned by how Claude Code sessions were run (commits, tests, lint, context score, good-practice badges) instead of tokens spent. XP is kept per session in `badges.json`, so the level no longer drops when old transcripts are cleaned up or a session crashes. Level titles no longer borrow job titles.
+- Context hygiene only counts ended sessions.
+- Toasts stay while hovered, focused or in a background tab.
+- The header streak follows the badge rule: a quiet weekend no longer resets it.
 
 ### Planned
 

@@ -40,7 +40,7 @@ There is no database, no network access beyond loopback, and no runtime dependen
                          │
                          ▼
       src/App.tsx ─┬─ AppHeader · ScopeBar (+ SessionFilters) · StatsRow
-                   ├─ pages/: Now · Sessions (SessionList, SessionCompare) · Usage · Health · Badges
+                   ├─ pages/: Now · Sessions (SessionList, SessionCompare) · Usage · Health · Progress
                    └─ SessionDetail overlay (Overview · Timeline · Tools · Tokens · Files)
 ```
 
@@ -70,7 +70,7 @@ Codex (`~/.codex`, or `$CODEX_HOME`), also read-only: `sessions/YYYY/MM/DD/rollo
 - Everything ccblackbox writes by itself lives under `~/.claude/ccblackbox/`:
   - `cache/<id>.jsonl`: one line per tool call / stop, appended by the plugin hook (mode `0600`).
   - `limits.json`: latest `rate_limits` payload, written atomically by the status line wrapper. `limits-history.jsonl`: one line per change of either window (`{t, five:{p,r}, seven:{p,r}}`, trimmed at 512 KB), kept to calibrate "% of window" later.
-  - `badges.json`: `{ startedAt, unlocked }`. `startedAt` is written on the API's first parse (first launch); `unlocked` maps `<family>:<tier>` to the unlock date. See §5.
+  - `badges.json`: `{ startedAt, unlocked, xp }`. `startedAt` is written on the API's first parse (first launch); `unlocked` maps `<family>:<tier>` to the unlock date; `xp` maps a session id to the best XP it earned. See §5.
   - `live/<session_id>.json`: sanitized per-session snapshot (context size, prompt-cache state; no paths or prompts) written on every refresh; the API removes ones older than 3 days.
   - `statusline.mjs`, `context-advice.mjs`, `statusline.json`: installed wrapper, its shared helper, and the saved previous `statusLine` setting (plus `"verdict": false` to hide the terminal segment).
   - `sessions.json`: full parse dump, only when `pnpm parse` is run by hand. The app never reads it.
@@ -167,15 +167,26 @@ The 5h window in the UI (`fleet/FiveHourSession.tsx`, `utils/fleetStats.ts`):
 
 ### Badges (`scripts/badges.mjs`)
 
-Computed server-side after every parse (`updateBadges` in the API), because they need full sessions (`shell`, `timeline`, `turns`) that the list payload omits. `fleet/Badges.tsx` fetches `/api/badges` whenever the session list changes.
+Computed server-side after every parse (`updateBadges` in the API), because they need full sessions (`shell`, `timeline`, `turns`) that the list payload omits. `App` fetches `/api/badges` whenever the session list changes (`useBadges`) and hands it to the header, the Now page and the Progress page.
 
-- **Only Claude Code sessions count**: Codex tools and models don't map onto the families (Editor, Researcher, model tourist…), and unlocks are permanent. The profile chip's level and activity streak (`utils/gamify.ts`) are overall activity and count every agent.
+- **Only Claude Code sessions count**: Codex tools and models don't map onto the families (Editor, Researcher, model tourist…), and unlocks are permanent. The level's XP ignores Codex too, since it is banked for good and Codex sessions have no context score; only the current streak (below) is overall activity and counts every agent.
 - **Only sessions started after the first launch count** (`badges.json` `startedAt`). History stays in every other view; badges start from zero so they feel earned and don't depend on how much transcript history Claude Code kept (`cleanupPeriodDays`).
 - **Unlocks are permanent**: stored with their date, so they survive transcript cleanup and 30-day windows sliding past them.
 - **Families**: one metric per family, tiers only raise the target, so a lower tier can never be harder than a higher one. Some families have 2 or 3 tiers; `oneshot` starts at gold.
 - **Calibration**: per-session records (Marathon, Orchestrator, File surgeon, Toolbox, Juggler) by rarity across real sessions; cumulative counters by time for a heavy user: bronze on day 1, silver in 1–2 weeks, gold in ~3 months, platinum in ~1 year.
 - **Continuous work**: Marathon, Juggler and Hours use stretches of main-thread activity (turns and prompts) where no pause exceeds 15 minutes (`RUN_GAP_MS`), not `durationMs`, which accumulates capped gaps over sessions left open for days. Hours counts the union of stretches, so parallel sessions count once.
 - **Streak** skips quiet Saturdays and Sundays.
+- **Next up**: families flagged `nudge` reward good practice (tests, lint, commits, PRs, plan mode, cache, context hygiene, outcomes). Only they are suggested as the next goal, the locked tier closest to its target (`nextUp` in `utils/gamify.ts`), and only they add XP. Volume and spend families (Orchestrator, Juggler, Veteran…) still unlock but are never pushed and earn no XP. Streak isn't flagged: its badge is the best run since the first launch, which would contradict the current streak shown next to it.
+- **Context hygiene** only counts ended sessions: a live session scores high early and falls as its context grows.
+
+### Level, XP and streak (also `scripts/badges.mjs`, in the `/api/badges` payload)
+
+- **XP rewards how sessions were run, never spend.** Per session: 5+ main-thread turns +1, a commit +3, tests +2, lint / typecheck / build +2, context score 90+ +1, so 9 at most. On real history nearly every session reaches 5 turns and a score of 90, so shipping and checks are weighted to make most of the XP. A good-practice badge adds 5 / 15 / 40 / 100 for its first to fourth tier when it unlocks, whatever the tier's color: One-shot, which starts at gold, earns 5 then 15 (`xp` on each tier in the payload). Like badges, only Claude Code sessions earn it; unlike badges, every session counts, including ones from before the first launch, so a new user starts at a real level.
+- **XP is banked**: `badges.json` `xp` keeps each session's best score, so the level never drops when Claude Code deletes old transcripts, a session falls back to its `/insights` meta or its process crashes. A live session banks what can only go up (turns, commit, tests, lint); its context point stays provisional until it ends, since the score falls as the context grows. Ghosts earn nothing.
+- **Level** n starts at 4 × (n − 1)² XP: a few levels on day one, then one every week or two for a heavy user (a heavy user with months of history opens around level 25). Titles change at levels 5, 10, 15, 20, 25, 30, 40 and 50.
+- **Today** is the XP of the sessions worked in since local midnight (whenever they started) plus badges unlocked today.
+- **Current streak** uses the badge streak's rule over all non-ghost sessions: quiet weekends are skipped, a quiet weekday ends it. A quiet weekday *today* doesn't end it yet; it is `atRisk` (the flame dims in the header and the Now page says "not yet today").
+- **Moments** (`utils/progress.ts`, `useProgressEvents`): `localStorage` `ccblackbox:progress` holds the unlocks already announced, the unlocks already seen on the Progress page and the highest level announced. A new unlock or level-up raises an achievement toast (several unlocks at once share one); unlocks not yet seen count on the Progress tab and are flagged "new" there. The first run records the current state silently; a payload without a level (before the first parse) is ignored; nothing is announced while the tab is hidden, so a background tab doesn't use up a toast. Toasts pause while hovered, focused or hidden. The header chip shows "+N XP" for a moment whenever XP grows while the dashboard is open.
 - `sniper` and `comeback` need `/insights` facets; `hygiene` needs scored sessions (5+ turns). They are hidden (`available: false`) when no session has that data.
 - The shell-based families only see commands run by Claude, not ones typed in another terminal.
 
@@ -216,7 +227,7 @@ Shared by the production server and the Vite dev server, so both expose the same
 | GET | `/api/sessions` | Session summaries + `errors` + `models` overrides + `generatedAt`. | `ETag` / `If-None-Match` → 304; `cache-control: no-cache`. |
 | GET | `/api/sessions/:id` | Full session from the cache. | id must be a 36-char UUID; 404 if unknown. |
 | GET | `/api/file-history/:id/:hash@v:n` | Raw snapshot from `file-history/`. | id and file name regex-validated (no path traversal). |
-| GET | `/api/badges` | Badge families with per-tier progress and unlock dates (§5). | `no-store`. |
+| GET | `/api/badges` | Badge families with per-tier progress and unlock dates, level and XP, current streak (§5). | `no-store`. |
 | GET | `/api/limits` | `readLimits()` or `null`. | `no-store`. |
 | GET | `/api/live-context` | `readLiveContext()`: context / prompt-cache snapshots per session, newest first. | `no-store`. |
 | GET | `/api/report-status` | Whether `usage-data/report.html` exists, and its mtime. | `no-store`. |
@@ -256,33 +267,34 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 
 ### State and routing (`App.tsx`)
 
-- Page (`now` / `sessions` / `usage` / `health` / `badges`, see `utils/pages.ts`), selected session, range (`today` / `7d` / `30d` / `all`), list filter (`all`, `live`, `ghost`, `friction`, `failed`, `lowquality`), project and search are mirrored to the URL hash (`#<page>?range=…&filter=…&project=…&q=…`, or `#session/<id>?…` while a session is open; Now has no path) and to `localStorage` (`ccblackbox:state`).
-- **Scope.** Sessions, Usage and Health follow the range and filters and show the scope bar and the headline tiles (`StatsRow`); Now and Badges ignore them and say so in their headings. The table sort (`utils/sortSessions.ts`) also orders ↑ / ↓ in the session view.
+- Page (`now` / `sessions` / `usage` / `health` / `badges`, the last labeled "Progress", see `utils/pages.ts`), selected session, range (`today` / `7d` / `30d` / `all`), list filter (`all`, `live`, `ghost`, `friction`, `failed`, `lowquality`), project and search are mirrored to the URL hash (`#<page>?range=…&filter=…&project=…&q=…`, or `#session/<id>?…` while a session is open; Now has no path) and to `localStorage` (`ccblackbox:state`).
+- **Scope.** Sessions, Usage and Health follow the range and filters and show the scope bar and the headline tiles (`StatsRow`); Now and Progress ignore them and say so in their headings. The table sort (`utils/sortSessions.ts`) also orders ↑ / ↓ in the session view.
 - The detail view merges the list summary with the fetched full session.
-- Keyboard: `1`–`4` (Now, Sessions, Usage, Health), `j`/`k` or arrows (next/previous session while one is open), `Esc` (close), `?` (help).
+- Keyboard: `1`–`5` (Now, Sessions, Usage, Health, Progress), `j`/`k` or arrows (next/previous session while one is open), `Esc` (close), `?` (help).
 
 ### Components
 
 | Component | Role |
 |---|---|
-| `AppHeader` | Brand, page navigation (session count on Sessions, failing checks on Health), `LimitsPill`, `ParseErrors`, `ProfileMenu`. |
+| `AppHeader` | Brand, page navigation (session count on Sessions, failing checks on Health, unseen unlocks on Progress), `LimitsPill`, `ParseErrors`, `ProfileMenu`. |
 | `ScopeBar` / `SessionFilters` | Range, project and status pickers (counts from the range, before filtering; ghosts split by crashed / empty in the tooltip; Claude Code / Codex when both are present), search, the resulting count and a reset. Clicking a project in the sessions table filters on it. |
 | `Kpi` / `KpiRow` | The one headline-tile style (label, value, context line), used by `StatsRow`, the session view and the 5h window. Up to six tiles share a row. |
 | `LimitsPill` | The 5h and 7-day usage windows (fill, elapsed-time tick, reset countdown); rendered in the top bar and in the session view so they are always on screen. |
 | `units` (`utils/units.ts`, `UnitSetting`) | Display unit for usage: **tokens** (fresh = input + output + cache writes; cached reads are shown apart) or **API value** ($ at API prices, read as a relative weight, since a subscription is limited by the 5h / 7d windows rather than dollars). Persisted in `localStorage` (`ccblackbox:unit`), set from the profile menu. Rankings by weight (podium "Heaviest", project league) use API value. The podium "Longest" ranks by `longestRunMs` (longest main-thread stretch with no pause over 15 min), not `durationMs`, which adds up to 5 min per gap and so favors sessions left open for days. |
-| `ParseErrors` / `ProfileMenu` | Top-bar badge listing unreadable session-meta files with a Trash action (only shown when there are some). Profile chip (data status dot, level, streak) opening a menu: level progress, links to the Badges page and Health, usage unit, data status and insights report, `LimitsSection`, keyboard shortcuts, bug report link. |
+| `ParseErrors` / `ProfileMenu` | Top-bar badge listing unreadable session-meta files with a Trash action (only shown when there are some). Profile chip (data status dot, level, XP bar, streak, dimmed when at risk; "+N XP" when XP comes in) opening a menu: level progress and today's XP (opens Progress), Health link, usage unit, data status and insights report, `LimitsSection`, keyboard shortcuts, bug report link. |
 | `StatsStrip` (`StatsRow`) | Headline tiles of the scope: sessions, active time, API value, fresh tokens. |
 | `SessionList` | The sessions table: status glyph (live, ghost, cleared, or an outcome dot filled as far as the goal was met), goal, project, flags (Codex tag, friction, plugin capture), usage, active time, start; sortable headers; day headers when sorted by date; virtualized. Also renders the short lists of the Now page, and `BulkGhostBar`. |
 | `SessionCompare` | Side-by-side metrics for selected sessions. |
 | `SessionDetail` | Full-screen overlay: header (outcome, project, model, "Copy resume command", export), a context / cache banner (`ContextCard`), live / cleared-chain / ghost banners (reveal, delete), and five tabs: **Overview** (headline tiles from `SessionOverview`, then two columns: prompts timeline / list in the chosen usage unit on the left, frictions and small previews of the Tools, Tokens and Files tabs with "See all" links on the right; the summary is hidden when it repeats the goal), **Timeline** (`SessionTimeline`, data from `src/utils/sessionTimeline.ts`: context fill per main-thread turn against a 200k or 1M window, compactions detected as a drop below half of the previous context, cumulative API value, fresh tokens per turn, prompts and tool calls with failures; idle gaps over 5 minutes are shortened; clicking a prompt focuses the Tools tab on it), **Tools** (tool counts and sequence with results, can be focused on one prompt), **Tokens** (headline tiles, then volume and cost per token kind in one panel), **Files** (file-history versions with diffs via `diff`). |
 | `HelpOverlay` | Keyboard shortcuts, the table glyphs, glossary, data sources. |
+| `Toaster` | Error toasts (`toastError`) and achievement toasts (`toastAchievement`: tier-colored, with a View action). |
 
 `pages/` (one question each) compose `fleet/`:
-- **Now**: `LiveTicker` (one line of live burn), `FiveHourSession` (current 5h window, per-session / prompt / tool / project share; all sessions, ignoring the scope), then live sessions, or the latest ones when none runs.
+- **Now**: `LiveTicker` (one line of live burn), `FiveHourSession` (current 5h window, per-session / prompt / tool / project share; all sessions, ignoring the scope), a **Next up** strip (level, today's XP, streak and the three closest good-practice badges), then live sessions, or the latest ones when none runs.
 - **Sessions**: the table, and `SessionCompare` beside it in compare mode (up to 3), or `BulkGhostBar` when the ghost filter is on.
 - **Usage**: `TokenTimeSeries`, then `ProjectRollup`, `ModelMix` and `ToolsHeatmap` side by side, then `HeavyPrompts`.
 - **Health**: `HealthCheck` (rule checklist, score in its heading), `AnomalyFlags`.
-- **Badges** (from the profile menu): level and streak, `TopSessions` as all-time records (podium, `FireCanvas`), `Badges`.
+- **Progress** (page id `badges`, key 5): level, next level, today's XP and streak, the XP rules, **Next up** (six), `Badges` (unseen unlocks flagged "new"), then `TopSessions` as all-time records (podium, `FireCanvas`).
 
 `BurnSpikeBanner` (+ `SpikeAnalysisOverlay`, `SpikeHeuristics`) shows above any page.
 

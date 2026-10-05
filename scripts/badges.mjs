@@ -62,6 +62,8 @@ function dayKey(ms) {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+const isWeekend = (d) => d.getDay() === 0 || d.getDay() === 6;
+
 /** Longest run of active days; a quiet Saturday or Sunday does not break it. */
 function bestWeekdayStreak(days, fromMs, toMs) {
   let cur = 0;
@@ -69,11 +71,28 @@ function bestWeekdayStreak(days, fromMs, toMs) {
   const d = new Date(fromMs);
   d.setHours(12, 0, 0, 0);
   for (; d.getTime() <= toMs; d.setDate(d.getDate() + 1)) {
-    const weekend = d.getDay() === 0 || d.getDay() === 6;
     if (days.has(dayKey(d.getTime()))) best = Math.max(best, ++cur);
-    else if (!weekend) cur = 0;
+    else if (!isWeekend(d)) cur = 0;
   }
   return best;
+}
+
+/**
+ * The streak still alive today, by the same rule as bestWeekdayStreak. A quiet
+ * today doesn't end it yet: on a weekday it is only at risk.
+ */
+export function currentStreak(days, now = Date.now()) {
+  const d = new Date(now);
+  d.setHours(12, 0, 0, 0);
+  const activeToday = days.has(dayKey(d.getTime()));
+  const weekday = !isWeekend(d);
+  let current = activeToday ? 1 : 0;
+  for (let i = 0; i < 3650; i++) {
+    d.setDate(d.getDate() - 1);
+    if (days.has(dayKey(d.getTime()))) current++;
+    else if (!isWeekend(d)) break;
+  }
+  return { current, activeToday, atRisk: current > 0 && !activeToday && weekday };
 }
 
 /** Most runs overlapping at one instant (sweep over start/end events). */
@@ -105,7 +124,8 @@ function unionMs(runs) {
 /**
  * `metric(ctx)` returns the family's value, or one value per tier when tiers
  * measure different thresholds (cache, sniper). `targets` lines up with TIERS,
- * starting at `firstTier`.
+ * starting at `firstTier`. `nudge` marks families that reward good practice:
+ * only they are suggested as the next goal ("Next up"), never volume or spend.
  */
 const FAMILIES = [
   // Per-session records (rarity)
@@ -114,22 +134,22 @@ const FAMILIES = [
   { id: "surgeon", name: "File surgeon", icon: "🩺", hint: "Most files changed in one session", targets: [5, 10, 25, 50], metric: (c) => max(c.sessions, (s) => s.filesChanged) },
   { id: "toolbox", name: "Toolbox", icon: "🧰", hint: "Most distinct tools used in one session", targets: [8, 10, 15], metric: (c) => max(c.sessions, (s) => Object.keys(s.toolCounts ?? {}).length) },
   { id: "juggler", name: "Juggler", icon: "🤹", hint: "Sessions actively running at the same time", targets: [2, 3, 5, 8], metric: (c) => maxOverlap(c.runs) },
-  { id: "oneshot", name: "One-shot", icon: "🏹", hint: "Sessions where a single prompt ended in a commit", firstTier: 2, targets: [1, 5], metric: (c) => count(c.sessions, (s) => (s.prompts?.length ?? 0) === 1 && s.commits > 0) },
+  { id: "oneshot", nudge: true, name: "One-shot", icon: "🏹", hint: "Sessions where a single prompt ended in a commit", firstTier: 2, targets: [1, 5], metric: (c) => count(c.sessions, (s) => (s.prompts?.length ?? 0) === 1 && s.commits > 0) },
 
   // Rolling 30 days
-  { id: "shipper", name: "Shipper", icon: "🚢", window: "30d", hint: "Days with a commit made by Claude in the last 30 days", targets: [3, 8, 15, 22], metric: (c) => c.commitDays30 },
-  { id: "cache", name: "Cache keeper", icon: "🧊", window: "30d", hint: "Sessions over 100k tokens in the last 30 days with a cache hit of 95% (bronze, silver) or 98% (gold)", targets: [1, 10, 25], metric: (c) => [c.cache95, c.cache95, c.cache98] },
-  { id: "streak", name: "Streak", icon: "🔥", hint: "Consecutive active days; quiet weekends don't break it", targets: [3, 7, 14, 30], metric: (c) => c.streak },
+  { id: "shipper", nudge: true, name: "Shipper", icon: "🚢", window: "30d", hint: "Days with a commit made by Claude in the last 30 days", targets: [3, 8, 15, 22], metric: (c) => c.commitDays30 },
+  { id: "cache", nudge: true, name: "Cache keeper", icon: "🧊", window: "30d", hint: "Sessions over 100k tokens in the last 30 days with a cache hit of 95% (bronze, silver) or 98% (gold)", targets: [1, 10, 25], metric: (c) => [c.cache95, c.cache95, c.cache98] },
+  { id: "streak", name: "Streak", icon: "🔥", hint: "Best run of active days in a row since ccblackbox first ran; quiet weekends don't break it", targets: [3, 7, 14, 30], metric: (c) => c.streak },
 
   // Shipping and rigor (shell commands run by Claude)
-  { id: "pr", name: "PR opener", icon: "🔀", hint: "Pull requests opened with gh pr create", targets: [1, 10, 200, 1000], metric: (c) => sum(c.sessions, (s) => s.shell?.prs ?? 0) },
-  { id: "tester", name: "Tester", icon: "🧪", hint: "Sessions that ran tests", targets: [1, 10, 100, 300], metric: (c) => count(c.sessions, (s) => s.shell?.tests > 0) },
-  { id: "gatekeeper", name: "Gatekeeper", icon: "🚦", hint: "Sessions that ran a lint, typecheck or build", targets: [1, 10, 100, 300], metric: (c) => count(c.sessions, (s) => s.shell?.lints > 0) },
+  { id: "pr", nudge: true, name: "PR opener", icon: "🔀", hint: "Pull requests opened with gh pr create", targets: [1, 10, 200, 1000], metric: (c) => sum(c.sessions, (s) => s.shell?.prs ?? 0) },
+  { id: "tester", nudge: true, name: "Tester", icon: "🧪", hint: "Sessions that ran tests", targets: [1, 10, 100, 300], metric: (c) => count(c.sessions, (s) => s.shell?.tests > 0) },
+  { id: "gatekeeper", nudge: true, name: "Gatekeeper", icon: "🚦", hint: "Sessions that ran a lint, typecheck or build", targets: [1, 10, 100, 300], metric: (c) => count(c.sessions, (s) => s.shell?.lints > 0) },
   { id: "infra", name: "Infra", icon: "🏗️", hint: "Sessions that ran docker, kubectl, terraform, gcloud…", targets: [1, 10, 50, 200], metric: (c) => count(c.sessions, (s) => s.shell?.infra > 0) },
   { id: "explorer", name: "Explorer", icon: "🧭", hint: "Projects with at least one commit", targets: [2, 5, 15, 40], metric: (c) => new Set(c.sessions.filter((s) => s.commits > 0).map((s) => s.project)).size },
 
   // Ways of working
-  { id: "planner", name: "Planner", icon: "🗺️", hint: "Sessions that went through plan mode", targets: [1, 10, 50, 200], metric: (c) => count(c.sessions, (s) => s.toolCounts?.ExitPlanMode > 0) },
+  { id: "planner", nudge: true, name: "Planner", icon: "🗺️", hint: "Sessions that went through plan mode", targets: [1, 10, 50, 200], metric: (c) => count(c.sessions, (s) => s.toolCounts?.ExitPlanMode > 0) },
   { id: "researcher", name: "Researcher", icon: "🔎", hint: "Sessions that searched or fetched the web", targets: [1, 10, 50, 150], metric: (c) => count(c.sessions, (s) => s.toolCounts?.WebSearch > 0 || s.toolCounts?.WebFetch > 0) },
   { id: "skills", name: "Skill user", icon: "🪄", hint: "Sessions that used a skill", targets: [1, 10, 75, 200], metric: (c) => count(c.sessions, (s) => s.toolCounts?.Skill > 0) },
   { id: "mcp", name: "MCP collector", icon: "🔌", hint: "Distinct MCP servers used", targets: [1, 4, 8, 12], metric: (c) => new Set(c.sessions.flatMap((s) => Object.keys(s.toolCounts ?? {}).filter((k) => k.startsWith("mcp:")))).size },
@@ -141,9 +161,9 @@ const FAMILIES = [
   { id: "editor", name: "Editor", icon: "✍️", hint: "Edit and Write calls", targets: [100, 1000, 10_000, 40_000], metric: (c) => sum(c.sessions, (s) => (s.toolCounts?.Edit ?? 0) + (s.toolCounts?.Write ?? 0) + (s.toolCounts?.MultiEdit ?? 0)) },
 
   // Need /insights facets or scored sessions; hidden without them.
-  { id: "sniper", name: "Sniper", icon: "🎯", requires: "insights", hint: "Fully achieved sessions: any (bronze), with under 2 frictions (silver), with none (gold). Needs /insights", targets: [1, 5, 10], metric: (c) => [count(c.sessions, (s) => s.outcome === "fully_achieved"), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length < 2), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length === 0)] },
-  { id: "comeback", name: "Comeback", icon: "🧗", requires: "insights", hint: "Sessions that hit friction and still got (mostly) done. Needs /insights", targets: [1, 10, 75, 200], metric: (c) => count(c.sessions, (s) => s.frictions.length > 0 && succeeded(s)) },
-  { id: "hygiene", name: "Context hygiene", icon: "🫧", requires: "quality", hint: "Sessions with a context quality score of 90+", targets: [1, 25, 100, 300], metric: (c) => count(c.sessions, (s) => (s.quality?.score ?? 0) >= 90) },
+  { id: "sniper", nudge: true, name: "Sniper", icon: "🎯", requires: "insights", hint: "Fully achieved sessions: any (bronze), with under 2 frictions (silver), with none (gold). Needs /insights", targets: [1, 5, 10], metric: (c) => [count(c.sessions, (s) => s.outcome === "fully_achieved"), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length < 2), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length === 0)] },
+  { id: "comeback", nudge: true, name: "Comeback", icon: "🧗", requires: "insights", hint: "Sessions that hit friction and still got (mostly) done. Needs /insights", targets: [1, 10, 75, 200], metric: (c) => count(c.sessions, (s) => s.frictions.length > 0 && succeeded(s)) },
+  { id: "hygiene", nudge: true, name: "Context hygiene", icon: "🫧", requires: "quality", hint: "Ended sessions with a context quality score of 90+", targets: [1, 25, 100, 300], metric: (c) => count(c.sessions, (s) => !s.live && (s.quality?.score ?? 0) >= 90) },
 ];
 
 function count(arr, fn) { let n = 0; for (const x of arr) if (fn(x)) n++; return n; }
@@ -152,6 +172,57 @@ function max(arr, fn) { let n = 0; for (const x of arr) n = Math.max(n, fn(x)); 
 
 /** Total badge count (one per family tier), for docs and sanity checks. */
 export const BADGE_COUNT = FAMILIES.reduce((a, f) => a + f.targets.length, 0);
+
+/* ---- XP and level ---- */
+
+/**
+ * XP rewards how a session was run, never how much it spent. Like badges, only
+ * Claude Code sessions earn it; unlike badges, sessions from before the first
+ * launch count, so the level is real on day one.
+ * Calibrated on real history so shipping and checks (commit, tests, lint) make
+ * most of it: nearly every session reaches 5 turns and a context score of 90.
+ */
+const SESSION_XP = [
+  { label: "5+ turns", points: 1, test: (s) => (s.turns ?? []).filter((t) => !t.sidechain).length >= 5 },
+  { label: "commit", points: 3, test: (s) => s.commits > 0 },
+  { label: "tests", points: 2, test: (s) => s.shell?.tests > 0 },
+  { label: "lint, typecheck or build", points: 2, test: (s) => s.shell?.lints > 0 },
+  // Provisional while the session runs: the score falls as the context grows.
+  { label: "context score 90+", points: 1, provisional: true, test: (s) => (s.quality?.score ?? 0) >= 90 },
+];
+/**
+ * XP for a family's first, second, third and fourth tier, whatever their
+ * color: One-shot starts at gold for rarity, but its first step is worth 5.
+ * Only good-practice badges (`nudge`) add XP: volume and spend badges unlock
+ * but earn nothing.
+ */
+const STEP_XP = [5, 15, 40, 100];
+const FAMILY_BY_ID = new Map(FAMILIES.map((f) => [f.id, f]));
+function tierXp(familyId, tier) {
+  const f = FAMILY_BY_ID.get(familyId);
+  return f?.nudge ? STEP_XP[TIERS.indexOf(tier) - (f.firstTier ?? 0)] ?? 0 : 0;
+}
+/** Level n starts at LEVEL_UNIT × (n-1)²: a new user levels up daily, a heavy one every week or two. */
+const LEVEL_UNIT = 4;
+const LEVEL_TITLES = [[1, "Rookie"], [5, "Apprentice"], [10, "Builder"], [15, "Artisan"], [20, "Expert"], [25, "Master"], [30, "Virtuoso"], [40, "Grandmaster"], [50, "Legend"]];
+
+/** `settled: false` leaves out what can still drop while the session runs. */
+export function sessionXp(s, settled = true) {
+  return sum(SESSION_XP, (r) => (r.test(s) && (settled || !r.provisional) ? r.points : 0));
+}
+
+export function levelOf(xp) {
+  const level = Math.floor(Math.sqrt(xp / LEVEL_UNIT)) + 1;
+  return {
+    level,
+    title: LEVEL_TITLES.findLast(([from]) => level >= from)[1],
+    xp,
+    from: LEVEL_UNIT * (level - 1) ** 2,
+    next: LEVEL_UNIT * level ** 2,
+  };
+}
+
+const XP_RULES = SESSION_XP.map(({ label, points }) => ({ label, points }));
 
 /* ---- Context ---- */
 
@@ -196,10 +267,11 @@ export async function loadBadgeState(path, now = Date.now()) {
   try {
     const st = JSON.parse(await fsp.readFile(path, "utf8"));
     if (typeof st.startedAt === "string" && !Number.isNaN(Date.parse(st.startedAt))) {
-      return { startedAt: st.startedAt, unlocked: st.unlocked && typeof st.unlocked === "object" ? st.unlocked : {} };
+      const obj = (v) => (v && typeof v === "object" ? v : {});
+      return { startedAt: st.startedAt, unlocked: obj(st.unlocked), xp: obj(st.xp) };
     }
   } catch { /* missing or unreadable: start fresh */ }
-  const fresh = { startedAt: new Date(now).toISOString(), unlocked: {} };
+  const fresh = { startedAt: new Date(now).toISOString(), unlocked: {}, xp: {} };
   await saveBadgeState(path, fresh);
   return fresh;
 }
@@ -218,8 +290,10 @@ export async function saveBadgeState(path, state) {
 /* ---- Compute ---- */
 
 /**
- * Progress for every family. Records new unlocks in `state.unlocked`
- * (`<family>:<tier>` → ISO date) and returns whether it changed.
+ * Progress for every family, the level and the current streak. Records new
+ * unlocks in `state.unlocked` (`<family>:<tier>` → ISO date) and each
+ * session's best XP in `state.xp` (id → points, so the level never drops when
+ * Claude Code cleans up old transcripts), and returns whether either changed.
  */
 export function computeBadges(allSessions, state, now = Date.now()) {
   const since = Date.parse(state.startedAt);
@@ -233,6 +307,28 @@ export function computeBadges(allSessions, state, now = Date.now()) {
   };
 
   let changed = false;
+  state.xp ??= {};
+  const midnight = new Date(now).setHours(0, 0, 0, 0);
+  const days = new Set();
+  let xpToday = 0;
+  let xpLive = 0;
+  for (const s of allSessions) {
+    if (s.ghost) continue;
+    const acts = activity(s);
+    for (const ts of acts) days.add(dayKey(ts));
+    // The streak is activity with any agent; XP is banked for good, so Codex (no context score) earns none.
+    if (s.agent === "codex") continue;
+    const earned = sessionXp(s);
+    // A live session banks what can only go up (so a crash keeps it); its context point stays provisional.
+    const bankable = s.live ? sessionXp(s, false) : earned;
+    if (bankable > (state.xp[s.id] ?? 0)) {
+      state.xp[s.id] = bankable;
+      changed = true;
+    }
+    if (s.live) xpLive += Math.max(0, earned - (state.xp[s.id] ?? 0));
+    if (acts.at(-1) >= midnight) xpToday += Math.max(state.xp[s.id] ?? 0, earned);
+  }
+
   const families = FAMILIES.map((f) => {
     const raw = f.metric(ctx);
     const first = f.firstTier ?? 0;
@@ -244,7 +340,7 @@ export function computeBadges(allSessions, state, now = Date.now()) {
         state.unlocked[key] = new Date(now).toISOString();
         changed = true;
       }
-      return { tier, target, progress: Math.min(progress, target), unlockedAt: state.unlocked[key] ?? null };
+      return { tier, target, progress: Math.min(progress, target), unlockedAt: state.unlocked[key] ?? null, xp: tierXp(f.id, tier) };
     });
     return {
       id: f.id,
@@ -254,9 +350,25 @@ export function computeBadges(allSessions, state, now = Date.now()) {
       unit: f.unit ?? null,
       window: f.window ?? "ever",
       available: f.requires ? available[f.requires] : true,
+      nudge: f.nudge ?? false,
       tiers,
     };
   });
 
-  return { startedAt: state.startedAt, total: BADGE_COUNT, families, changed };
+  let xp = sum(Object.values(state.xp), (n) => n) + xpLive;
+  for (const [key, at] of Object.entries(state.unlocked)) {
+    const [id, tier] = key.split(":");
+    const points = tierXp(id, tier);
+    xp += points;
+    if (Date.parse(at) >= midnight) xpToday += points;
+  }
+
+  return {
+    startedAt: state.startedAt,
+    total: BADGE_COUNT,
+    families,
+    level: { ...levelOf(xp), today: xpToday, rules: XP_RULES, stepXp: STEP_XP },
+    streak: currentStreak(days, now),
+    changed,
+  };
 }

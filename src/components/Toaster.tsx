@@ -1,42 +1,83 @@
-import { useEffect, useState } from "react";
-import { TOAST_EVENT } from "../utils/toast";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { TOAST_EVENT, type ToastDetail } from "../utils/toast";
+import { useDocumentVisible } from "../utils/visibility";
 
-interface Toast {
-  id: number;
-  message: string;
-}
+type Toast = ToastDetail & { id: number };
 
 let nextId = 1;
+const LIFETIME_MS = { error: 6000, achievement: 8000 };
 
+/** The live region stays mounted so screen readers announce the first toast too. */
 export function Toaster() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   useEffect(() => {
     const onToast = (e: Event) => {
-      const id = nextId++;
-      const message = String((e as CustomEvent).detail);
-      setToasts((t) => [...t, { id, message }]);
-      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 6000);
+      const detail = (e as CustomEvent<ToastDetail>).detail;
+      setToasts((t) => [...t, { ...detail, id: nextId++ }]);
     };
     window.addEventListener(TOAST_EVENT, onToast);
     return () => window.removeEventListener(TOAST_EVENT, onToast);
   }, []);
 
-  if (toasts.length === 0) return null;
+  const dismiss = useCallback((id: number) => setToasts((all) => all.filter((x) => x.id !== id)), []);
   return (
     <div className="toaster" role="status" aria-live="polite">
-      {toasts.map((t) => (
-        <div key={t.id} className="toast">
-          <span>{t.message}</span>
-          <button
-            className="toast-close"
-            aria-label="Dismiss"
-            onClick={() => setToasts((all) => all.filter((x) => x.id !== t.id))}
-          >
-            ✕
-          </button>
-        </div>
-      ))}
+      {toasts.map((t) => <ToastItem key={t.id} toast={t} onDismiss={dismiss} />)}
+    </div>
+  );
+}
+
+/** Dismisses itself after its lifetime, paused while hovered, focused or in a background tab. */
+function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: (id: number) => void }) {
+  const [held, setHeld] = useState(false);
+  const visible = useDocumentVisible();
+  const remaining = useRef(LIFETIME_MS[t.kind]);
+  useEffect(() => {
+    if (held || !visible) return;
+    const start = Date.now();
+    const timer = setTimeout(() => onDismiss(t.id), remaining.current);
+    return () => {
+      clearTimeout(timer);
+      remaining.current -= Date.now() - start;
+    };
+  }, [held, visible, onDismiss, t.id]);
+
+  const hold = {
+    onMouseEnter: () => setHeld(true),
+    onMouseLeave: () => setHeld(false),
+    onFocus: () => setHeld(true),
+    onBlur: () => setHeld(false),
+  };
+  const close = <button className="toast-close" aria-label="Dismiss" onClick={() => onDismiss(t.id)}>✕</button>;
+
+  if (t.kind === "error") {
+    return (
+      <div className="toast" {...hold}>
+        <span>{t.message}</span>
+        {close}
+      </div>
+    );
+  }
+  return (
+    <div className={`toast achievement tone-${t.tone}`} {...hold}>
+      <span className="toast-icon" aria-hidden="true">{t.icon}</span>
+      <span className="toast-body">
+        <span className="toast-title">{t.title}</span>
+        {t.sub && <span className="toast-sub mono">{t.sub}</span>}
+      </span>
+      {t.action && (
+        <button
+          className="link-btn toast-action"
+          onClick={() => {
+            t.action!.run();
+            onDismiss(t.id);
+          }}
+        >
+          {t.action.label}
+        </button>
+      )}
+      {close}
     </div>
   );
 }

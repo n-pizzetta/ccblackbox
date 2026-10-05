@@ -24,6 +24,8 @@ import { useRateLimits } from "./utils/rateLimits";
 import { useBurnTracker, type Spike } from "./utils/burnTracker";
 import { useUnit } from "./utils/units";
 import { NAV_PAGES, PAGE_IDS, SCOPED_PAGES, type Page } from "./utils/pages";
+import { useBadges } from "./utils/gamify";
+import { useProgressEvents } from "./utils/progress";
 import "./gamify.css";
 import "./App.css";
 import "./shell.css";
@@ -123,6 +125,14 @@ function App() {
   /** Sessions that count against the Claude usage limits: 5h window, burn rate, spikes. Codex has its own. */
   const limitSessions = useMemo(() => allSessions.filter((s) => s.agent !== "codex"), [allSessions]);
   const burn = useBurnTracker(limitSessions, limits);
+  // Refetched after each parse; announces unlocks and level-ups wherever the user is.
+  const badges = useBadges(allSessions);
+  const openProgress = () => {
+    setSelectedIdInternal(null);
+    setPage("badges");
+  };
+  // Not while loading: the Toaster isn't mounted yet, so announcements would be lost.
+  const progress = useProgressEvents(source === "loading" ? null : badges, openProgress);
 
   useEffect(() => {
     const state: PersistedState = { page, id: selectedId, range, filter, project: projectFilter, search };
@@ -312,7 +322,9 @@ function App() {
         onPageChange={setPage}
         sessionCount={filtered.length}
         healthIssues={healthIssues}
-        allSessions={allSessions}
+        unseenUnlocks={page === "badges" ? 0 : progress.unseen.size}
+        level={badges?.level ?? null}
+        streak={badges?.streak ?? null}
         source={source}
         generatedAt={generatedAt}
         reportStatus={reportStatus}
@@ -355,8 +367,10 @@ function App() {
             allSessions={allSessions}
             limitSessions={limitSessions}
             limits={limits}
+            badges={badges}
             onSelectSession={setSelectedId}
             onShowAllSessions={() => setPage("sessions")}
+            onOpenProgress={openProgress}
           />
         )}
         {page === "sessions" && (
@@ -417,7 +431,15 @@ function App() {
         {page === "health" && (
           <HealthPage sessions={scopedFiltered} allSessions={allSessions} onSelectSession={setSelectedId} />
         )}
-        {page === "badges" && <BadgesPage allSessions={allSessions} onSelectSession={setSelectedId} />}
+        {page === "badges" && (
+          <BadgesPage
+            allSessions={allSessions}
+            badges={badges}
+            unseen={progress.unseen}
+            onViewed={progress.markViewed}
+            onSelectSession={setSelectedId}
+          />
+        )}
       </main>
       {analysisSpike && (
         <SpikeAnalysisOverlay
