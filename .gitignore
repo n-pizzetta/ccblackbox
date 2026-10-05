@@ -36,6 +36,7 @@ dist/sessions.json
 
 # Synthetic data from scripts/seed-demo.mjs
 .demo-claude/
+.demo-codex/
 
 # Intermediate files from scripts/readme/
 .readme-rec/
