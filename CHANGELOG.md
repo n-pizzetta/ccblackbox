@@ -6,6 +6,21 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Planned
+
+- Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
+- Sub-Agent Tree component.
+- Cross-Session Patterns component.
+- Delta vs `~/.claude/usage-data/report.html` view.
+- Tests: parser unit tests around `mapFrictions`, `linkClearedChains`,
+  `reassignLiveToChainTail`, plugin-cache merge.
+- CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
+  macOS/Linux).
+- Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
+  with mtime invalidation, so cold start doesn't re-parse the full set.
+
+## [0.3.0] — 2026-10-05
+
 ### Added
 
 - **Pages**: the dashboard is split into **Now** (5h window, live burn, live or latest sessions), **Sessions** (full-width sortable table, compare beside it), **Usage** (tokens over time, projects, models, tools, heaviest prompts) and **Health** (checklist, anomalies), switched from the header or with keys 1–4. Badges move to a page reached from the profile menu.
@@ -38,19 +53,6 @@ versioning follows [SemVer](https://semver.org/).
 ### Fixed
 
 - The Now page's Top prompts counted the whole cost of a prompt that started before the 5h window; only its turns inside the window count now.
-
-### Planned
-
-- Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
-- Sub-Agent Tree component.
-- Cross-Session Patterns component.
-- Delta vs `~/.claude/usage-data/report.html` view.
-- Tests: parser unit tests around `mapFrictions`, `linkClearedChains`,
-  `reassignLiveToChainTail`, plugin-cache merge.
-- CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
-  macOS/Linux).
-- Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
-  with mtime invalidation, so cold start doesn't re-parse the full set.
 
 ## [0.2.0] — 2026-10-02
 
