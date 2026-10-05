@@ -34,6 +34,7 @@ const GLYPHS: Array<{ glyph: React.ReactNode; label: string; kind: string }> = [
   })),
   { glyph: <span className="glyph friction-chip">△</span>, label: "Friction", kind: "Friction points flagged by /insights" },
   { glyph: <span className="agent-tag">codex</span>, label: "Codex", kind: "Session from Codex (~/.codex)" },
+  { glyph: <span className="terminal-chip">›_</span>, label: "Open terminal", kind: "Brings a running session's terminal to the front (macOS; exact tab in Ghostty)" },
 ];
 
 const GLOSSARY: Array<[string, string]> = [

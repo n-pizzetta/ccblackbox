@@ -170,6 +170,7 @@
   transition: filter var(--t-fast);
 }
 .resume-btn:hover { filter: brightness(1.15); }
+.resume-btn:disabled { cursor: progress; filter: saturate(0.6); }
 
 /* ---- Two columns on wide screens ---- */
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: stretch; }

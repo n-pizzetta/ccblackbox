@@ -14,6 +14,7 @@ import { downloadSessionHtml } from "../utils/exportSession";
 import { classifyPrompt, PROMPT_KIND_COLOR, PROMPT_KIND_LABEL } from "../utils/classifyPrompt";
 import { costOf, modelLabel, priceFor, type CostTokens, type ModelPrice } from "../../scripts/models.mjs";
 import { toastError } from "../utils/toast";
+import { canOpenTerminal, openTerminal } from "../utils/openTerminal";
 
 function gradeColor(grade: string): string {
   if (grade === "S" || grade === "A") return "var(--c-green)";
@@ -233,6 +234,14 @@ export function SessionDetail({
     }
   };
 
+  // A running session is picked up in its terminal, not resumed in a second one.
+  const [opening, setOpening] = useState(false);
+  const openSessionTerminal = async () => {
+    setOpening(true);
+    await openTerminal(session.id);
+    setOpening(false);
+  };
+
   const focusToolsForPrompt = (promptIdx: number, start: number, end: number) => {
     setToolFocus({ promptIdx, start, end });
     setTab("tools");
@@ -337,9 +346,15 @@ export function SessionDetail({
           </div>
           <div className="goal-row">
             <div className="goal">{session.goal}</div>
-            <button className="resume-btn" onClick={copyResume} title={resumeCmd}>
-              {resumeCopied ? "✓ Copied" : "Copy resume command"}
-            </button>
+            {canOpenTerminal(session) ? (
+              <button className="resume-btn" onClick={openSessionTerminal} disabled={opening} title="Bring the terminal running this session to the front">
+                {opening ? "Opening…" : "Open terminal"}
+              </button>
+            ) : (
+              <button className="resume-btn" onClick={copyResume} title={resumeCmd}>
+                {resumeCopied ? "✓ Copied" : "Copy resume command"}
+              </button>
+            )}
           </div>
         </div>
 
