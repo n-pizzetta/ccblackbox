@@ -6,6 +6,7 @@ import { PRODUCT_NAME } from "../utils/brand";
 import { API_VALUE_HINT, freshTokens, formatUsage, useUnit } from "../utils/units";
 import { ContextLine } from "./ContextCard";
 import { useSnapshotMap } from "../utils/liveContext";
+import { canOpenTerminal, openTerminal } from "../utils/openTerminal";
 import { useNow } from "../utils/useNow";
 import type { ContextSnapshot } from "../../scripts/context-advice.mjs";
 import type { Sort, SortKey } from "../utils/sortSessions";
@@ -252,6 +253,19 @@ export function SessionList({
                       </button>
                     </span>
                     <span className="st-col-flags">
+                      {canOpenTerminal(s) && (
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          className="terminal-chip"
+                          title="Open the terminal running this session"
+                          aria-label="Open terminal"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openTerminal(s.id);
+                          }}
+                        >›_</button>
+                      )}
                       {s.agent === "codex" && (
                         <span className="agent-tag" title="Codex session (~/.codex)">codex</span>
                       )}

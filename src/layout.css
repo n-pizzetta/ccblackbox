@@ -460,6 +460,22 @@
 .st-col-flags { display: flex; justify-content: flex-end; gap: 6px; }
 .st-col-flags .friction-chip,
 .st-col-flags .plugin-chip { padding: 1px 6px; gap: 3px; font-size: var(--fs-xs); }
+/* live rows: brings the session's terminal to the front */
+.terminal-chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  height: 20px;
+  padding: 0 6px;
+  font-family: var(--f-mono);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--c-text-dim);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  transition: color var(--t-fast), box-shadow var(--t-fast);
+}
+.terminal-chip:hover { color: var(--c-cyan); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-cyan) 55%, transparent); }
 .st-num.mono { font-family: var(--f-ui); }
 .st-row .st-num { font-size: var(--fs-base); color: var(--c-text-dim); }
 .st-row .st-usage { font-weight: 600; color: var(--c-text); }
