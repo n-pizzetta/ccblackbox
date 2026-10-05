@@ -6,10 +6,6 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
-### Fixed
-
-- **Updating needs no manual restart.** After a plugin update, `/marey:replay` used to reopen the dashboard from the previous version still running on the port. It now stops an older Marey (or ccblackbox) server and starts the new one, and refreshes the status line wrapper copied by `/marey:limits`, so re-running `/marey:limits` after an update is no longer needed. The server reports its version at `/api/version`.
-
 ### Planned
 
 - Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
@@ -22,6 +18,12 @@ versioning follows [SemVer](https://semver.org/).
   macOS/Linux).
 - Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
   with mtime invalidation, so cold start doesn't re-parse the full set.
+
+## [0.5.1] — 2026-10-05
+
+### Fixed
+
+- **Updating needs no manual restart.** After a plugin update, `/marey:replay` used to reopen the dashboard from the previous version still running on the port. It now stops an older Marey (or ccblackbox) server and starts the new one, and refreshes the status line wrapper copied by `/marey:limits`, so re-running `/marey:limits` after an update is no longer needed. The server reports its version at `/api/version`.
 
 ## [0.5.0] — 2026-10-05
 
