@@ -40,6 +40,6 @@ export function windowStartFrom(limits: RateLimits | null): number | null {
 export function limitColor(frac: number): string {
   if (frac >= 0.95) return "var(--c-red)";
   if (frac >= 0.8) return "var(--c-amber)";
-  if (frac >= 0.5) return "var(--c-cyan)";
-  return "var(--c-green)";
+  // neutral until it matters: colour is a warning, not a progress meter
+  return "var(--c-text)";
 }

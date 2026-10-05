@@ -4,24 +4,20 @@
 .project-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 
 /* ---- Usage limits (always visible: top bar + session view) ---- */
+/* flat on the backdrop: no capsule, the bars and numbers carry it */
 .limits-pill {
   display: inline-flex;
   align-items: center;
   align-self: center;
   gap: 16px;
-  padding: 6px 14px;
-  background: var(--c-bg-panel);
-  border: 1px solid var(--c-hairline-strong);
-  border-radius: 999px;
 }
-.limits-pill.off { padding: 6px 12px; }
-.limits-pill-item { display: inline-flex; align-items: center; gap: 8px; }
-.limits-pill-label { font-size: var(--fs-sm); color: var(--c-text-dim); }
+.limits-pill-item { display: inline-flex; align-items: center; gap: 7px; }
+.limits-pill-label { font-size: var(--fs-md); color: var(--c-text-dim); }
 .limits-pill-bar {
   position: relative;
-  width: 64px;
-  height: 6px;
-  background: var(--c-hairline-strong);
+  width: 48px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
 }
 .limits-pill-fill {
@@ -41,8 +37,8 @@
   opacity: 0.6;
   border-radius: 1px;
 }
-.limits-pill-pct { font-family: var(--f-mono); font-size: var(--fs-md); font-weight: 600; }
-.limits-pill-reset { font-family: var(--f-mono); font-size: var(--fs-xs); color: var(--c-text-faint); }
+.limits-pill-pct { font-size: var(--fs-md); font-weight: 600; }
+.limits-pill-reset { font-size: var(--fs-md); color: var(--c-text-dim); }
 .limits-pill-above { font-size: var(--fs-xs); color: var(--c-amber); }
 .limits-pill-item.critical .limits-pill-fill { animation: limit-pulse 1.6s ease-in-out infinite; }
 @keyframes limit-pulse { 50% { opacity: 0.55; } }
@@ -108,26 +104,28 @@
 .live-burn.on .live-burn-dot { background: var(--c-green); box-shadow: 0 0 8px var(--c-green); }
 /* ---- Profile chip + menu (ProfileMenu) ---- */
 .profile { position: relative; align-self: center; }
+/* a ghost capsule: no fill until hovered or open */
 .profile-trigger {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
+  height: 32px;
   padding: 0 12px;
-  background: var(--c-bg-panel);
-  border: 1px solid var(--c-hairline);
+  background: transparent;
+  border: none;
   border-radius: 999px;
   color: var(--c-text);
   font-family: inherit;
   cursor: pointer;
+  transition: background var(--t-fast);
 }
 .profile-trigger:hover,
-.profile-trigger.open { border-color: var(--c-hairline-strong); background: var(--c-bg-elevated); }
+.profile-trigger.open { background: var(--c-fill); }
 .profile-trigger:focus-visible { outline: 2px solid var(--c-cyan); outline-offset: 2px; }
 .profile-status { width: 8px; height: 8px; border-radius: 50%; background: var(--c-green); }
 .profile-status.mock { background: var(--c-amber); }
-.profile-level { font-size: var(--fs-md); font-weight: 600; }
-.profile-streak { font-size: var(--fs-md); color: var(--c-text-dim); }
+.profile-level { font-family: var(--f-ui); font-size: var(--fs-base); font-weight: 600; }
+.profile-streak { font-family: var(--f-ui); font-size: var(--fs-base); color: var(--c-text-dim); }
 
 .profile-popover { width: 300px; gap: 10px; }
 .profile-head { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; border-bottom: 1px solid var(--c-hairline); }

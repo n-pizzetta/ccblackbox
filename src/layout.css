@@ -22,15 +22,15 @@
   width: 100vw;
 }
 
+/* brand left, page nav centered, limits and profile right; only the nav is glass */
 .app-header {
   flex: none;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 28px;
-  height: 56px;
+  gap: 16px;
+  height: 68px;
   padding: 0 var(--pad-x);
-  background: var(--c-bg);
-  border-bottom: 1px solid var(--c-hairline);
 }
 .app-brand { display: flex; align-items: center; gap: 10px; flex: none; }
 .app-brand-name {
@@ -39,46 +39,49 @@
   letter-spacing: -0.02em;
   color: var(--c-text);
 }
-.app-nav { display: flex; align-self: stretch; gap: 4px; }
+.app-nav {
+  display: flex;
+  gap: 2px;
+  height: 44px;
+  padding: 4px;
+  border-radius: 22px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-glass);
+}
 .app-nav-item {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
   font-size: var(--fs-base);
   font-weight: 500;
+  white-space: nowrap;
   color: var(--c-text-dim);
-  transition: color var(--t-fast);
+  border-radius: 18px;
+  transition: color var(--t-fast), background var(--t-fast);
 }
-.app-nav-item:hover { color: var(--c-text); }
-.app-nav-item.active { color: var(--c-text); }
-.app-nav-item.active::after {
-  content: "";
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--c-cyan);
-}
+.app-nav-item:hover { color: var(--c-text); background: rgba(255, 255, 255, 0.05); }
+.app-nav-item.active { color: var(--c-text); font-weight: 600; background: var(--c-lens); box-shadow: var(--shadow-lens); }
+/* counts read as plain numbers next to the label */
 .app-nav-count {
-  min-width: 20px;
-  padding: 1px 6px;
-  font-size: var(--fs-xs);
-  line-height: 14px;
-  text-align: center;
-  color: var(--c-text-dim);
-  background: var(--c-bg-elevated);
-  border-radius: 999px;
+  font-family: var(--f-ui);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  color: var(--c-text-faint);
 }
-.app-nav-count.warn {
-  color: var(--c-amber);
-  background: color-mix(in srgb, var(--c-amber) 14%, transparent);
+.app-nav-count.warn { font-weight: 600; color: var(--c-amber); }
+.app-header-right { display: flex; align-items: center; justify-content: flex-end; gap: 16px; min-width: 0; }
+
+/* no blur support or "reduce transparency": the glass becomes a solid capsule */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app-nav { background: #2a2c33; }
 }
-.app-header-right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-.app-header .profile-trigger { height: var(--control-h); }
+@media (prefers-reduced-transparency: reduce) {
+  .app-nav { background: #2a2c33; -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
 
 .app-content {
   flex: 1;
@@ -445,9 +448,10 @@
 
 /* ---- Small screens: navigation on its own scrollable row ---- */
 @media (max-width: 900px) {
-  .app-header { flex-wrap: wrap; height: auto; gap: 8px 16px; padding-block: 10px 0; }
-  .app-nav { order: 3; width: 100%; overflow-x: auto; height: 40px; }
-  .app-nav-item { padding: 0 10px; }
+  .app-header { display: flex; flex-wrap: wrap; height: auto; gap: 10px 16px; padding-block: 12px 4px; }
+  .app-header-right { margin-left: auto; }
+  .app-nav { order: 3; width: 100%; overflow-x: auto; }
+  .app-nav-item { padding: 0 12px; }
   .scope-search { width: 100%; order: 5; }
   .scope-summary { margin-left: 0; }
 }
