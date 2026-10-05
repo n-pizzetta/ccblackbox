@@ -290,11 +290,13 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 | `Toaster` | Error toasts (`toastError`) and achievement toasts (`toastAchievement`: tier-colored, with a View action). |
 
 `pages/` (one question each) compose `fleet/`:
-- **Now**: `LiveTicker` (one line of live burn), `FiveHourSession` (current 5h window, per-session / prompt / tool / project share; all sessions, ignoring the scope), a **Next up** strip (level, today's XP, streak and the three closest good-practice badges), then live sessions, or the latest ones when none runs.
+- **Now**: `LiveTicker` (one line of live burn), `FiveHourSession` (current 5h window: headline tiles, `HotSpots`, then per-session / prompt / tool / project lists; all sessions, ignoring the scope), a **Next up** strip (level, today's XP, streak and the three closest good-practice badges), then live sessions, or the latest ones when none runs.
 - **Sessions**: the table, and `SessionCompare` beside it in compare mode (up to 3), or `BulkGhostBar` when the ghost filter is on.
 - **Usage**: `TokenTimeSeries`, then `ProjectRollup`, `ModelMix` and `ToolsHeatmap` side by side, then `HeavyPrompts`.
 - **Health**: `HealthCheck` (rule checklist, score in its heading), `AnomalyFlags`.
 - **Progress** (page id `badges`, key 5): level, next level, today's XP and streak, the XP rules, **Next up** (six), `Badges` (unseen unlocks flagged "new"), then `TopSessions` as all-time records (podium, `FireCanvas`).
+
+`HotSpots` puts the biggest consumers first: the heaviest session as a hero card (with #2 and #3), then the leading prompt, project and tool. It uses the lists' order and unit: sessions and projects are ranked and shown as a share of the 5h limit (estimated by API value) when limits are connected, else as a share of the window's tokens. Prompt and tool are in API value, the tool ranked by its estimated cost rather than its calls. A prompt started before the window only counts its turns inside it. The heat measures concentration, as a warning rather than a trophy: neutral for a lone session, amber when one of several takes half, red with a "one session is using N%" line when one of three or more takes three quarters. While the window is idle it shows today's consumers instead. Both read `utils/windowBreakdown.ts` (`windowBreakdown(sessions, from, to, weigh)`). Project colors in the card follow the session list, and a clash in the card takes the next free color.
 
 `BurnSpikeBanner` (+ `SpikeAnalysisOverlay`, `SpikeHeuristics`) shows above any page.
 

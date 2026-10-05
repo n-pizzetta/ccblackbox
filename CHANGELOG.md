@@ -17,6 +17,7 @@ versioning follows [SemVer](https://semver.org/).
 - Achievement toasts when a badge unlocks or you level up, wherever you are in the dashboard.
 - **Next up**: the badges closest to unlocking, limited to ones that reward good practice, on the Now page and the Progress page.
 - Header chip: XP bar, "+N XP" when XP comes in, and a dimmed flame when today's streak is still to be earned.
+- **Hot spots** on the Now page: the session eating most of the 5h window as a hero card, with the runners-up and the leading prompt, project and tool. It turns amber when one session takes half the window and red, with a warning, when one of three or more takes three quarters. While the window is idle it shows today's biggest consumers instead of an empty panel.
 
 ### Changed
 
@@ -31,6 +32,12 @@ versioning follows [SemVer](https://semver.org/).
 - Context hygiene only counts ended sessions.
 - Toasts stay while hovered, focused or in a background tab.
 - The header streak follows the badge rule: a quiet weekend no longer resets it.
+- The Now page's Projects card uses each project's color from the session list instead of a color by rank (a clash in the card takes the next free color).
+- The Now page's session and project lists are ranked by what their % shows (API value when limits are connected).
+
+### Fixed
+
+- The Now page's Top prompts counted the whole cost of a prompt that started before the 5h window; only its turns inside the window count now.
 
 ### Planned
 
