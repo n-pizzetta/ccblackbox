@@ -1,13 +1,13 @@
 {
-  "name": "ccblackbox",
-  "description": "Visual debugger and analytics dashboard for Claude Code sessions. Replay turns, inspect tool calls and file diffs, track tokens/cost, and surface friction patterns across your fleet.",
+  "name": "marey",
+  "description": "Visual debugger and analytics dashboard for Claude Code and Codex sessions. Replay turns, inspect tool calls and file diffs, track tokens/cost, and surface friction patterns across your fleet.",
   "version": "0.3.0",
   "author": {
     "name": "Nathan Pizzetta",
     "url": "https://github.com/n-pizzetta"
   },
-  "homepage": "https://github.com/n-pizzetta/ccblackbox",
-  "repository": "https://github.com/n-pizzetta/ccblackbox",
+  "homepage": "https://github.com/n-pizzetta/marey",
+  "repository": "https://github.com/n-pizzetta/marey",
   "license": "MIT",
   "keywords": [
     "claude-code",

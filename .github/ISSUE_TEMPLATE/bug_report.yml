@@ -25,7 +25,7 @@ body:
     required: true
   - type: input
     id: version
-    label: ccblackbox version
+    label: Marey version
     description: "The version or commit you are running."
     required: true
   - type: textarea

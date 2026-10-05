@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const root = mkdtempSync(join(tmpdir(), "ccblackbox-test-"));
+const root = mkdtempSync(join(tmpdir(), "marey-test-"));
 const CLAUDE = join(root, ".claude");
 const PROJECTS = join(CLAUDE, "projects");
 const CODEX = join(root, ".codex");
