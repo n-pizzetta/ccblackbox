@@ -54,8 +54,8 @@ export function BadgesPage({ allSessions, badges, unseen, onViewed, onSelectSess
             {level.rules.map((r) => (
               <span key={r.label} className="mono">{r.label} <b>+{r.points}</b></span>
             ))}
-            <span className="mono" title="Only badges that reward good practice (the ones in Next up) add XP">
-              good-practice badge <b>+{level.tierXp.bronze} / {level.tierXp.silver} / {level.tierXp.gold} / {level.tierXp.platinum}</b>
+            <span className="mono" title="Per tier reached, from a family's first: only badges that reward good practice (the ones in Next up) add XP">
+              good-practice badge <b>+{level.stepXp.join(" / ")}</b>
             </span>
           </p>
         </PageSection>

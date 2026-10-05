@@ -144,6 +144,15 @@ test("only good-practice badges add XP", () => {
   assert.ok(state.unlocked["tester:bronze"]);
 });
 
+test("badge XP goes by tier reached, so One-shot's first tier (gold) is worth 5", () => {
+  const now = monday().getTime();
+  const out = computeBadges([session("a", now - HOUR, { commits: 1 })], freshState(now), now);
+  const oneshot = out.families.find((f) => f.id === "oneshot");
+  assert.deepEqual(oneshot.tiers.map((t) => [t.tier, t.xp]), [["gold", 5], ["platinum", 15]]);
+  assert.ok(oneshot.tiers[0].unlockedAt, "one prompt that ends in a commit");
+  assert.deepEqual(out.families.find((f) => f.id === "tester").tiers.map((t) => t.xp), [5, 15, 40, 100]);
+});
+
 test("today's XP counts sessions worked in today and badges unlocked today", () => {
   const now = monday().getTime();
   const midnight = new Date(now).setHours(0, 0, 0, 0);

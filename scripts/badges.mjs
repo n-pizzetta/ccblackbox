@@ -190,10 +190,18 @@ const SESSION_XP = [
   // Provisional while the session runs: the score falls as the context grows.
   { label: "context score 90+", points: 1, provisional: true, test: (s) => (s.quality?.score ?? 0) >= 90 },
 ];
-/** Only good-practice badges (`nudge`) add XP: volume and spend badges unlock but earn nothing. */
-const TIER_XP = { bronze: 5, silver: 15, gold: 40, platinum: 100 };
-const NUDGE_IDS = new Set(FAMILIES.filter((f) => f.nudge).map((f) => f.id));
-const tierXp = (familyId, tier) => (NUDGE_IDS.has(familyId) ? TIER_XP[tier] ?? 0 : 0);
+/**
+ * XP for a family's first, second, third and fourth tier, whatever their
+ * color: One-shot starts at gold for rarity, but its first step is worth 5.
+ * Only good-practice badges (`nudge`) add XP: volume and spend badges unlock
+ * but earn nothing.
+ */
+const STEP_XP = [5, 15, 40, 100];
+const FAMILY_BY_ID = new Map(FAMILIES.map((f) => [f.id, f]));
+function tierXp(familyId, tier) {
+  const f = FAMILY_BY_ID.get(familyId);
+  return f?.nudge ? STEP_XP[TIERS.indexOf(tier) - (f.firstTier ?? 0)] ?? 0 : 0;
+}
 /** Level n starts at LEVEL_UNIT × (n-1)²: a new user levels up daily, a heavy one every week or two. */
 const LEVEL_UNIT = 4;
 const LEVEL_TITLES = [[1, "Rookie"], [5, "Apprentice"], [10, "Builder"], [15, "Artisan"], [20, "Expert"], [25, "Master"], [30, "Virtuoso"], [40, "Grandmaster"], [50, "Legend"]];
@@ -359,7 +367,7 @@ export function computeBadges(allSessions, state, now = Date.now()) {
     startedAt: state.startedAt,
     total: BADGE_COUNT,
     families,
-    level: { ...levelOf(xp), today: xpToday, rules: XP_RULES, tierXp: TIER_XP },
+    level: { ...levelOf(xp), today: xpToday, rules: XP_RULES, stepXp: STEP_XP },
     streak: currentStreak(days, now),
     changed,
   };

@@ -143,8 +143,8 @@ export type Level = {
   today: number;
   /** XP per session for each criterion met. */
   rules: Array<{ label: string; points: number }>;
-  /** XP a good-practice badge adds when a tier unlocks. */
-  tierXp: Record<Tier, number>;
+  /** XP a good-practice badge adds for its first, second, third and fourth tier. */
+  stepXp: number[];
 };
 
 /** Active days in a row; quiet weekends don't break it, a quiet weekday today puts it at risk. */
