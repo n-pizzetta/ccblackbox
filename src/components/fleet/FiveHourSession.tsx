@@ -1,25 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Session } from "../../types";
 import {
-  costOfTokens,
   firstEventAfter,
   FIVE_HOUR_MS,
-  PROJECT_PALETTE,
   OTHER_COLOR,
+  PROJECT_PALETTE,
+  projectColor,
   resolveWindowStartMs,
-  sumTokens,
-  tokensInWindow,
 } from "../../utils/fleetStats";
-import { aggregateByPrompt, type PromptStats } from "../../utils/aggregateByPrompt";
+import { windowBreakdown } from "../../utils/windowBreakdown";
 import { loadWindowStart, saveWindowStart } from "../../utils/windowState";
 import { formatCost, formatDuration, formatTokens } from "../../utils/format";
 import type { RateLimits } from "../../utils/rateLimits";
 import { KpiRow } from "../Kpi";
+import { HotSpots } from "./HotSpots";
 
 interface Props {
   sessions: Session[];
   limits: RateLimits | null;
   onSelectSession: (id: string) => void;
+}
+
+/** Each project's session-list color, unless an earlier one in the card took it: then the next free one. */
+function distinctColors(projects: string[]): string[] {
+  const used = new Set<string>();
+  return projects.map((p) => {
+    let color = p.startsWith("other (") ? OTHER_COLOR : projectColor(p);
+    if (used.has(color)) color = PROJECT_PALETTE.find((c) => !used.has(c)) ?? OTHER_COLOR;
+    used.add(color);
+    return color;
+  });
 }
 
 function formatClock(ms: number): string {
@@ -62,100 +72,39 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
     () => realStart ?? resolveWindowStartMs(sessions, windowStart, now),
     [realStart, sessions, windowStart, now],
   );
-  const windowBurn = useMemo(
-    () => fromMs !== null ? tokensInWindow(sessions, fromMs, now) : { tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, cost: 0 },
-    [sessions, fromMs, now],
+  const pct = limits?.fiveHour ? limits.fiveHour.usedPct / 100 : null;
+  // Rank by what the % column shows: API value against a known limit, else tokens.
+  const weigh = pct !== null ? "cost" : "tokens";
+  const data = useMemo(
+    () => (fromMs !== null ? windowBreakdown(sessions, fromMs, now, weigh) : null),
+    [sessions, fromMs, now, weigh],
+  );
+  const totalTokens = data?.total.tokens ?? 0;
+  // While the window is idle, the hot spots fall back to today so the page still says what consumed most.
+  const today = useMemo(
+    () => (totalTokens === 0 ? windowBreakdown(sessions, new Date(now).setHours(0, 0, 0, 0), now) : null),
+    [totalTokens, sessions, now],
   );
   const elapsed = fromMs !== null ? now - fromMs : 0;
   const sessionEnd = fromMs !== null ? fromMs + FIVE_HOUR_MS : 0;
   const resetIn = fromMs !== null ? Math.max(0, sessionEnd - now) : 0;
-  const pct = limits?.fiveHour ? limits.fiveHour.usedPct / 100 : null;
-
-  const totalTokens = sumTokens(windowBurn.tokens);
 
   // With real limits, attribute the used 5h % pro rata to cost (an estimate:
   // Anthropic weights usage per model). Otherwise, share of the window burn.
   const shareOf = (tokens: number, cost: number): number => {
-    if (pct !== null) return windowBurn.cost > 0 ? (cost / windowBurn.cost) * pct * 100 : 0;
+    const windowCost = data?.total.cost ?? 0;
+    if (pct !== null) return windowCost > 0 ? (cost / windowCost) * pct * 100 : 0;
     return totalTokens > 0 ? (tokens / totalTokens) * 100 : 0;
   };
   const shareSuffix = pct !== null ? "of 5h limit (est.)" : "of window";
 
-  const topSessions = useMemo<{ s: Session; burn: { tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost: number } }[]>(() => {
-    if (fromMs === null) return [];
-    const rows = sessions
-      .map((s) => ({ s, burn: tokensInWindow([s], fromMs, now) }))
-      .filter((r) => sumTokens(r.burn.tokens) > 0)
-      .sort((a, b) => sumTokens(b.burn.tokens) - sumTokens(a.burn.tokens))
-      .slice(0, 5);
-    return rows;
-  }, [sessions, fromMs, now]);
-
-  const topPrompts = useMemo(() => {
-    type Row = { session: Session; stat: PromptStats };
-    if (fromMs === null) return [] as Row[];
-    const all: Row[] = [];
-    for (const s of sessions) {
-      if (!s.turns || !s.prompts || s.turns.length === 0 || s.prompts.length === 0) continue;
-      const startMs = new Date(s.startedAt).getTime();
-      const stats = aggregateByPrompt(s.turns, s.model, s.prompts);
-      for (const st of stats) {
-        const stStart = startMs + st.t;
-        const stEnd = startMs + (isFinite(st.endT) ? st.endT : st.t);
-        if (stEnd < fromMs || stStart > now) continue;
-        if (st.cost <= 0) continue;
-        all.push({ session: s, stat: st });
-      }
-    }
-    all.sort((a, b) => b.stat.cost - a.stat.cost);
-    return all.slice(0, 5);
-  }, [sessions, fromMs, now]);
-
-  const toolsBreakdown = useMemo<{ tool: string; calls: number; tokens: number; cost: number }[]>(() => {
-    if (fromMs === null) return [];
-    const m = new Map<string, { calls: number; tokens: number; cost: number }>();
-    for (const s of sessions) {
-      if (!s.turns) continue;
-      const startMs = new Date(s.startedAt).getTime();
-      for (const t of s.turns) {
-        const ts = startMs + t.t;
-        if (ts < fromMs || ts > now) continue;
-        if (t.tools.length === 0) continue;
-        const turnTokens = sumTokens(t.tokens);
-        const turnCost = costOfTokens(t.model ?? s.model, t.tokens);
-        for (const tool of t.tools) {
-          const cur = m.get(tool) ?? { calls: 0, tokens: 0, cost: 0 };
-          cur.calls += 1;
-          cur.tokens += turnTokens / t.tools.length;
-          cur.cost += turnCost / t.tools.length;
-          m.set(tool, cur);
-        }
-      }
-    }
-    return Array.from(m.entries())
-      .map(([tool, v]) => ({ tool, ...v }))
-      .sort((a, b) => b.calls - a.calls)
-      .slice(0, 6);
-  }, [sessions, fromMs, now]);
-
-  const projectSplit = useMemo<{ project: string; tokens: number; cost: number }[]>(() => {
-    if (fromMs === null) return [];
-    const allByProj = new Map<string, { tokens: number; cost: number }>();
-    for (const s of sessions) {
-      const burn = tokensInWindow([s], fromMs, now);
-      const tk = sumTokens(burn.tokens);
-      if (tk <= 0) continue;
-      const key = s.project || "unknown";
-      const cur = allByProj.get(key) ?? { tokens: 0, cost: 0 };
-      cur.tokens += tk;
-      cur.cost += burn.cost;
-      allByProj.set(key, cur);
-    }
-    const arr = Array.from(allByProj.entries())
-      .map(([project, v]) => ({ project, tokens: v.tokens, cost: v.cost }))
-      .sort((a, b) => b.tokens - a.tokens);
-    const top = arr.slice(0, 5);
-    const rest = arr.slice(5);
+  const topSessions = data?.sessions.slice(0, 5) ?? [];
+  const topPrompts = data?.prompts.slice(0, 5) ?? [];
+  const toolsBreakdown = data?.tools.slice(0, 6) ?? [];
+  const projectSplit = useMemo(() => {
+    const all = data?.projects ?? [];
+    const top = all.slice(0, 5);
+    const rest = all.slice(5);
     if (rest.length > 0) {
       top.push({
         project: `other (${rest.length})`,
@@ -164,30 +113,22 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
       });
     }
     return top;
-  }, [sessions, fromMs, now]);
+  }, [data]);
 
-  if (fromMs === null) {
+  if (fromMs === null || !data || totalTokens === 0) {
     return (
       <div className="fleet-block five-hour-session five-hour-idle">
         <div className="section-title">
           <span>Current 5h window</span>
+          <span className="dim">{fromMs === null ? "Idle · waiting for the first message" : "Idle · no Claude Code activity in the last 5h"}</span>
         </div>
-        <span className="dim">Idle · waiting for the first message</span>
-      </div>
-    );
-  }
-  if (totalTokens === 0) {
-    return (
-      <div className="fleet-block five-hour-session five-hour-idle">
-        <div className="section-title">
-          <span>Current 5h window</span>
-        </div>
-        <span className="dim">Idle · no Claude Code activity in the last 5h</span>
+        {today && <HotSpots data={today} scope="today" limitPct={null} onSelectSession={onSelectSession} />}
       </div>
     );
   }
 
-  const projectsTotal = projectSplit.reduce((a, p) => a + p.tokens, 0);
+  const projectsTotal = projectSplit.reduce((a, p) => a + p[weigh], 0);
+  const projectColors = distinctColors(projectSplit.map((p) => p.project));
 
   return (
     <div className="fleet-block five-hour-session">
@@ -199,11 +140,13 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
       <KpiRow
         items={[
           { label: "Tokens", value: formatTokens(totalTokens), sub: "all kinds, in this window" },
-          { label: "API value", value: formatCost(windowBurn.cost), sub: pct !== null ? `${Math.round(pct * 100)}% of the 5h limit used` : "limit not reported" },
+          { label: "API value", value: formatCost(data.total.cost), sub: pct !== null ? `${Math.round(pct * 100)}% of the 5h limit used` : "limit not reported" },
           { label: "Elapsed", value: formatDuration(elapsed), sub: "of 5h" },
           { label: "Resets in", value: formatDuration(resetIn), sub: `at ${formatClock(sessionEnd)}` },
         ]}
       />
+
+      <HotSpots data={data} scope="window" limitPct={pct} onSelectSession={onSelectSession} />
 
       <div className="five-hour-grid">
         {/* Top sessions */}
@@ -216,13 +159,12 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
           ) : (
             <div className="five-hour-rows">
               {topSessions.map((r) => {
-                const tokens = sumTokens(r.burn.tokens);
-                const share = shareOf(tokens, r.burn.cost);
+                const share = shareOf(r.tokens, r.cost);
                 return (
                   <button key={r.s.id} className="five-hour-row" onClick={() => onSelectSession(r.s.id)}>
                     <span className="mono five-hour-row-name" title={r.s.goal || r.s.project}>{r.s.goal || r.s.project}</span>
                     <span className="mono dim five-hour-row-sub">{r.s.project}</span>
-                    <span className="mono tabular right">{formatTokens(tokens)}</span>
+                    <span className="mono tabular right">{formatTokens(r.tokens)}</span>
                     <span className="mono dim tabular right" title={`${share.toFixed(2)}% ${shareSuffix}`}>
                       {share < 10 ? share.toFixed(1) : share.toFixed(0)}%
                     </span>
@@ -297,29 +239,23 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
             <>
               <div className="five-hour-project-bar">
                 {projectSplit.map((p, i) => {
-                  const w = projectsTotal > 0 ? (p.tokens / projectsTotal) * 100 : 0;
-                  const color = p.project.startsWith("other") || i >= PROJECT_PALETTE.length
-                    ? OTHER_COLOR
-                    : PROJECT_PALETTE[i];
+                  const w = projectsTotal > 0 ? (p[weigh] / projectsTotal) * 100 : 0;
                   return (
                     <div
                       key={p.project}
                       className="five-hour-project-seg"
-                      style={{ flex: w, background: color }}
-                      title={`${p.project}: ${formatTokens(p.tokens)} (${w.toFixed(0)}%)`}
+                      style={{ flex: w, background: projectColors[i] }}
+                      title={`${p.project}: ${formatTokens(p.tokens)} · ${formatCost(p.cost)} (${w.toFixed(0)}% of the ${weigh === "cost" ? "API value" : "tokens"})`}
                     />
                   );
                 })}
               </div>
               <div className="five-hour-project-list">
                 {projectSplit.map((p, i) => {
-                  const color = p.project.startsWith("other") || i >= PROJECT_PALETTE.length
-                    ? OTHER_COLOR
-                    : PROJECT_PALETTE[i];
                   const share = shareOf(p.tokens, p.cost);
                   return (
                     <div key={p.project} className="five-hour-project-row" title={`${p.project}: ${share.toFixed(2)}% ${shareSuffix}`}>
-                      <span className="five-hour-project-swatch" style={{ background: color }} />
+                      <span className="five-hour-project-swatch" style={{ background: projectColors[i] }} />
                       <span className="mono five-hour-project-name">{p.project}</span>
                       <span className="mono tabular right">{formatTokens(p.tokens)}</span>
                       <span className="mono dim tabular right">
