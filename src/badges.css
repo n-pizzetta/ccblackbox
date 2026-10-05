@@ -1,7 +1,7 @@
 /* Badge cards: foil collector cards, one per family, showing the best tier reached.
    The tier is only the finish (matte bronze, silver and gold sheen, holographic platinum)
-   and its name; progress lives in the hover card. Sizes inside a card are in cqw (1% of the
-   card width) so it scales as a unit: set the width on the grid, never inside the card. */
+   and its name; progress lives in the focus view a click opens. Sizes on a card are in cqw
+   (1% of the card width) so it scales as a unit: set the width on the slot, never inside. */
 
 .badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 14px 12px; }
 
@@ -11,7 +11,8 @@
 .badge-card.tier-gold { --tier-hi: #fff3bd; --tier-lo: #97661a; }
 .badge-card.tier-platinum { --tier-hi: #f0feff; --tier-lo: #2d7a8e; }
 
-.badge-slot { position: relative; min-width: 0; perspective: 700px; }
+/* The slot is a container too, so the card's own radius and shadow scale with its width. */
+.badge-slot { position: relative; min-width: 0; container-type: inline-size; perspective: 700px; }
 
 .badge-card {
   /* pointer position (0-100) and tilt, set while hovered */
@@ -21,6 +22,10 @@
   --ry: 0deg;
   container-type: inline-size;
   position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
   aspect-ratio: 5 / 7;
   border-radius: 9.2cqw;
   transform: rotateX(var(--rx)) rotateY(var(--ry));
@@ -32,7 +37,6 @@
   transition: transform 80ms linear, box-shadow 350ms; /* follow the pointer tightly, relax slowly */
   box-shadow: 0 14px 26px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(0, 0, 0, 0.6);
 }
-.badge-card:focus-visible { box-shadow: 0 0 0 2px var(--c-bg), 0 0 0 4px var(--c-cyan); }
 
 .badge-frame { position: absolute; inset: 0; border-radius: 9.2cqw; }
 
@@ -151,6 +155,13 @@
 }
 .badge-card.locked .badge-name { color: var(--c-text-dim); }
 
+/* After the locked shadow so it wins; the card's own radius, not the global focus one. */
+button.badge-card:focus-visible {
+  outline: none;
+  border-radius: 9.2cqw;
+  box-shadow: 0 0 0 2px var(--c-bg-panel), 0 0 0 4px var(--c-cyan);
+}
+
 /* ---- Unlocked since the last visit ---- */
 .badge-card.fresh { animation: badge-pop 600ms var(--t-slow) both; }
 .badge-card.fresh::after {
@@ -182,29 +193,157 @@
 .badge-mini .badge-card { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(0, 0, 0, 0.6); }
 button.next-up-item:hover .badge-mini { opacity: 0.85; }
 
-/* ---- Hover card: the only place progress shows ---- */
-.badge-tip {
+/* ---- Focus view: the card floats on the dimmed page, everything about it in one panel beside it ---- */
+.badge-focus-backdrop {
   position: fixed;
-  z-index: 60;
-  width: min(272px, calc(100vw - 16px));
-  padding: 12px 14px;
-  background: var(--c-bg-elevated);
-  border: 1px solid var(--c-hairline-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-pop);
-  pointer-events: none;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  padding: 24px;
+  overflow-y: auto; /* when taller than the window, card and panel scroll together */
+  overscroll-behavior: contain;
+  background: rgba(4, 5, 7, 0.72);
+  backdrop-filter: blur(4px);
+  animation: badge-focus-fade 180ms ease-out;
 }
-.badge-tip-name { font-size: var(--fs-base); font-weight: 600; color: var(--c-text); }
-.badge-tip-hint { margin-top: 2px; font-size: var(--fs-sm); line-height: 1.4; color: var(--c-text-dim); }
-.badge-tip-tiers { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 5px 10px; align-items: center; margin-top: 10px; list-style: none; font-size: var(--fs-md); }
-.badge-tip-tiers li { display: contents; color: var(--c-text-faint); }
-.badge-tip-tiers li.done { color: var(--c-text-soft); }
-.badge-tip-dot { width: 7px; height: 7px; border-radius: 2px; background: var(--tier); opacity: 0.35; }
-.badge-tip-tiers li.done .badge-tip-dot { opacity: 1; }
-.badge-tip-target, .badge-tip-date { font-size: var(--fs-sm); text-align: right; }
-.badge-tip-next { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--c-hairline-strong); font-size: var(--fs-sm); color: var(--c-text-dim); }
-.badge-tip-next .badge-track { grid-column: 1 / -1; width: 100%; height: 4px; margin: 2px 0 0; }
-.badge-tip-next .badge-track > span { background: var(--tier); animation: none; }
+/* The dialog itself has no surface: it only places the card and the panel side by side. */
+.badge-focus {
+  display: grid;
+  grid-template-columns: auto minmax(0, 540px);
+  justify-content: center;
+  align-items: center;
+  gap: 48px;
+  width: min(880px, 100%);
+  margin: auto; /* centred, yet never clipped at the top when it scrolls */
+  animation: badge-focus-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.badge-focus[tabindex]:focus-visible { outline: none; }
+
+/* The card and its arrows, straight on the backdrop; the whole column steers the tilt. */
+.badge-focus-stage {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+.badge-focus-stage .badge-slot { width: 256px; perspective: 900px; }
+/* the loop in useLiveCard eases the tilt itself; the only light is the card's own soft glow */
+.badge-focus .badge-card,
+.badge-focus .badge-card:hover {
+  transition: none;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.8), 0 0 56px -18px color-mix(in srgb, var(--tier) 26%, transparent), 0 0 0 0.5px rgba(0, 0, 0, 0.6);
+}
+
+.badge-focus-nav { display: flex; align-items: center; gap: 4px; font-size: var(--fs-md); color: var(--c-text-dim); }
+.badge-focus-nav .mono { min-width: 56px; text-align: center; }
+.badge-focus-nav button,
+.badge-focus-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: var(--c-text-dim);
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.badge-focus-nav button:hover,
+.badge-focus-close:hover { background: var(--c-fill); color: var(--c-text); }
+.badge-focus-nav button:focus-visible,
+.badge-focus-close:focus-visible { border-radius: 999px; }
+.badge-focus-close { position: absolute; top: 14px; right: 14px; }
+
+/* The one surface: the text. */
+.badge-focus-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  padding: 32px 32px 28px;
+  background: var(--c-bg-panel);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+}
+.badge-focus-head { display: flex; flex-direction: column; gap: 4px; padding-right: 32px; }
+.badge-focus-head h2 { font-size: var(--fs-xl); font-weight: 650; line-height: 1.2; letter-spacing: -0.02em; color: var(--c-text); }
+.badge-focus-status { font-size: var(--fs-body); color: var(--c-text-dim); }
+.badge-focus-status b { font-weight: 600; color: var(--tier, var(--c-text)); }
+
+.badge-focus-section { display: flex; flex-direction: column; gap: 8px; }
+.badge-focus-section h3 { font-size: var(--fs-md); font-weight: 500; color: var(--c-text-faint); }
+.badge-focus-hint { font-size: var(--fs-body); line-height: 1.5; color: var(--c-text-soft); }
+
+/* Progress toward the next tier, in that tier's colour. */
+.badge-focus-next {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  font-size: var(--fs-md);
+  background: var(--c-bg-elevated);
+  border-radius: var(--radius);
+}
+.badge-focus-next-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: var(--fs-body); color: var(--c-text-soft); }
+.badge-focus-next-head b { font-weight: 600; color: var(--c-text); }
+.badge-focus-next .badge-track { height: 6px; margin: 0; background: var(--c-fill); }
+.badge-focus-next .badge-track > span { background: var(--tier); transition: width var(--t-med); }
+
+/* The ladder: one row per tier, the reached ones lit, the current one raised. */
+.badge-focus-tiers {
+  width: calc(100% + 20px);
+  margin: -4px -10px 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--fs-md);
+}
+.badge-focus-tiers th { padding: 0 10px 6px; font-weight: 500; text-align: right; white-space: nowrap; color: var(--c-text-faint); }
+.badge-focus-tiers td { padding: 8px 10px; text-align: right; white-space: nowrap; color: var(--c-text-faint); }
+.badge-focus-tiers :is(th, td):first-child { width: 100%; text-align: left; white-space: normal; }
+.badge-focus-tiers tr.done td { color: var(--c-text-soft); }
+.badge-focus-tiers tr.current td { background: var(--c-bg-elevated); }
+.badge-focus-tiers tr.current td:first-child { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.badge-focus-tiers tr.current td:last-child { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.badge-focus-tier { display: flex; align-items: center; gap: 14px; }
+.badge-focus-swatch {
+  flex: none;
+  width: 10px;
+  height: 14px; /* the card's 5:7 */
+  border-radius: 2.5px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tier) 45%, transparent);
+}
+.badge-focus-tiers tr.done .badge-focus-swatch { background: var(--tier); box-shadow: none; }
+.badge-focus-tiers tr.tier-platinum.done .badge-focus-swatch { background: linear-gradient(140deg, #e9fbff, #4cc2ff 28%, #b084ff 56%, #ff7eb6 78%, #5eead4); }
+.badge-focus-tier-text { display: flex; flex-direction: column; min-width: 0; }
+.badge-focus-tier-name { display: flex; align-items: center; gap: 8px; font-size: var(--fs-body); font-weight: 500; }
+.badge-focus-tiers tr.done .badge-focus-tier-name { color: var(--c-text); }
+.badge-focus-tier-sub { font-size: var(--fs-sm); color: var(--c-text-faint); }
+.badge-focus-new { padding: 0 6px; font-size: var(--fs-xs); line-height: 16px; color: var(--c-bg); background: var(--tier); border-radius: 999px; }
+
+.badge-focus-facts { display: flex; flex-direction: column; gap: 6px; padding-top: 16px; border-top: 1px solid var(--c-hairline); font-size: var(--fs-md); }
+.badge-focus-facts > div { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; }
+.badge-focus-facts dt { color: var(--c-text-faint); }
+.badge-focus-facts dd { color: var(--c-text-dim); }
+
+@keyframes badge-focus-fade { from { opacity: 0; } }
+@keyframes badge-focus-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } }
+
+@media (max-width: 900px) {
+  .badge-focus { gap: 32px; }
+  .badge-focus-stage .badge-slot { width: 208px; }
+}
+/* Phones: the card floats above the panel and the two scroll together. */
+@media (max-width: 640px) {
+  .badge-focus-backdrop { padding: 24px 12px 12px; }
+  .badge-focus { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .badge-focus-stage { gap: 12px; }
+  .badge-focus-stage .badge-slot { width: 176px; }
+  .badge-focus-panel { gap: 18px; padding: 20px 18px 22px; }
+  .badge-focus-close { top: 10px; right: 10px; }
+  .badge-focus-tiers :is(th, td) { padding-inline: 8px; }
+  .badge-focus-tiers { width: calc(100% + 16px); margin-inline: -8px; }
+}
 
 @media (prefers-reduced-motion: no-preference) {
   .badge-card.tier-platinum .badge-foil { animation: badge-holo 6s ease-in-out infinite alternate; }

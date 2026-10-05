@@ -1,27 +1,31 @@
-import { useEffect, useId, useState, type PointerEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { TIER_LABEL, badgeKey, nextUp, type BadgeFamily, type BadgeTier, type BadgesPayload } from "../../utils/gamify";
 import { BadgeGlyph } from "./BadgeGlyph";
 import "../../badges.css";
 
 const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
 const fmt = (n: number, unit: string | null) => `${compact.format(n)}${unit ? ` ${unit}` : ""}`;
+const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Tilts the card toward the pointer and moves the foil with it. */
-function tilt(e: PointerEvent<HTMLDivElement>) {
-  if (e.pointerType !== "mouse" || reducedMotion()) return;
-  const card = e.currentTarget;
-  const r = card.getBoundingClientRect();
-  const x = (e.clientX - r.left) / r.width;
-  const y = (e.clientY - r.top) / r.height;
+/** Points the foil and glare at (x, y), from 0 to 1 across the card, and tilts the card toward it. */
+function aim(card: HTMLElement, x: number, y: number) {
   card.style.setProperty("--mx", String(x * 100));
   card.style.setProperty("--my", String(y * 100));
   card.style.setProperty("--ry", `${(x - 0.5) * 16}deg`);
   card.style.setProperty("--rx", `${(0.5 - y) * 16}deg`);
 }
 
-function untilt(e: PointerEvent<HTMLDivElement>) {
+/** A grid card tilts toward the mouse while hovered. */
+function tilt(e: ReactPointerEvent<HTMLElement>) {
+  if (e.pointerType !== "mouse" || reducedMotion()) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  aim(e.currentTarget, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+}
+
+function untilt(e: ReactPointerEvent<HTMLElement>) {
   for (const p of ["--mx", "--my", "--rx", "--ry"]) e.currentTarget.style.removeProperty(p);
 }
 
@@ -32,82 +36,291 @@ const trace = (
   </svg>
 );
 
+const icon = (d: string) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={d} />
+  </svg>
+);
+const ICON_PREV = icon("M15 6l-6 6 6 6");
+const ICON_NEXT = icon("M9 6l6 6-6 6");
+const ICON_CLOSE = icon("M6 6l12 12M18 6 6 18");
+
 /** The card shows the best tier reached, or the first one face down. */
 function shownTier(f: BadgeFamily) {
   const best = f.tiers.filter((t) => t.unlockedAt).at(-1) ?? null;
   return { best, shown: best ?? f.tiers[0] };
 }
 
-type Tip = { f: BadgeFamily; rect: DOMRect };
+const cardClass = (best: BadgeTier | null) => `badge-card ${best ? `tier-${best.tier}` : "locked"}`;
 
-function FamilyCard({ f, fresh, tipId, onTip }: { f: BadgeFamily; fresh: boolean; tipId: string | undefined; onTip: (tip: Tip | null) => void }) {
+/** A card's layers, in spans so the grid card can be a button. `lit`: face up, with its finish. */
+function CardLayers({ f, t, lit, named = true }: { f: BadgeFamily; t: BadgeTier; lit: boolean; named?: boolean }) {
+  return (
+    <>
+      <span className="badge-frame" />
+      <span className="badge-face">
+        <span className="badge-art">
+          {lit && trace}
+          <BadgeGlyph family={f.id} step={f.tiers.indexOf(t)} fallback={f.icon} />
+          <span className="badge-corners" />
+        </span>
+        {named && <span className="badge-name">{t.name}</span>}
+      </span>
+      {lit && t.tier !== "bronze" && <span className="badge-foil" />}
+      {lit && <span className="badge-glare" />}
+    </>
+  );
+}
+
+function FamilyCard({ f, fresh, onOpen }: { f: BadgeFamily; fresh: boolean; onOpen: () => void }) {
   const { best, shown } = shownTier(f);
-  const show = (el: HTMLElement) => onTip({ f, rect: el.getBoundingClientRect() });
   return (
     <div className="badge-slot">
-      <div
-        className={`badge-card ${best ? `tier-${best.tier}` : "locked"}${fresh ? " fresh" : ""}`}
-        role="img"
-        tabIndex={0}
-        aria-label={best ? `${shown.name}: ${TIER_LABEL[best.tier]} ${f.name}` : `${f.name}: locked`}
-        aria-describedby={tipId}
+      <button
+        type="button"
+        className={`${cardClass(best)}${fresh ? " fresh" : ""}`}
+        data-badge={f.id}
+        aria-label={`${f.name}: ${best ? `${best.name}, ${TIER_LABEL[best.tier]}` : "locked"}${fresh ? ", new" : ""}`}
+        aria-haspopup="dialog"
         onPointerMove={tilt}
-        onPointerEnter={(e) => show(e.currentTarget)}
-        onPointerLeave={(e) => { untilt(e); onTip(null); }}
-        onFocus={(e) => show(e.currentTarget)}
-        onBlur={() => onTip(null)}
+        onPointerLeave={untilt}
+        onClick={onOpen}
       >
-        <div className="badge-frame" />
-        <div className="badge-face">
-          <div className="badge-art">
-            {best && trace}
-            <BadgeGlyph family={f.id} step={f.tiers.indexOf(shown)} fallback={f.icon} />
-            <span className="badge-corners" />
-          </div>
-          <div className="badge-name">{shown.name}</div>
-        </div>
-        {best && best.tier !== "bronze" && <div className="badge-foil" />}
-        {best && <div className="badge-glare" />}
+        <CardLayers f={f} t={shown} lit={best !== null} />
         {fresh && <span className="badge-new mono">new</span>}
-      </div>
+      </button>
     </div>
   );
 }
 
-/** Every tier with its target and unlock date, then progress toward the next one. */
-function BadgeTip({ tip, id }: { tip: Tip; id: string }) {
-  const { f, rect } = tip;
+/**
+ * Keeps the focused card alive: it follows the pointer anywhere over the stage and
+ * sways slowly on its own otherwise, easing between the two. Still under reduced motion.
+ */
+function useLiveCard(stage: RefObject<HTMLElement | null>, card: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const area = stage.current;
+    const el = card.current;
+    if (!area || !el || reducedMotion()) return;
+    const clamp = (v: number) => Math.min(1, Math.max(0, v));
+    let pointer: { x: number; y: number } | null = null;
+    const move = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      const r = el.getBoundingClientRect();
+      pointer = { x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height) };
+    };
+    const leave = () => { pointer = null; };
+    const at = { x: 0.5, y: 0.4 };
+    let last = performance.now();
+    let raf = requestAnimationFrame(function frame(now) {
+      const s = now / 1000;
+      const goal = pointer ?? { x: 0.5 + 0.3 * Math.sin(s * 0.7), y: 0.42 + 0.14 * Math.sin(s * 0.45 + 1) };
+      const k = 1 - Math.exp(-(now - last) / (pointer ? 60 : 450));
+      last = now;
+      at.x += (goal.x - at.x) * k;
+      at.y += (goal.y - at.y) * k;
+      aim(el, at.x, at.y);
+      raf = requestAnimationFrame(frame);
+    });
+    area.addEventListener("pointermove", move);
+    area.addEventListener("pointerleave", leave);
+    return () => {
+      cancelAnimationFrame(raf);
+      area.removeEventListener("pointermove", move);
+      area.removeEventListener("pointerleave", leave);
+    };
+  }, [stage, card]);
+}
+
+/** Tab cycles through the dialog's controls instead of leaving it. */
+function trapTab(e: KeyboardEvent, dialog: HTMLElement | null) {
+  if (!dialog) return;
+  const items = [...dialog.querySelectorAll<HTMLElement>("button:not(:disabled)")];
+  const i = items.indexOf(document.activeElement as HTMLElement);
+  if (items.length === 0 || (i === -1 && !e.shiftKey && dialog.contains(document.activeElement))) return;
+  if (e.shiftKey && i <= 0) {
+    e.preventDefault();
+    items[items.length - 1].focus();
+  } else if (!e.shiftKey && (i === -1 || i === items.length - 1)) {
+    e.preventDefault();
+    items[0].focus();
+  }
+}
+
+/** The dimmed background, or the empty room around the floating card: a click there closes the focus view. */
+const onBackdrop = (t: EventTarget) => t instanceof Element && !t.closest(".badge-focus .badge-slot, .badge-focus-nav, .badge-focus-panel");
+
+interface FocusProps {
+  f: BadgeFamily;
+  /** The card's place in the grid, from 1, and how many cards there are. */
+  pos: number;
+  count: number;
+  fresh: Set<string>;
+  /** When Marey first ran: badges only count sessions after it. */
+  startedAt: string | null;
+  onMove: (step: number) => void;
+  onClose: () => void;
+}
+
+/** One badge brought forward: its card large and alive, floating on the left; everything about it in a panel on the right. */
+function BadgeFocus({ f, pos, count, fresh, startedAt, onMove, onClose }: FocusProps) {
+  const titleId = useId();
+  const dialog = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
+  const card = useRef<HTMLDivElement>(null);
+  const pressed = useRef(false);
+  const { best, shown } = shownTier(f);
   const next = f.tiers.find((t) => !t.unlockedAt);
-  // Below the card in the top half of the screen, above it in the bottom half; kept inside the viewport.
-  const width = Math.min(272, window.innerWidth - 16);
-  const left = Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8);
-  const style = rect.top > window.innerHeight / 2 ? { left, bottom: window.innerHeight - rect.top + 8 } : { left, top: rect.bottom + 8 };
-  return (
-    <div className="badge-tip" id={id} role="tooltip" style={style}>
-      <div className="badge-tip-name">{f.name}</div>
-      <p className="badge-tip-hint">{f.hint}{f.window === "30d" ? " · rolling 30 days" : ""}</p>
-      <ul className="badge-tip-tiers">
-        {f.tiers.map((t) => (
-          <li key={t.tier} className={`tier-${t.tier}${t.unlockedAt ? " done" : ""}`} title={TIER_LABEL[t.tier]}>
-            <span className="badge-tip-dot" />
-            <span>{t.name}</span>
-            <span className="badge-tip-target mono tabular">{fmt(t.target, f.unit)}</span>
-            <span className="badge-tip-date mono tabular">{t.unlockedAt ? new Date(t.unlockedAt).toLocaleDateString() : "–"}</span>
-          </li>
-        ))}
-      </ul>
-      {next ? (
-        <div className={`badge-tip-next tier-${next.tier}`}>
-          <span>Next: {next.name}</span>
-          <span className="mono tabular">{fmt(next.progress, null)}/{fmt(next.target, f.unit)}</span>
-          <span className="badge-track" aria-hidden="true">
-            <span style={{ width: `${(next.progress / next.target) * 100}%` }} />
-          </span>
+  const xpEarned = f.tiers.reduce((a, t) => a + (t.unlockedAt ? t.xp : 0), 0);
+  const xpTotal = f.tiers.reduce((a, t) => a + t.xp, 0);
+
+  // Modal: the page behind goes inert and focus starts on the dialog.
+  useLayoutEffect(() => {
+    const root = document.getElementById("root");
+    root?.setAttribute("inert", "");
+    dialog.current?.focus({ preventScroll: true });
+    return () => root?.removeAttribute("inert");
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      e.stopPropagation(); // the app's shortcuts (1-5, ?) wait until the dialog closes
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      } else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        onMove(e.key === "ArrowLeft" ? -1 : 1);
+      } else if (e.key === "Tab") trapTab(e, dialog.current);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose, onMove]);
+
+  useLiveCard(stage, card);
+
+  return createPortal(
+    <div
+      className="badge-focus-backdrop"
+      // Closes on a click that starts and ends on the dimmed background (around the card included),
+      // not on the card, its arrows or the panel, nor on a drag out of them.
+      onPointerDown={(e) => { pressed.current = onBackdrop(e.target); }}
+      onClick={(e) => { if (pressed.current && onBackdrop(e.target)) onClose(); }}
+    >
+      <div
+        ref={dialog}
+        className={`badge-focus${best ? ` tier-${best.tier}` : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={`${titleId}-status`}
+        tabIndex={-1}
+      >
+        {/* The card floats on the dimmed page, no surface behind it. */}
+        <div ref={stage} className="badge-focus-stage">
+          <div className="badge-slot">
+            <div ref={card} className={cardClass(best)} aria-hidden="true">
+              <CardLayers f={f} t={shown} lit={best !== null} />
+            </div>
+          </div>
+          {count > 1 && (
+            <div className="badge-focus-nav">
+              <button type="button" aria-label="Previous badge" title="Previous badge (←)" onClick={() => onMove(-1)}>{ICON_PREV}</button>
+              <span className="mono tabular">{pos} / {count}</span>
+              <button type="button" aria-label="Next badge" title="Next badge (→)" onClick={() => onMove(1)}>{ICON_NEXT}</button>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="badge-tip-next">Every tier earned</div>
-      )}
-    </div>
+
+        <div className="badge-focus-panel">
+          <button type="button" className="badge-focus-close" aria-label="Close" onClick={onClose}>{ICON_CLOSE}</button>
+          <header className="badge-focus-head">
+            <h2 id={titleId}>{f.name}</h2>
+            <p id={`${titleId}-status`} className="badge-focus-status">
+              {best ? (
+                <><b>{best.name}</b> · {TIER_LABEL[best.tier]} · tier {f.tiers.indexOf(best) + 1} of {f.tiers.length}</>
+              ) : (
+                <>Locked · face down until its first tier</>
+              )}
+            </p>
+          </header>
+
+          <section className="badge-focus-section">
+            <h3>How to earn it</h3>
+            <p className="badge-focus-hint">{f.hint}</p>
+          </section>
+
+          {next ? (
+            <section className={`badge-focus-next tier-${next.tier}`}>
+              <div className="badge-focus-next-head">
+                <span>{best ? "Next" : "To unlock"}: <b>{next.name}</b> <span className="dim">· {TIER_LABEL[next.tier]}</span></span>
+                <span className="mono tabular dim">{Math.floor((next.progress / next.target) * 100)}%</span>
+              </div>
+              <span className="badge-track" aria-hidden="true">
+                <span style={{ width: `${(next.progress / next.target) * 100}%` }} />
+              </span>
+              <span className="mono tabular dim">
+                {fmt(next.progress, null)} / {fmt(next.target, f.unit)} · {fmt(next.target - next.progress, f.unit)} to go
+              </span>
+            </section>
+          ) : (
+            <section className="badge-focus-next done">
+              <div className="badge-focus-next-head"><span><b>Every tier earned</b></span></div>
+            </section>
+          )}
+
+          <table className="badge-focus-tiers">
+            <thead>
+              <tr>
+                <th scope="col">Tier</th>
+                <th scope="col">Target</th>
+                <th scope="col">Unlocked</th>
+              </tr>
+            </thead>
+            <tbody>
+              {f.tiers.map((t) => (
+                <tr key={t.tier} className={`tier-${t.tier}${t.unlockedAt ? " done" : ""}${t === best ? " current" : ""}`}>
+                  <td>
+                    <span className="badge-focus-tier">
+                      <span className="badge-focus-swatch" aria-hidden="true" />
+                      <span className="badge-focus-tier-text">
+                        <span className="badge-focus-tier-name">
+                          {t.name}
+                          {fresh.has(badgeKey(f, t)) && <span className="badge-focus-new mono">new</span>}
+                        </span>
+                        <span className="badge-focus-tier-sub">{TIER_LABEL[t.tier]}{t.xp ? ` · +${t.xp} XP` : ""}</span>
+                      </span>
+                    </span>
+                  </td>
+                  <td className="mono tabular">{fmt(t.target, f.unit)}</td>
+                  <td className="tabular">{t.unlockedAt ? day(t.unlockedAt) : "Locked"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <dl className="badge-focus-facts">
+            <div>
+              <dt>XP</dt>
+              <dd>
+                {f.nudge
+                  ? `+${xpEarned} of ${xpTotal} earned: a good-practice badge, each tier adds to your level`
+                  : "None: a volume badge, it unlocks but only good-practice badges add XP"}
+              </dd>
+            </div>
+            <div>
+              <dt>Counts</dt>
+              <dd>
+                {f.window === "30d"
+                  ? "The last 30 days: progress drops as days slide out, an unlocked tier stays"
+                  : startedAt ? `Sessions since ${day(startedAt)}` : "All sessions"}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -118,24 +331,28 @@ interface Props {
 }
 
 export function Badges({ data, fresh }: Props) {
-  const [tip, setTip] = useState<Tip | null>(null);
-  const tipId = useId();
-  // A fixed hover card would drift from its card on scroll: close it instead.
-  useEffect(() => {
-    if (!tip) return;
-    const close = () => setTip(null);
-    window.addEventListener("scroll", close, { capture: true, passive: true });
-    window.addEventListener("resize", close);
-    return () => {
-      window.removeEventListener("scroll", close, { capture: true });
-      window.removeEventListener("resize", close);
-    };
-  }, [tip]);
+  const [open, setOpen] = useState<string | null>(null);
+  const grid = useRef<HTMLDivElement>(null);
+  const returnTo = useRef<string | null>(null);
 
   const families = data.families.filter((f) => f.available);
   const total = families.reduce((a, f) => a + f.tiers.length, 0);
   const unlocked = families.reduce((a, f) => a + f.tiers.filter((t) => t.unlockedAt).length, 0);
   const since = data.startedAt ? new Date(data.startedAt).toLocaleDateString() : null;
+  const at = families.findIndex((f) => f.id === open);
+
+  const close = () => {
+    returnTo.current = open;
+    setOpen(null);
+  };
+  const move = (step: number) => setOpen(families[(at + step + families.length) % families.length].id);
+
+  // Focus goes back to the card of the badge last shown, which the arrows may have changed.
+  useEffect(() => {
+    if (open !== null || returnTo.current === null) return;
+    grid.current?.querySelector<HTMLElement>(`[data-badge="${returnTo.current}"]`)?.focus();
+    returnTo.current = null;
+  }, [open]);
 
   return (
     <div className="fleet-block">
@@ -145,39 +362,31 @@ export function Badges({ data, fresh }: Props) {
           {unlocked}/{total}{since ? ` · since ${since}` : ""}
         </span>
       </div>
-      <div className="badges">
+      <div className="badges" ref={grid}>
         {families.map((f) => (
           <FamilyCard
             key={f.id}
             f={f}
             fresh={f.tiers.some((t) => fresh.has(badgeKey(f, t)))}
-            tipId={tip?.f.id === f.id ? tipId : undefined}
-            onTip={setTip}
+            onOpen={() => setOpen(f.id)}
           />
         ))}
       </div>
-      {tip && <BadgeTip tip={tip} id={tipId} />}
+      {at >= 0 && (
+        <BadgeFocus f={families[at]} pos={at + 1} count={families.length} fresh={fresh} startedAt={data.startedAt} onMove={move} onClose={close} />
+      )}
     </div>
   );
 }
 
-/** The next tier's card as a thumbnail, without its name, dimmed: a goal, not a win. */
+/** The next tier's card as a thumbnail, without its name, dimmed: a goal, not a win. Spans: it can sit in a button. */
 function MiniCard({ f, t }: { f: BadgeFamily; t: BadgeTier }) {
   return (
-    <div className="badge-slot badge-mini" aria-hidden="true">
-      <div className={`badge-card tier-${t.tier}`}>
-        <div className="badge-frame" />
-        <div className="badge-face">
-          <div className="badge-art">
-            {trace}
-            <BadgeGlyph family={f.id} step={f.tiers.indexOf(t)} fallback={f.icon} />
-            <span className="badge-corners" />
-          </div>
-        </div>
-        {t.tier !== "bronze" && <div className="badge-foil" />}
-        <div className="badge-glare" />
-      </div>
-    </div>
+    <span className="badge-slot badge-mini" aria-hidden="true">
+      <span className={`badge-card tier-${t.tier}`}>
+        <CardLayers f={f} t={t} lit named={false} />
+      </span>
+    </span>
   );
 }
 
