@@ -153,6 +153,17 @@ test("badge XP goes by tier reached, so One-shot's first tier (gold) is worth 5"
   assert.deepEqual(out.families.find((f) => f.id === "tester").tiers.map((t) => t.xp), [5, 15, 40, 100]);
 });
 
+test("every tier has its own name", () => {
+  const now = monday().getTime();
+  const out = computeBadges([], freshState(now), now);
+  for (const f of out.families) {
+    const names = f.tiers.map((t) => t.name);
+    assert.ok(names.every((n) => typeof n === "string" && n.length > 0), f.id);
+    assert.equal(new Set(names).size, names.length, `${f.id}: names repeat`);
+  }
+  assert.deepEqual(out.families.find((f) => f.id === "marathon").tiers.map((t) => t.name), ["5K", "10K", "Half marathon", "Marathon"]);
+});
+
 test("today's XP counts sessions worked in today and badges unlocked today", () => {
   const now = monday().getTime();
   const midnight = new Date(now).setHours(0, 0, 0, 0);

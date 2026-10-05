@@ -124,46 +124,48 @@ function unionMs(runs) {
 /**
  * `metric(ctx)` returns the family's value, or one value per tier when tiers
  * measure different thresholds (cache, sniper). `targets` lines up with TIERS,
- * starting at `firstTier`. `nudge` marks families that reward good practice:
- * only they are suggested as the next goal ("Next up"), never volume or spend.
+ * starting at `firstTier`. `tierNames` lines up with `targets`: each tier is
+ * shown under its own name (Marathon: 5K, 10K, Half marathon, Marathon), while
+ * unlock keys stay `family:tier`. `nudge` marks families that reward good
+ * practice: only they are suggested as the next goal ("Next up"), never volume or spend.
  */
 const FAMILIES = [
   // Per-session records (rarity)
-  { id: "marathon", name: "Marathon", icon: "🏃", unit: "min", hint: "Longest continuous stretch in one session; pauses of 15 min or less don't break it", targets: [30, 60, 120, 240], metric: (c) => Math.floor(c.longestRunMs / 60_000) },
-  { id: "orchestrator", name: "Orchestrator", icon: "🐝", hint: "Most sub-agents in one session", targets: [1, 5, 20, 50], metric: (c) => max(c.sessions, (s) => s.subAgents) },
-  { id: "surgeon", name: "File surgeon", icon: "🩺", hint: "Most files changed in one session", targets: [5, 10, 25, 50], metric: (c) => max(c.sessions, (s) => s.filesChanged) },
-  { id: "toolbox", name: "Toolbox", icon: "🧰", hint: "Most distinct tools used in one session", targets: [8, 10, 15], metric: (c) => max(c.sessions, (s) => Object.keys(s.toolCounts ?? {}).length) },
-  { id: "juggler", name: "Juggler", icon: "🤹", hint: "Sessions actively running at the same time", targets: [2, 3, 5, 8], metric: (c) => maxOverlap(c.runs) },
-  { id: "oneshot", nudge: true, name: "One-shot", icon: "🏹", hint: "Sessions where a single prompt ended in a commit", firstTier: 2, targets: [1, 5], metric: (c) => count(c.sessions, (s) => (s.prompts?.length ?? 0) === 1 && s.commits > 0) },
+  { id: "marathon", name: "Marathon", icon: "🏃", tierNames: ["5K", "10K", "Half marathon", "Marathon"], unit: "min", hint: "Longest continuous stretch in one session; pauses of 15 min or less don't break it", targets: [30, 60, 120, 240], metric: (c) => Math.floor(c.longestRunMs / 60_000) },
+  { id: "orchestrator", name: "Orchestrator", icon: "🐝", tierNames: ["Duet", "Quintet", "Orchestra", "Maestro"], hint: "Most sub-agents in one session", targets: [1, 5, 20, 50], metric: (c) => max(c.sessions, (s) => s.subAgents) },
+  { id: "surgeon", name: "File surgeon", icon: "🩺", tierNames: ["Intern", "Resident", "Surgeon", "Chief surgeon"], hint: "Most files changed in one session", targets: [5, 10, 25, 50], metric: (c) => max(c.sessions, (s) => s.filesChanged) },
+  { id: "toolbox", name: "Toolbox", icon: "🧰", tierNames: ["Tinkerer", "Mechanic", "Engineer"], hint: "Most distinct tools used in one session", targets: [8, 10, 15], metric: (c) => max(c.sessions, (s) => Object.keys(s.toolCounts ?? {}).length) },
+  { id: "juggler", name: "Juggler", icon: "🤹", tierNames: ["Double", "Cascade", "Fountain", "Big top"], hint: "Sessions actively running at the same time", targets: [2, 3, 5, 8], metric: (c) => maxOverlap(c.runs) },
+  { id: "oneshot", nudge: true, name: "One-shot", icon: "🏹", tierNames: ["Clean shot", "Robin Hood"], hint: "Sessions where a single prompt ended in a commit", firstTier: 2, targets: [1, 5], metric: (c) => count(c.sessions, (s) => (s.prompts?.length ?? 0) === 1 && s.commits > 0) },
 
   // Rolling 30 days
-  { id: "shipper", nudge: true, name: "Shipper", icon: "🚢", window: "30d", hint: "Days with a commit made by Claude in the last 30 days", targets: [3, 8, 15, 22], metric: (c) => c.commitDays30 },
-  { id: "cache", nudge: true, name: "Cache keeper", icon: "🧊", window: "30d", hint: "Sessions over 100k tokens in the last 30 days with a cache hit of 95% (bronze, silver) or 98% (gold)", targets: [1, 10, 25], metric: (c) => [c.cache95, c.cache95, c.cache98] },
-  { id: "streak", name: "Streak", icon: "🔥", hint: "Best run of active days in a row since ccblackbox first ran; quiet weekends don't break it", targets: [3, 7, 14, 30], metric: (c) => c.streak },
+  { id: "shipper", nudge: true, name: "Shipper", icon: "🚢", tierNames: ["Dinghy", "Sailboat", "Steamer", "Flagship"], window: "30d", hint: "Days with a commit made by Claude in the last 30 days", targets: [3, 8, 15, 22], metric: (c) => c.commitDays30 },
+  { id: "cache", nudge: true, name: "Cache keeper", icon: "🧊", tierNames: ["Ice cube", "Iceberg", "Glacier"], window: "30d", hint: "Sessions over 100k tokens in the last 30 days with a cache hit of 95% (bronze, silver) or 98% (gold)", targets: [1, 10, 25], metric: (c) => [c.cache95, c.cache95, c.cache98] },
+  { id: "streak", name: "Streak", icon: "🔥", tierNames: ["Spark", "Flame", "Bonfire", "Wildfire"], hint: "Best run of active days in a row since ccblackbox first ran; quiet weekends don't break it", targets: [3, 7, 14, 30], metric: (c) => c.streak },
 
   // Shipping and rigor (shell commands run by Claude)
-  { id: "pr", nudge: true, name: "PR opener", icon: "🔀", hint: "Pull requests opened with gh pr create", targets: [1, 10, 200, 1000], metric: (c) => sum(c.sessions, (s) => s.shell?.prs ?? 0) },
-  { id: "tester", nudge: true, name: "Tester", icon: "🧪", hint: "Sessions that ran tests", targets: [1, 10, 100, 300], metric: (c) => count(c.sessions, (s) => s.shell?.tests > 0) },
-  { id: "gatekeeper", nudge: true, name: "Gatekeeper", icon: "🚦", hint: "Sessions that ran a lint, typecheck or build", targets: [1, 10, 100, 300], metric: (c) => count(c.sessions, (s) => s.shell?.lints > 0) },
-  { id: "infra", name: "Infra", icon: "🏗️", hint: "Sessions that ran docker, kubectl, terraform, gcloud…", targets: [1, 10, 50, 200], metric: (c) => count(c.sessions, (s) => s.shell?.infra > 0) },
-  { id: "explorer", name: "Explorer", icon: "🧭", hint: "Projects with at least one commit", targets: [2, 5, 15, 40], metric: (c) => new Set(c.sessions.filter((s) => s.commits > 0).map((s) => s.project)).size },
+  { id: "pr", nudge: true, name: "PR opener", icon: "🔀", tierNames: ["First PR", "Contributor", "Maintainer", "Core team"], hint: "Pull requests opened with gh pr create", targets: [1, 10, 200, 1000], metric: (c) => sum(c.sessions, (s) => s.shell?.prs ?? 0) },
+  { id: "tester", nudge: true, name: "Tester", icon: "🧪", tierNames: ["Lab intern", "Lab tech", "Scientist", "Nobel"], hint: "Sessions that ran tests", targets: [1, 10, 100, 300], metric: (c) => count(c.sessions, (s) => s.shell?.tests > 0) },
+  { id: "gatekeeper", nudge: true, name: "Gatekeeper", icon: "🚦", tierNames: ["Turnstile", "Checkpoint", "Border control", "Gatekeeper"], hint: "Sessions that ran a lint, typecheck or build", targets: [1, 10, 100, 300], metric: (c) => count(c.sessions, (s) => s.shell?.lints > 0) },
+  { id: "infra", name: "Infra", icon: "🏗️", tierNames: ["Shed", "Warehouse", "Tower", "Skyline"], hint: "Sessions that ran docker, kubectl, terraform, gcloud…", targets: [1, 10, 50, 200], metric: (c) => count(c.sessions, (s) => s.shell?.infra > 0) },
+  { id: "explorer", name: "Explorer", icon: "🧭", tierNames: ["Wanderer", "Trailblazer", "Pathfinder", "Cartographer"], hint: "Projects with at least one commit", targets: [2, 5, 15, 40], metric: (c) => new Set(c.sessions.filter((s) => s.commits > 0).map((s) => s.project)).size },
 
   // Ways of working
-  { id: "planner", nudge: true, name: "Planner", icon: "🗺️", hint: "Sessions that went through plan mode", targets: [1, 10, 50, 200], metric: (c) => count(c.sessions, (s) => s.toolCounts?.ExitPlanMode > 0) },
-  { id: "researcher", name: "Researcher", icon: "🔎", hint: "Sessions that searched or fetched the web", targets: [1, 10, 50, 150], metric: (c) => count(c.sessions, (s) => s.toolCounts?.WebSearch > 0 || s.toolCounts?.WebFetch > 0) },
-  { id: "skills", name: "Skill user", icon: "🪄", hint: "Sessions that used a skill", targets: [1, 10, 75, 200], metric: (c) => count(c.sessions, (s) => s.toolCounts?.Skill > 0) },
-  { id: "mcp", name: "MCP collector", icon: "🔌", hint: "Distinct MCP servers used", targets: [1, 4, 8, 12], metric: (c) => new Set(c.sessions.flatMap((s) => Object.keys(s.toolCounts ?? {}).filter((k) => k.startsWith("mcp:")))).size },
-  { id: "models", name: "Model tourist", icon: "🧬", hint: "Model families used (Haiku, Sonnet, Opus, Fable)", targets: [2, 3, 4], metric: (c) => new Set(c.sessions.flatMap((s) => (s.turns ?? []).map((t) => (t.model ?? s.model).split("-")[0]))).size },
+  { id: "planner", nudge: true, name: "Planner", icon: "🗺️", tierNames: ["Sketch", "Blueprint", "Roadmap", "Masterplan"], hint: "Sessions that went through plan mode", targets: [1, 10, 50, 200], metric: (c) => count(c.sessions, (s) => s.toolCounts?.ExitPlanMode > 0) },
+  { id: "researcher", name: "Researcher", icon: "🔎", tierNames: ["Curious", "Investigator", "Detective", "Sherlock"], hint: "Sessions that searched or fetched the web", targets: [1, 10, 50, 150], metric: (c) => count(c.sessions, (s) => s.toolCounts?.WebSearch > 0 || s.toolCounts?.WebFetch > 0) },
+  { id: "skills", name: "Skill user", icon: "🪄", tierNames: ["Initiate", "Conjurer", "Wizard", "Archmage"], hint: "Sessions that used a skill", targets: [1, 10, 75, 200], metric: (c) => count(c.sessions, (s) => s.toolCounts?.Skill > 0) },
+  { id: "mcp", name: "MCP collector", icon: "🔌", tierNames: ["Plugged in", "Power strip", "Switchboard", "Power grid"], hint: "Distinct MCP servers used", targets: [1, 4, 8, 12], metric: (c) => new Set(c.sessions.flatMap((s) => Object.keys(s.toolCounts ?? {}).filter((k) => k.startsWith("mcp:")))).size },
+  { id: "models", name: "Model tourist", icon: "🧬", tierNames: ["Day tripper", "Backpacker", "Globetrotter"], hint: "Model families used (Haiku, Sonnet, Opus, Fable)", targets: [2, 3, 4], metric: (c) => new Set(c.sessions.flatMap((s) => (s.turns ?? []).map((t) => (t.model ?? s.model).split("-")[0]))).size },
 
   // Milestones
-  { id: "veteran", name: "Veteran", icon: "🎖️", hint: "Sessions", targets: [10, 100, 500, 1500], metric: (c) => c.sessions.length },
-  { id: "hours", name: "Hours", icon: "⏳", unit: "h", hint: "Hours of continuous work; parallel sessions count once", targets: [10, 100, 300, 1000], metric: (c) => Math.floor(unionMs(c.runs) / 3_600_000) },
-  { id: "editor", name: "Editor", icon: "✍️", hint: "Edit and Write calls", targets: [100, 1000, 10_000, 40_000], metric: (c) => sum(c.sessions, (s) => (s.toolCounts?.Edit ?? 0) + (s.toolCounts?.Write ?? 0) + (s.toolCounts?.MultiEdit ?? 0)) },
+  { id: "veteran", name: "Veteran", icon: "🎖️", tierNames: ["Recruit", "Sergeant", "Captain", "General"], hint: "Sessions", targets: [10, 100, 500, 1500], metric: (c) => c.sessions.length },
+  { id: "hours", name: "Hours", icon: "⏳", tierNames: ["Clocked in", "Full-timer", "Overtime", "Timeless"], unit: "h", hint: "Hours of continuous work; parallel sessions count once", targets: [10, 100, 300, 1000], metric: (c) => Math.floor(unionMs(c.runs) / 3_600_000) },
+  { id: "editor", name: "Editor", icon: "✍️", tierNames: ["Draft", "Chapter", "Novel", "Saga"], hint: "Edit and Write calls", targets: [100, 1000, 10_000, 40_000], metric: (c) => sum(c.sessions, (s) => (s.toolCounts?.Edit ?? 0) + (s.toolCounts?.Write ?? 0) + (s.toolCounts?.MultiEdit ?? 0)) },
 
   // Need /insights facets or scored sessions; hidden without them.
-  { id: "sniper", nudge: true, name: "Sniper", icon: "🎯", requires: "insights", hint: "Fully achieved sessions: any (bronze), with under 2 frictions (silver), with none (gold). Needs /insights", targets: [1, 5, 10], metric: (c) => [count(c.sessions, (s) => s.outcome === "fully_achieved"), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length < 2), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length === 0)] },
-  { id: "comeback", nudge: true, name: "Comeback", icon: "🧗", requires: "insights", hint: "Sessions that hit friction and still got (mostly) done. Needs /insights", targets: [1, 10, 75, 200], metric: (c) => count(c.sessions, (s) => s.frictions.length > 0 && succeeded(s)) },
-  { id: "hygiene", nudge: true, name: "Context hygiene", icon: "🫧", requires: "quality", hint: "Ended sessions with a context quality score of 90+", targets: [1, 25, 100, 300], metric: (c) => count(c.sessions, (s) => !s.live && (s.quality?.score ?? 0) >= 90) },
+  { id: "sniper", nudge: true, name: "Sniper", icon: "🎯", tierNames: ["On target", "Sharpshooter", "Bullseye"], requires: "insights", hint: "Fully achieved sessions: any (bronze), with under 2 frictions (silver), with none (gold). Needs /insights", targets: [1, 5, 10], metric: (c) => [count(c.sessions, (s) => s.outcome === "fully_achieved"), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length < 2), count(c.sessions, (s) => s.outcome === "fully_achieved" && s.frictions.length === 0)] },
+  { id: "comeback", nudge: true, name: "Comeback", icon: "🧗", tierNames: ["Foothold", "Climber", "Summit", "Everest"], requires: "insights", hint: "Sessions that hit friction and still got (mostly) done. Needs /insights", targets: [1, 10, 75, 200], metric: (c) => count(c.sessions, (s) => s.frictions.length > 0 && succeeded(s)) },
+  { id: "hygiene", nudge: true, name: "Context hygiene", icon: "🫧", tierNames: ["Rinse", "Clean", "Spotless", "Pristine"], requires: "quality", hint: "Ended sessions with a context quality score of 90+", targets: [1, 25, 100, 300], metric: (c) => count(c.sessions, (s) => !s.live && (s.quality?.score ?? 0) >= 90) },
 ];
 
 function count(arr, fn) { let n = 0; for (const x of arr) if (fn(x)) n++; return n; }
@@ -340,7 +342,7 @@ export function computeBadges(allSessions, state, now = Date.now()) {
         state.unlocked[key] = new Date(now).toISOString();
         changed = true;
       }
-      return { tier, target, progress: Math.min(progress, target), unlockedAt: state.unlocked[key] ?? null, xp: tierXp(f.id, tier) };
+      return { tier, name: f.tierNames[i], target, progress: Math.min(progress, target), unlockedAt: state.unlocked[key] ?? null, xp: tierXp(f.id, tier) };
     });
     return {
       id: f.id,

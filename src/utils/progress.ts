@@ -34,7 +34,7 @@ function announceUnlocks(data: BadgesPayload, keys: string[], onOpen: () => void
   const xpText = xp > 0 ? `+${xp} XP · ` : "";
   if (items.length === 1) {
     const { f, t } = items[0];
-    toastAchievement({ icon: f.icon, title: `${TIER_LABEL[t.tier]} · ${f.name}`, sub: `${xpText}${f.hint}`, tone: t.tier, action });
+    toastAchievement({ icon: f.icon, title: `${t.name} · ${TIER_LABEL[t.tier]}`, sub: `${xpText}${f.name}: ${f.hint}`, tone: t.tier, action });
     return;
   }
   const order: Tier[] = ["platinum", "gold", "silver", "bronze"];
@@ -42,7 +42,7 @@ function announceUnlocks(data: BadgesPayload, keys: string[], onOpen: () => void
   toastAchievement({
     icon: items.slice(0, 3).map((i) => i.f.icon).join(""),
     title: `${items.length} badges unlocked`,
-    sub: `${xpText}${items.map(({ f, t }) => `${TIER_LABEL[t.tier]} ${f.name}`).join(", ")}`,
+    sub: `${xpText}${items.map(({ t }) => `${t.name} (${TIER_LABEL[t.tier]})`).join(", ")}`,
     tone: best,
     action,
   });

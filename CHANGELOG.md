@@ -6,6 +6,10 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Badge cards**: each badge is a foil collector card whose finish is the tier (matte bronze, silver and gold sheen, holographic platinum that follows the pointer), with a line-art glyph in place of the emoji. Every tier has its own name and glyph that grows with it (Marathon: 5K, 10K, Half marathon, then Marathon, from jog to finish tape). Locked badges are face down. Progress, targets and unlock dates moved from the card to its hover card.
+
 ### Planned
 
 - Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
