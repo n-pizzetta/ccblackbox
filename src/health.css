@@ -23,7 +23,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: var(--fs-md);
   font-weight: 700;
   border: 1px solid currentColor;
 }
@@ -43,18 +43,18 @@
   font-weight: 600;
 }
 .health-value {
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 .status-warn .health-value { color: var(--c-amber); }
 .status-fail .health-value { color: var(--c-red); }
 .health-target {
-  font-size: 12px;
+  font-size: var(--fs-md);
 }
 
 .health-why,
 .health-hint {
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: var(--fs-md);
   line-height: 1.45;
 }
 
@@ -65,7 +65,7 @@
   margin-top: 8px;
 }
 .health-session {
-  font-size: 11px;
+  font-size: var(--fs-sm);
   padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--c-hairline-strong);
@@ -82,3 +82,7 @@
   color: inherit;
   border-color: var(--c-text-faint);
 }
+
+/* score in the checklist heading */
+.health-score { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 400; color: var(--c-text-dim); }
+.health-score svg { flex: none; }

@@ -8,6 +8,8 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Added
 
+- **Pages**: the dashboard is split into **Now** (5h window, live burn, live or latest sessions), **Sessions** (full-width sortable table, compare beside it), **Usage** (tokens over time, projects, models, tools, heaviest prompts) and **Health** (checklist, anomalies), switched from the header or with keys 1–4. Badges move to a page reached from the profile menu.
+- **Scope bar**: range, project, status and search in one place, with the resulting count and a reset. Only Sessions, Usage and Health follow it; Now and Badges say they ignore it.
 - Session **Timeline** tab: context fill, cumulative API value and fresh tokens per turn over time, with compactions, prompts and failed tool calls marked. It loads when you open a session, for review after the fact.
 - Demo data (`pnpm seed:demo`) now includes compactions and failed tool calls.
 - **Codex support**: sessions from the Codex CLI and IDE extension (`~/.codex/sessions/`, `$CODEX_HOME`) are parsed next to Claude Code ones: tokens (cached input apart), GPT pricing (GPT-6 and GPT-5.6 families, GPT-5.5, GPT-5.4), prompts, commands, patches, MCP calls and failures, code-mode scripts (including commands that outlive their script), sub-agents merged into their parent, thread names, the timeline against the reported context window, and `codex resume` in the session view. Rows are tagged `codex`; a Claude Code / Codex filter shows when both are present. Codex sessions stay out of Claude's 5h window, badges and Claude-specific health rules. `pnpm seed:demo` also writes `.demo-codex/`.
@@ -16,6 +18,11 @@ versioning follows [SemVer](https://semver.org/).
 
 - Logo and favicon: the red recording dot is gone, leaving the session trace.
 - README: hero image, one animated demo per feature, and install via `/plugin`.
+- The session list is a sortable table (status glyph with one dot per outcome, project, flags, usage, active time, start) with day headers; its order drives ↑ / ↓ in the session view. The help explains its glyphs.
+- One headline-tile style (`KpiRow`) for the scope, the session view and the 5h window; the Tokens tab merges its bars, table and total into one Breakdown panel.
+- One type scale (nine sizes, `--fs-xs` to `--fs-3xl`), sentence-case sans labels, mono only for values and code; about 260 CSS rules for removed markup are gone.
+- Session view: one line per tool call in fixed columns, one chip style in the header, tool and file counts on the tabs, Export as a labeled button.
+- On phones the Sessions page scrolls as a whole, and the limits and the profile chip get their own header row.
 
 ### Planned
 

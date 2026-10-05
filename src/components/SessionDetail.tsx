@@ -2,6 +2,7 @@ import { LimitsPill } from "./LimitsGauge";
 import { SessionContext } from "./ContextCard";
 import { TimelineTab } from "./SessionTimeline";
 import { SessionKpis, TabPreviews } from "./SessionOverview";
+import { KpiRow } from "./Kpi";
 import { freshTokens, useUnit } from "../utils/units";
 import { projectColor } from "../utils/fleetStats";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -123,7 +124,7 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
           "--badge-border": `${c}40`,
         } as React.CSSProperties}
       >
-        <span className="quality-label">QUALITY</span>
+        <span className="quality-label">Quality</span>
         <span className="quality-grade">{quality.grade}</span>
         <span className="quality-score tabular">{quality.score.toFixed(1)}</span>
         <span className="badge-info" aria-hidden>ⓘ</span>
@@ -217,6 +218,7 @@ export function SessionDetail({
   const [toolFocus, setToolFocus] = useState<{ promptIdx: number; start: number; end: number } | null>(null);
   const [resumeCopied, setResumeCopied] = useState(false);
   const c = outcomeColor(session.outcome);
+  const toolCallCount = Object.values(session.toolCounts ?? {}).reduce((a, n) => a + n, 0);
 
   const shellEscape = (s: string) => (/^[A-Za-z0-9_@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`);
   const resume = session.agent === "codex" ? `codex resume ${session.id}` : `claude --resume ${session.id}`;
@@ -262,12 +264,11 @@ export function SessionDetail({
           <div className="detail-toolbar-right">
             <LimitsPill />
             <button
-              className="toolbar-btn"
+              className="toolbar-btn wide"
               onClick={() => downloadSessionHtml(session)}
               title="Export session as HTML"
-              aria-label="Export session"
             >
-              ↓
+              Export
             </button>
             {onClose ? (
               <button
@@ -312,7 +313,7 @@ export function SessionDetail({
                   boxShadow: `0 0 8px ${c}`,
                 }}
               />
-              {outcomeLabel(session.outcome)}
+              <span>Outcome: {outcomeLabel(session.outcome)}</span>
               <InfoDot
                 title={
                   session.outcome === "in_progress"
@@ -326,8 +327,13 @@ export function SessionDetail({
               />
             </div>
             {session.quality && <QualityChip quality={session.quality} />}
-            <span className="proj-pill" style={{ "--pc": projectColor(session.project) } as React.CSSProperties}>{session.project}</span>
-            <span className="detail-meta mono">{modelLabel(session.model)} · {new Date(session.startedAt).toLocaleString()}</span>
+            <span className="st-project">
+              <span className="project-dot" style={{ background: projectColor(session.project) }} aria-hidden="true" />
+              <span className="mono">{session.project}</span>
+            </span>
+            <span className="detail-meta">
+              {modelLabel(session.model)} · {new Date(session.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            </span>
           </div>
           <div className="goal-row">
             <div className="goal">{session.goal}</div>
@@ -355,6 +361,8 @@ export function SessionDetail({
               {t.id === "overview" && session.frictions.length > 0 && (
                 <span className="tab-badge">{session.frictions.length}</span>
               )}
+              {t.id === "tools" && <span className="tab-count mono tabular">{toolCallCount}</span>}
+              {t.id === "files" && <span className="tab-count mono tabular">{session.filesChanged}</span>}
             </button>
           ))}
         </div>
@@ -383,7 +391,6 @@ export function SessionDetail({
             {resumeCopied ? "✓ copied" : session.id}
           </button>
         </span>
-        <span className="cost tabular" title="API value: what this would cost at API prices">API value {formatCost(session.costUsd)}</span>
       </div>
     </div>
   );
@@ -802,13 +809,13 @@ function OverviewTab({
             <div className="prompt-list">
               <div className="prompt-row prompt-row-head mono dim caps">
                 <span>#</span>
-                <span>t</span>
-                <span>cat</span>
-                <span className="right">tools</span>
+                <span>Time</span>
+                <span>Kind</span>
+                <span className="right">Tools</span>
                 <span className="right">{unit === "tokens" ? "tok" : "$"}</span>
                 <span />
-                <span>preview</span>
-                <span className="right">len</span>
+                <span>Prompt</span>
+                <span className="right">Length</span>
               </div>
               {prompts.map((_, revIdx) => {
                 const i = prompts.length - 1 - revIdx;
@@ -1043,7 +1050,7 @@ function ToolsTab({
               );
             })}
             {sequence.length >= 300 && (
-              <div className="mono dim" style={{ padding: "8px 10px", fontSize: 11 }}>
+              <div className="mono dim" style={{ padding: "8px 10px", fontSize: "var(--fs-sm)" }}>
                 (older tool calls truncated — showing first 300 captured)
               </div>
             )}
@@ -1067,7 +1074,9 @@ function ToolSeqRow({
   const hasResult = !!entry.result;
   const hasFull = !!entry.full;
   const expandable = hasResult || hasFull;
+  const isError = !!entry.result?.isError;
   const resultOneLine = entry.result?.text.replace(/\s+/g, " ").trim() ?? "";
+  const status = pending ? "running" : isError ? "error" : hasResult ? "ok" : "no result";
   return (
     <div className={`tool-seq-row ${expandable ? "has-result" : ""} ${open ? "open" : ""} ${pending ? "pending" : ""}`}>
       <button
@@ -1077,32 +1086,36 @@ function ToolSeqRow({
         aria-label={expandable ? (open ? "Collapse tool details" : "Expand tool details") : undefined}
       >
         <span className="tool-seq-time mono dim tabular">{formatClockAt(startedAt, entry.t)}</span>
-        <span className="tool-seq-name mono">
-          {entry.tool}
+        <span className={`tool-seq-status ${pending ? "run" : isError ? "err" : hasResult ? "ok" : ""}`} title={status} aria-label={status}>
+          {pending ? "▶" : isError ? "✗" : hasResult ? "✓" : "·"}
+        </span>
+        <span className="tool-seq-name mono" title={entry.tool}>{entry.tool}</span>
+        <span className="tool-seq-preview mono dim">{entry.preview}</span>
+        <span className="tool-seq-size">
           {entry.result?.bytes != null && entry.result.bytes > 0 && (
-            <span className={`result-size-chip mono tabular ${
-              entry.result.bytes > 30_000 ? "hot" : entry.result.bytes > 8_000 ? "warm" : ""
-            }`}>
+            <span
+              className={`result-size-chip mono tabular ${entry.result.bytes > 30_000 ? "hot" : entry.result.bytes > 8_000 ? "warm" : ""}`}
+              title="Size of the tool result sent back to the model"
+            >
               {formatBytes(entry.result.bytes)}
             </span>
           )}
         </span>
-        <span className="tool-seq-preview mono dim">{entry.preview}</span>
-        {pending && <span className="tool-seq-pending mono" aria-label="Running">▶ running</span>}
-        {expandable && <span className="tool-seq-toggle mono dim">{open ? "▾" : "▸"}</span>}
+        <span className="tool-seq-toggle mono dim" aria-hidden="true">{expandable ? (open ? "▾" : "▸") : ""}</span>
       </button>
       {open && (
         <pre className="tool-seq-command mono">{entry.full ?? entry.preview}</pre>
       )}
       {hasResult && open && (
-        <pre className={`tool-seq-result mono ${entry.result!.isError ? "is-error" : ""}`}>
+        <pre className={`tool-seq-result mono ${isError ? "is-error" : ""}`}>
           {entry.result!.text}
           {entry.result!.truncated && <span className="dim"> …</span>}
         </pre>
       )}
-      {hasResult && !open && (
-        <div className="tool-seq-result-hint mono dim">
-          → {resultOneLine.slice(0, 100)}{resultOneLine.length > 100 ? "…" : ""}
+      {/* successes stay one line; failures show why */}
+      {isError && !open && (
+        <div className="tool-seq-result-hint mono">
+          {resultOneLine.slice(0, 140)}{resultOneLine.length > 140 ? "…" : ""}
         </div>
       )}
     </div>
@@ -1137,13 +1150,6 @@ function sessionCostPerKind(session: Session) {
     out.cacheWrite += c.cacheWrite;
   }
   return out;
-}
-
-function hitColor(ratio: number): string {
-  if (ratio >= 0.9) return "var(--c-green)";
-  if (ratio >= 0.7) return "var(--c-cyan)";
-  if (ratio >= 0.4) return "var(--c-amber)";
-  return "var(--c-red)";
 }
 
 const ratio = (n: number) => `${Number(n.toFixed(3))}×`;
@@ -1245,57 +1251,74 @@ function TokensTab({ session }: { session: Session }) {
   ];
 
   const pct = (v: number, t: number) => (t > 0 ? (v / t) * 100 : 0);
+  const hitTone = cacheHit >= 0.9 ? "green" : cacheHit >= 0.4 ? undefined : "red";
+  const estimated = session.unpricedModels?.length ? "~" : "";
 
   return (
     <>
-      <div>
+      <KpiRow
+        items={[
+          {
+            label: "API value",
+            value: `${estimated}${formatCost(totalCost)}`,
+            sub: baseline > totalCost ? `${formatCost(baseline)} without cache` : "public per-token prices",
+            title: session.unpricedModels?.length ? estimateHint(session.unpricedModels) : "Public per-token pricing for this session's models. Excludes batch discounts and negotiated rates.",
+          },
+          {
+            label: "Cache hit",
+            value: `${(cacheHit * 100).toFixed(1)}%`,
+            sub: `${formatTokens(session.tokens.cacheRead)} of ${formatTokens(session.tokens.input + session.tokens.cacheRead)} input`,
+            tone: hitTone,
+            title: "cacheRead / (cacheRead + input): input served from the prompt cache instead of billed fresh. Aim for 90% or more.",
+          },
+          {
+            label: "Cache savings",
+            value: formatCost(savings),
+            sub: `${savingsPct.toFixed(0)}% off the no-cache cost`,
+            tone: savings > 0 ? "green" : undefined,
+            title: "Actual cost vs every cached token billed as fresh input: what the prompt cache is worth here.",
+          },
+          {
+            label: "Per prompt",
+            value: promptCount > 0 ? formatCost(costPerPrompt) : "—",
+            sub: promptCount > 0 ? `${promptCount} user prompts` : "no prompts captured",
+            title: "API value ÷ user prompts: a rough weight of each turn, inflated by tool-heavy turns and long replies.",
+          },
+        ]}
+      />
+
+      <div className="d-panel">
         <div className="section-title">
           <span>
-            Tokens <InfoDot title="Raw token volume from assistant.usage in the transcript. Volume ≠ cost — cache tokens are cheap, output tokens cost several times input. See cost bar below." />
+            Breakdown <InfoDot title="Token volume and cost per kind. Volume ≠ cost: cache reads are cheap, output costs several times input, so cost is often dominated by output and cache writes even when cache reads dominate volume." />
           </span>
-          <span className="dim mono tabular">{formatTokens(totalTokens)} total</span>
+          <span className="dim mono tabular">{formatTokens(totalTokens)} tokens · {estimated}{formatCost(totalCost)}</span>
         </div>
-        <div className="tokens-bar" aria-label="Token volume">
-          {rows.map((r) => (
-            <div
-              key={r.key}
-              className={`tokens-seg ${r.cls}`}
-              style={{ flex: r.tokens || 0.0001 }}
-              title={`${r.label}: ${formatTokens(r.tokens)} (${pct(r.tokens, totalTokens).toFixed(1)}%)`}
-            />
+        <div className="tokens-bars">
+          {([["Volume", "tokens"], ["Cost", "cost"]] as const).map(([label, field]) => (
+            <div key={field} className="tokens-bars-row">
+              <span className="tokens-bars-label">{label}</span>
+              <div className="tokens-bar" aria-label={`${label} by token kind`}>
+                {rows.map((r) => (
+                  <div
+                    key={r.key}
+                    className={`tokens-seg ${r.cls}`}
+                    style={{ flex: r[field] || 0.0001 }}
+                    title={`${r.label}: ${field === "tokens" ? formatTokens(r.tokens) : formatCost(r.cost)} (${pct(r[field], field === "tokens" ? totalTokens : totalCost).toFixed(1)}%)`}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
-      </div>
-
-      <div>
-        <div className="section-title">
-          <span>
-            Cost <InfoDot title="Anthropic public per-model pricing applied to each token kind. This bar shows where the money went — often dominated by output and cacheWrite even when cache reads dominate volume." />
-          </span>
-          <span className="dim mono tabular">{formatCost(totalCost)} actual</span>
-        </div>
-        <div className="tokens-bar" aria-label="Cost share">
-          {rows.map((r) => (
-            <div
-              key={r.key}
-              className={`tokens-seg ${r.cls}`}
-              style={{ flex: r.cost || 0.0001 }}
-              title={`${r.label}: ${formatCost(r.cost)} (${pct(r.cost, totalCost).toFixed(1)}%)`}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <div className="section-title">Breakdown</div>
         <div className="tokens-table">
-          <div className="tokens-table-head mono dim caps">
+          <div className="tokens-table-head">
             <span />
-            <span>kind</span>
-            <span className="tabular right">tokens</span>
-            <span className="tabular right">vol %</span>
-            <span className="tabular right">cost</span>
-            <span className="tabular right">cost %</span>
+            <span>Kind</span>
+            <span className="tabular right">Tokens</span>
+            <span className="tabular right">Volume</span>
+            <span className="tabular right">Cost</span>
+            <span className="tabular right">Cost share</span>
           </div>
           {rows.map((r) => (
             <div key={r.key} className="tokens-table-row">
@@ -1310,73 +1333,6 @@ function TokensTab({ session }: { session: Session }) {
             </div>
           ))}
         </div>
-      </div>
-
-      <div>
-        <div className="section-title">Efficiency</div>
-        <div className="tokens-metrics">
-          <div className="tokens-metric">
-            <div className="tokens-metric-label mono caps dim">
-              Cache hit <InfoDot title="cacheRead / (cacheRead + input). Higher = more of the input tokens were served from Anthropic's prompt cache rather than being billed fresh. Aim ≥ 90% for repeat-heavy sessions." />
-            </div>
-            <div className="tokens-metric-val tabular" style={{ color: hitColor(cacheHit) }}>
-              {(cacheHit * 100).toFixed(1)}%
-            </div>
-            <div className="tokens-metric-sub mono dim">
-              {formatTokens(session.tokens.cacheRead)} cached / {formatTokens(session.tokens.input + session.tokens.cacheRead)} total input
-            </div>
-          </div>
-          <div className="tokens-metric">
-            <div className="tokens-metric-label mono caps dim">
-              Cache savings <InfoDot title="Delta between actual cost and a hypothetical baseline where every cached token had been billed as fresh input. Tells you what the prompt cache is worth for this session." />
-            </div>
-            <div className="tokens-metric-val tabular" style={{ color: savings > 0 ? "var(--c-green)" : "var(--c-text-faint)" }}>
-              {formatCost(savings)}
-            </div>
-            <div className="tokens-metric-sub mono dim">
-              {savingsPct.toFixed(0)}% off {formatCost(baseline)} baseline
-            </div>
-          </div>
-          <div className="tokens-metric">
-            <div className="tokens-metric-label mono caps dim">
-              Per prompt <InfoDot title="Total session cost ÷ number of user prompts. Rough proxy for how heavy each user turn was. Inflated by tool-heavy turns and long assistant replies." />
-            </div>
-            <div className="tokens-metric-val tabular">
-              {promptCount > 0 ? formatCost(costPerPrompt) : "—"}
-            </div>
-            <div className="tokens-metric-sub mono dim">
-              {promptCount > 0 ? `${promptCount} user prompts` : "no prompts captured"}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div className="section-title">
-          <span>
-            Cost total <InfoDot title="Estimated cost computed from per-token public pricing for this session's model. Excludes batch-API discounts and any account-level negotiated rates." />
-          </span>
-        </div>
-        <div className="cost-line">
-          <span className="dim">estimated cost</span>
-          <span
-            className="tabular"
-            style={{ color: "var(--c-amber)", fontWeight: 600 }}
-            title={session.unpricedModels?.length ? estimateHint(session.unpricedModels) : undefined}
-          >
-            {session.unpricedModels?.length ? "~" : ""}{formatCost(totalCost)}
-          </span>
-        </div>
-        {baseline > totalCost && (
-          <div className="cost-line cost-line-sub">
-            <span className="dim mono">
-              without cache <InfoDot title="What this session would have cost if no prompt caching had applied — every cached token billed at full input rate." />
-            </span>
-            <span className="tabular mono dim" style={{ textDecoration: "line-through" }}>
-              {formatCost(baseline)}
-            </span>
-          </div>
-        )}
       </div>
     </>
   );
@@ -1607,14 +1563,14 @@ function TurnBreakdown({ details }: { details: PromptStats["turnDetails"] }) {
         <div className="turn-breakdown-table">
           <div className="turn-breakdown-head mono dim caps">
             <span>#</span>
-            <span className="right">gap</span>
-            <span className="right">inB</span>
-            <span className="right">outB</span>
-            <span className="right">cacheR</span>
-            <span className="right">cacheW</span>
+            <span className="right">Gap</span>
+            <span className="right">In</span>
+            <span className="right">Out</span>
+            <span className="right">Cache R</span>
+            <span className="right">Cache W</span>
             <span className="right">1h</span>
             <span className="right">5m</span>
-            <span>tools</span>
+            <span>Tools</span>
           </div>
           {details.map((d, i) => {
             const hasCw = d.cacheWrite > 0;

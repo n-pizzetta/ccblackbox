@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type { Session } from "../types";
 import { projectColor } from "../utils/fleetStats";
 
@@ -16,7 +16,7 @@ interface Props {
 
 type Item = { id: FilterId; label: string; count: number; tip: string };
 
-/** Chip labels, also for a persisted filter whose item is hidden in the current range. */
+/** Option labels, also for a persisted filter whose item is hidden in the current range. */
 const FILTER_LABELS: Record<FilterId, string> = {
   all: "All sessions",
   live: "Live",
@@ -27,14 +27,6 @@ const FILTER_LABELS: Record<FilterId, string> = {
   claude: "Claude Code",
   codex: "Codex",
 };
-
-const OUTCOME_LEGEND: Array<{ color: string; label: string }> = [
-  { color: "var(--c-green)", label: "achieved / live" },
-  { color: "var(--c-cyan)", label: "mostly" },
-  { color: "var(--c-amber)", label: "partial" },
-  { color: "var(--c-red)", label: "not achieved" },
-  { color: "var(--c-text-faint)", label: "unknown" },
-];
 
 function statusItems(sessions: Session[]): Item[] {
   const ghostByKind = { crashed: 0, empty: 0 } as Record<string, number>;
@@ -76,142 +68,46 @@ function statusItems(sessions: Session[]): Item[] {
   ];
 }
 
-/** Filters button + popover, and the row of active filters (removable) under the list header. */
+/** Status and project pickers of the scope bar. Counts come from the range, before filtering. */
 export function SessionFilters({ filter, onFilterChange, projectFilter, onProjectFilterChange, sessions }: Props) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   const items = useMemo(() => statusItems(sessions), [sessions]);
   const projects = useMemo(() => {
     const counts = new Map<string, number>();
     for (const s of sessions) counts.set(s.project, (counts.get(s.project) ?? 0) + 1);
     return [...counts.entries()].sort(([, a], [, b]) => b - a);
   }, [sessions]);
-
-  const activeStatus =
-    filter !== "all" ? items.find((i) => i.id === filter) ?? { id: filter, label: FILTER_LABELS[filter], count: 0, tip: "" } : undefined;
-  const activeCount = (activeStatus ? 1 : 0) + (projectFilter ? 1 : 0);
+  const activeStatus = items.find((i) => i.id === filter);
 
   return (
-    <div className="session-filters" ref={wrapRef}>
-      <div className="session-filters-row">
-        <button
-          type="button"
-          className={`filters-btn ${open ? "open" : ""} ${activeCount > 0 ? "has-active" : ""}`}
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-haspopup="dialog"
-        >
-          <span aria-hidden="true">⚲</span> Filters
-          {activeCount > 0 && <span className="filters-btn-count tabular">{activeCount}</span>}
-        </button>
-
+    <>
+      <label className={`scope-select ${projectFilter ? "set" : ""}`}>
+        <span className="scope-select-label">Project</span>
         {projectFilter && (
-          <button
-            type="button"
-            className="active-chip"
-            style={{ "--pc": projectColor(projectFilter) } as React.CSSProperties}
-            onClick={() => onProjectFilterChange(null)}
-            title={`Clear project filter: ${projectFilter}`}
-          >
-            <span className="active-chip-dot" />
-            <span className="mono">{projectFilter}</span>
-            <span className="active-chip-x" aria-hidden="true">×</span>
-          </button>
+          <span className="project-dot" style={{ background: projectColor(projectFilter) }} aria-hidden="true" />
         )}
-        {activeStatus && (
-          <button
-            type="button"
-            className="active-chip status"
-            onClick={() => onFilterChange("all")}
-            title={`Clear filter: ${activeStatus.label}`}
-          >
-            <span>{activeStatus.label}</span>
-            <span className="active-chip-x" aria-hidden="true">×</span>
-          </button>
-        )}
-        {activeCount >= 2 && (
-          <button
-            type="button"
-            className="filters-clear"
-            onClick={() => {
-              onFilterChange("all");
-              onProjectFilterChange(null);
-            }}
-          >
-            clear
-          </button>
-        )}
-      </div>
-
-      {open && (
-        <div className="filters-pop" role="dialog" aria-label="Filters">
-          <div className="filters-pop-section">
-            <div className="filters-pop-label">Status</div>
-            {items.map((i) => (
-              <button
-                key={i.id}
-                type="button"
-                className={`filters-pop-item ${filter === i.id ? "active" : ""} ${i.count === 0 && filter !== i.id ? "empty" : ""}`}
-                aria-pressed={filter === i.id}
-                onClick={() => onFilterChange(i.id)}
-                title={i.tip || undefined}
-              >
-                <span>{i.label}</span>
-                <span className="mono tabular filters-pop-count">{i.count}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="filters-pop-section">
-            <div className="filters-pop-label">Project</div>
-            {projects.map(([p, count]) => {
-              const active = projectFilter === p;
-              return (
-                <button
-                  key={p}
-                  type="button"
-                  className={`filters-pop-item ${active ? "active" : ""}`}
-                  aria-pressed={active}
-                  onClick={() => onProjectFilterChange(active ? null : p)}
-                >
-                  <span className="filters-pop-project">
-                    <span className="project-dot" style={{ background: projectColor(p) }} />
-                    <span className="mono">{p}</span>
-                  </span>
-                  <span className="mono tabular filters-pop-count">{count}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="filters-pop-legend">
-            <span className="filters-pop-label">Row bar</span>
-            {OUTCOME_LEGEND.map((l) => (
-              <span key={l.label} className="filters-pop-legend-item">
-                <span className="legend-bar" style={{ background: l.color }} />
-                {l.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+        <select value={projectFilter ?? ""} onChange={(e) => onProjectFilterChange(e.target.value || null)}>
+          <option value="">All ({sessions.length})</option>
+          {projects.map(([p, count]) => (
+            <option key={p} value={p}>{p} ({count})</option>
+          ))}
+          {/* a project from the URL that has no session in this range */}
+          {projectFilter && !projects.some(([p]) => p === projectFilter) && (
+            <option value={projectFilter}>{projectFilter} (0)</option>
+          )}
+        </select>
+      </label>
+      <label className={`scope-select ${filter !== "all" ? "set" : ""}`} title={activeStatus?.tip || undefined}>
+        <span className="scope-select-label">Show</span>
+        <select value={filter} onChange={(e) => onFilterChange(e.target.value as FilterId)}>
+          {items.map((i) => (
+            <option key={i.id} value={i.id} disabled={i.count === 0 && filter !== i.id}>
+              {i.id === "all" ? "All" : i.label} ({i.count})
+            </option>
+          ))}
+          {/* a filter from the URL whose option is hidden in this range */}
+          {!activeStatus && <option value={filter}>{FILTER_LABELS[filter]} (0)</option>}
+        </select>
+      </label>
+    </>
   );
 }

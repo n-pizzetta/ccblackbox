@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "../types";
 import { buildSessionTimeline, type TimelinePoint } from "../utils/sessionTimeline";
 import { formatClockAt, formatCost, formatDuration, formatTokens } from "../utils/format";
+import { KpiRow } from "./Kpi";
 import "../timeline.css";
 
 const PAD_L = 46;
@@ -102,13 +103,14 @@ export function TimelineTab({
 
   return (
     <>
-      <div className="tl-kpis">
-        <Kpi label="Peak context" value={`${Math.round(data.peakPct)}%`} sub={`of ${formatTokens(data.window)}`} tone={data.peakPct >= 85 ? "red" : data.peakPct >= WATCH_PCT ? "amber" : undefined} />
-        <Kpi label="Context now" value={lastMain ? `${Math.round(lastMain.ctxPct!)}%` : "—"} sub={lastMain ? formatTokens(lastMain.ctx!) : ""} />
-        <Kpi label="Compactions" value={String(data.compactions.length)} sub={data.compactions.length ? "context dropped by half" : "none detected"} tone={data.compactions.length ? "amber" : undefined} />
-        <Kpi label="API value" value={formatCost(data.totalCost)} sub={`${data.points.length} turns`} />
-        <Kpi label="Failed tool calls" value={String(data.failedTools)} sub={`of ${data.tools.length}`} tone={data.failedTools ? "red" : undefined} />
-      </div>
+      <KpiRow
+        items={[
+          { label: "Peak context", value: `${Math.round(data.peakPct)}%`, sub: `of ${formatTokens(data.window)}`, tone: data.peakPct >= 85 ? "red" : data.peakPct >= WATCH_PCT ? "amber" : undefined },
+          { label: "Context now", value: lastMain ? `${Math.round(lastMain.ctxPct!)}%` : "—", sub: lastMain ? `${formatTokens(lastMain.ctx!)} · ${data.points.length} turns` : `${data.points.length} turns` },
+          { label: "Compactions", value: data.compactions.length, sub: data.compactions.length ? "context dropped by half" : "none detected", tone: data.compactions.length ? "amber" : undefined },
+          { label: "Failed tool calls", value: data.failedTools, sub: `of ${data.tools.length}`, tone: data.failedTools ? "red" : undefined },
+        ]}
+      />
 
       <div className="d-panel tl-panel">
         <div className="section-title tl-head">
@@ -217,16 +219,6 @@ export function TimelineTab({
         </p>
       </div>
     </>
-  );
-}
-
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "amber" | "red" }) {
-  return (
-    <div className="tl-kpi">
-      <div className="tl-kpi-l">{label}</div>
-      <div className={`tl-kpi-v tabular ${tone ?? ""}`}>{value}</div>
-      {sub && <div className="tl-kpi-s mono">{sub}</div>}
-    </div>
   );
 }
 
