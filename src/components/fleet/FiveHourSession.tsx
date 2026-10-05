@@ -9,6 +9,7 @@ import {
   resolveWindowStartMs,
 } from "../../utils/fleetStats";
 import { windowBreakdown } from "../../utils/windowBreakdown";
+import { useStickyRank } from "../../utils/stickyRank";
 import { loadWindowStart, saveWindowStart } from "../../utils/windowState";
 import { formatCost, formatDuration, formatTokens } from "../../utils/format";
 import type { RateLimits } from "../../utils/rateLimits";
@@ -56,10 +57,14 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
   // Exact window when Claude Code reported the reset time (status line wrapper).
   const realStart = limits?.fiveHour?.resetsAt ? limits.fiveHour.resetsAt - FIVE_HOUR_MS : null;
 
-  // Fallback without real limits: persist an inferred anchor as soon as a new
-  // message arrives after the previous window expired (or none was set yet).
+  // With real limits, keep the local anchor on the real window: a poll without them then
+  // continues it instead of jumping to an inferred one. Without: persist an inferred anchor
+  // as soon as a new message arrives after the previous window expired (or none was set yet).
   useEffect(() => {
-    if (realStart !== null) return;
+    if (realStart !== null) {
+      if (realStart !== windowStart) saveWindowStart(realStart);
+      return;
+    }
     if (windowStart && now < windowStart + FIVE_HOUR_MS) return;
     const lastExpiry = windowStart ? windowStart + FIVE_HOUR_MS : 0;
     const fresh = firstEventAfter(sessions, lastExpiry, now);
@@ -73,12 +78,10 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
     [realStart, sessions, windowStart, now],
   );
   const pct = limits?.fiveHour ? limits.fiveHour.usedPct / 100 : null;
-  // Rank by what the % column shows: API value against a known limit, else tokens.
-  const weigh = pct !== null ? "cost" : "tokens";
-  const data = useMemo(
-    () => (fromMs !== null ? windowBreakdown(sessions, fromMs, now, weigh) : null),
-    [sessions, fromMs, now, weigh],
-  );
+  const data = useMemo(() => (fromMs !== null ? windowBreakdown(sessions, fromMs, now) : null), [sessions, fromMs, now]);
+  const weigh = data?.weigh ?? "cost";
+  // A session only overtakes another by more than 1% of the window, so near ties don't swap on every poll.
+  const rankedSessions = useStickyRank(data?.sessions ?? [], (r) => r.s.id, (r) => r[weigh], (data?.total[weigh] ?? 0) / 100);
   const totalTokens = data?.total.tokens ?? 0;
   // While the window is idle, the hot spots fall back to today so the page still says what consumed most.
   const today = useMemo(
@@ -89,16 +92,16 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
   const sessionEnd = fromMs !== null ? fromMs + FIVE_HOUR_MS : 0;
   const resetIn = fromMs !== null ? Math.max(0, sessionEnd - now) : 0;
 
-  // With real limits, attribute the used 5h % pro rata to cost (an estimate:
-  // Anthropic weights usage per model). Otherwise, share of the window burn.
+  // Share of the window's burn in the ranking unit; with real limits, of the used 5h %
+  // pro rata (an estimate: Anthropic weights usage per model).
   const shareOf = (tokens: number, cost: number): number => {
-    const windowCost = data?.total.cost ?? 0;
-    if (pct !== null) return windowCost > 0 ? (cost / windowCost) * pct * 100 : 0;
-    return totalTokens > 0 ? (tokens / totalTokens) * 100 : 0;
+    const total = data?.total[weigh] ?? 0;
+    const part = total > 0 ? (weigh === "cost" ? cost : tokens) / total : 0;
+    return part * (pct ?? 1) * 100;
   };
   const shareSuffix = pct !== null ? "of 5h limit (est.)" : "of window";
 
-  const topSessions = data?.sessions.slice(0, 5) ?? [];
+  const topSessions = rankedSessions.slice(0, 5);
   const topPrompts = data?.prompts.slice(0, 5) ?? [];
   const toolsBreakdown = data?.tools.slice(0, 6) ?? [];
   const projectSplit = useMemo(() => {
@@ -146,7 +149,7 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
         ]}
       />
 
-      <HotSpots data={data} scope="window" limitPct={pct} onSelectSession={onSelectSession} />
+      <HotSpots data={{ ...data, sessions: rankedSessions }} scope="window" limitPct={pct} onSelectSession={onSelectSession} />
 
       <div className="five-hour-grid">
         {/* Top sessions */}

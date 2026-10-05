@@ -3,7 +3,7 @@ import { projectColor } from "../../utils/fleetStats";
 import { formatCost, formatTokens } from "../../utils/format";
 
 interface Props {
-  /** Ranked by API value with a known limit, else by tokens: the same order as the lists below. */
+  /** Ranked by `data.weigh`: the same order as the lists below. */
   data: WindowBreakdown;
   /** "window": the current 5h window; "today": since midnight, shown while the window is idle. */
   scope: "window" | "today";
@@ -37,7 +37,7 @@ function heat(part: number, count: number): "mild" | "warm" | "hot" {
  */
 export function HotSpots({ data, scope, limitPct, onSelectSession }: Props) {
   const limit = scope === "window" ? limitPct : null;
-  const weight = (b: Burn) => (limit !== null ? b.cost : b.tokens);
+  const weight = (b: Burn) => b[data.weigh];
   const total = weight(data.total);
   if (total <= 0 || data.sessions.length === 0) return null;
   /** Part of what the scope burned (0-1). */
