@@ -296,7 +296,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 - **Sessions**: the table, and `SessionCompare` beside it in compare mode (up to 3), or `BulkGhostBar` when the ghost filter is on.
 - **Usage**: `TokenTimeSeries`, then `ProjectRollup`, `ModelMix` and `ToolsHeatmap` side by side, then `HeavyPrompts`.
 - **Health**: `HealthCheck` (rule checklist, score in its heading), `AnomalyFlags`.
-- **Progress** (page id `badges`, key 5): level, next level, today's XP and streak, the XP rules, **Next up** (six), `Badges` (foil cards, unseen unlocks flagged "new"), then `TopSessions` as all-time records (podium, `FireCanvas`).
+- **Progress** (page id `badges`, key 5): level, next level, today's XP and streak, the XP rules, **Next up** (six), `Badges` (foil cards, unseen unlocks flagged "new"), then `TopSessions` as all-time records (podium).
 
 `WindowConsumers` says what used the window: one bar split by project (filled to the used 5h % when the limits are connected, so the full bar is the limit) with its legend, then the five heaviest sessions and prompts. Every share is of the window's API value (tokens when nothing is priced), and a prompt started before the window only counts its turns inside it. Rows keep the order shown last time unless one overtakes another by more than 1% of the window (`useStickyRank`, `utils/stickyRank.ts`), so near ties don't swap on every poll; equal weights break on the id. When one of three or more sessions takes three quarters, an amber "one session is using N%" line says so. While the window is idle the same card shows today's consumers. Data from `utils/windowBreakdown.ts` (`windowBreakdown(sessions, from, to)`). Project colors follow the session list, and a clash in the card takes the next free color.
 

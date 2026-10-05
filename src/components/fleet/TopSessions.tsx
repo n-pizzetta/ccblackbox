@@ -3,7 +3,6 @@ import type { Session } from "../../types";
 import { freshTokens } from "../../utils/units";
 import { CATEGORIES, rankSessions, type Category } from "../../utils/gamify";
 import { formatCost, formatDuration, formatTokens } from "../../utils/format";
-import { FireCanvas, HeatFilter } from "./FireCanvas";
 
 interface Props {
   sessions: Session[];
@@ -63,7 +62,6 @@ export function TopSessions({ sessions, onSelectSession, limit = 10, title = "To
         <>
           {/* key restarts the rise animation when the category changes */}
           <div className="podium" key={category}>
-            <HeatFilter />
             {PODIUM_ORDER.filter((i) => podium[i]).map((i) => {
               const { s, value } = podium[i];
               return (
@@ -72,7 +70,6 @@ export function TopSessions({ sessions, onSelectSession, limit = 10, title = "To
                   className={`podium-card place-${PLACE_CLASS[i]}`}
                   onClick={() => onSelectSession(s.id)}
                 >
-                  {i === 0 && <FireCanvas />}
                   <span className="mono podium-project">{s.project}</span>
                   <span className="podium-goal">{s.goal || "—"}</span>
                   <span className="podium-value tabular">{formatValue(category, value)}</span>
