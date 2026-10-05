@@ -1,6 +1,6 @@
 # Architecture
 
-`ccblackbox` is a local dashboard for Claude Code and Codex sessions, shipped both as an npm package (`npx ccblackbox`) and as a Claude Code plugin (`/ccblackbox:replay`). A Node server parses the files Claude Code already writes under `~/.claude/` (and Codex under `~/.codex/`, §3), keeps the result in memory and serves it to a React single-page app over a small local API.
+Marey is a local dashboard for Claude Code and Codex sessions, shipped both as an npm package (`npx marey`) and as a Claude Code plugin (`/marey:replay`). A Node server parses the files Claude Code already writes under `~/.claude/` (and Codex under `~/.codex/`, §3), keeps the result in memory and serves it to a React single-page app over a small local API.
 
 There is no database, no network access beyond loopback, and no runtime dependency besides Node's standard library on the server side.
 
@@ -9,7 +9,7 @@ There is no database, no network access beyond loopback, and no runtime dependen
 ## 1. Overview
 
 ```
- ~/.claude/  (written by Claude Code)            ~/.claude/ccblackbox/  (written by ccblackbox)
+ ~/.claude/  (written by Claude Code)            ~/.claude/marey/  (written by Marey)
  ├── projects/<slug>/<id>.jsonl                  ├── cache/<id>.jsonl      ◀── hooks/capture.mjs
  ├── projects/<slug>/<id>/subagents/*.jsonl      ├── limits.json           ◀── statusline.mjs
  ├── sessions/<pid>.json                         ├── models.json           (user, optional)
@@ -67,7 +67,7 @@ Codex (`~/.codex`, or `$CODEX_HOME`), also read-only: `sessions/YYYY/MM/DD/rollo
 
 ### Written
 
-- Everything ccblackbox writes by itself lives under `~/.claude/ccblackbox/`:
+- Everything Marey writes by itself lives under `~/.claude/marey/` (`scripts/data-dir.mjs`). Before the rename it was `~/.claude/ccblackbox/`: the first call to `dataDir()` (API, parser, plugin hook, `/marey:limits`) moves that folder and leaves a symlink at the old path, so a status line wrapper or an older plugin still writing there lands in the same place:
   - `cache/<id>.jsonl`: one line per tool call / stop, appended by the plugin hook (mode `0600`).
   - `limits.json`: latest `rate_limits` payload, written atomically by the status line wrapper. `limits-history.jsonl`: one line per change of either window (`{t, five:{p,r}, seven:{p,r}}`, trimmed at 512 KB), kept to calibrate "% of window" later.
   - `badges.json`: `{ startedAt, unlocked, xp }`. `startedAt` is written on the API's first parse (first launch); `unlocked` maps `<family>:<tier>` to the unlock date; `xp` maps a session id to the best XP it earned. See §5.
@@ -75,7 +75,7 @@ Codex (`~/.codex`, or `$CODEX_HOME`), also read-only: `sessions/YYYY/MM/DD/rollo
   - `statusline.mjs`, `context-advice.mjs`, `statusline.json`: installed wrapper, its shared helper, and the saved previous `statusLine` setting (plus `"verdict": false` to hide the terminal segment).
   - `sessions.json`: full parse dump, only when `pnpm parse` is run by hand. The app never reads it.
   - `models.json`: never written; the user creates it to override prices.
-- `~/.claude/settings.json` is modified only by `install-statusline.mjs` (i.e. when the user runs `/ccblackbox:limits`), with a backup at `settings.json.ccblackbox.bak`. `--uninstall` restores the previous `statusLine`.
+- `~/.claude/settings.json` is modified only by `install-statusline.mjs` (i.e. when the user runs `/marey:limits`), with a backup at `settings.json.marey.bak`. `--uninstall` restores the previous `statusLine`.
 - Deletions and moves of Claude Code files happen only on explicit user action in the UI:
   - **Ghost delete** (single or bulk): unlinks `projects/<slug>/<id>.jsonl` and `sessions/.stale/<id>.json`, and only for sessions the parser currently classifies as ghosts.
   - **Trash a parse error**: moves an unparseable `usage-data/session-meta/<file>.json` to the macOS Trash (via Finder/`osascript`), or on other platforms to `usage-data/session-meta/.trash/`.
@@ -85,11 +85,11 @@ Codex (`~/.codex`, or `$CODEX_HOME`), also read-only: `sessions/YYYY/MM/DD/rollo
 
 ## 3. Parser (`scripts/parse-sessions.mjs`)
 
-Used as a library by `scripts/api.mjs`, and as a CLI (`pnpm parse`) that writes `~/.claude/ccblackbox/sessions.json`.
+Used as a library by `scripts/api.mjs`, and as a CLI (`pnpm parse`) that writes `~/.claude/marey/sessions.json`.
 
 ### Pipeline (`parseAllSessions`)
 
-1. `loadModelOverrides()` reads `~/.claude/ccblackbox/models.json` and applies it via `setModelOverrides` (invalid file → warning, built-in table).
+1. `loadModelOverrides()` reads `~/.claude/marey/models.json` and applies it via `setModelOverrides` (invalid file → warning, built-in table).
 2. `classifyLiveFiles()` splits `sessions/*.json` into alive pid files and dead session ids. A pid is alive if `process.kill(pid, 0)` succeeds **and** `ps -p <pid> -o comm=` matches `claude`. Read-only. Ids in `sessions/.stale/` are added to the dead set.
 3. `readHistoryBySession()` groups `history.jsonl` by session id.
 4. `indexTranscripts()` maps every `projects/*/<id>.jsonl` by session id. Project directory names are lossy (`.`, `_`, `/` all become `-`), so lookups are by id only, never by reconstructed path.
@@ -138,7 +138,7 @@ A single table shared by the parser (Node) and the UI (imported by Vite; types i
 - `normalizeModel()`: `claude-opus-5-5[1m]` → `opus-5.5`, date suffixes stripped, bare aliases (`opus`, `sonnet[1m]`) mapped to the family's latest model (`FAMILY_LATEST`), `<synthetic>` → `null`.
 - `priceFor()`: unknown ids fall back to the family's latest price, then to `DEFAULT_MODEL`; `isKnownModel()` flags these as estimates (`unpricedModels` on the session, shown with a hint in the UI).
 - `costOf()`: bills `cacheWrite1h` at the 1h rate and the remaining cache writes at the 5m rate.
-- `setModelOverrides()`: rebuilds the table from the built-ins plus `~/.claude/ccblackbox/models.json` (keys raw or normalized; rows need numeric `in`, `out`, `cacheRead`; invalid rows skipped). The server sends the accepted overrides in `/api/sessions` (`models`), and `loadSessions()` applies them in the browser so UI-side costs match.
+- `setModelOverrides()`: rebuilds the table from the built-ins plus `~/.claude/marey/models.json` (keys raw or normalized; rows need numeric `in`, `out`, `cacheRead`; invalid rows skipped). The server sends the accepted overrides in `/api/sessions` (`models`), and `loadSessions()` applies them in the browser so UI-side costs match.
 - `baselineCostUsd` (parser) is the same tokens priced without caching, used to show cache savings.
 
 Costs are API-equivalent estimates; they are not what a subscription plan bills.
@@ -149,7 +149,7 @@ Costs are API-equivalent estimates; they are not what a subscription plan bills.
 
 Claude Code exposes the real limits (`rate_limits.five_hour` / `seven_day`, as in `/usage`) only in the JSON it pipes to the status line command. Everything in this section is about Claude's limits: Codex sessions are left out of the 5h window, the burn tracker and the spike analysis (`FleetDashboard`). So:
 
-1. `/ccblackbox:limits` runs [`scripts/install-statusline.mjs`](scripts/install-statusline.mjs): copies [`scripts/statusline.mjs`](scripts/statusline.mjs) to `~/.claude/ccblackbox/statusline.mjs` (stable path across plugin updates), saves the current `statusLine` to `statusline.json`, and points `settings.json` at the wrapper.
+1. `/marey:limits` runs [`scripts/install-statusline.mjs`](scripts/install-statusline.mjs): copies [`scripts/statusline.mjs`](scripts/statusline.mjs) to `~/.claude/marey/statusline.mjs` (stable path across plugin updates), saves the current `statusLine` to `statusline.json`, and points `settings.json` at the wrapper.
 2. On every status line refresh the wrapper writes `limits.json`, then pipes the untouched payload to the user's previous status line command, or prints a minimal `model · 5h n% · 7d n%` line if there was none.
 3. `/api/limits` serves `readLimits()`; [`src/utils/rateLimits.ts`](src/utils/rateLimits.ts) polls it every 5 s (`useRateLimits`).
 
@@ -162,7 +162,7 @@ The wrapper appends a short segment to the status line (`ctx ━━━───�
 The 5h window in the UI (`fleet/FiveHourSession.tsx`, `utils/fleetStats.ts`):
 
 - With real limits: window start = `resetsAt − 5h`; the used % is real. Per-session / per-prompt shares of that % are attributed pro rata to estimated cost (an approximation).
-- Without: the window is inferred locally. The first turn after the previous window expired anchors a new window, persisted in `localStorage` (`ccblackbox:window-start`, `utils/windowState.ts`); shares are by tokens.
+- Without: the window is inferred locally. The first turn after the previous window expired anchors a new window, persisted in `localStorage` (`marey:window-start`, `utils/windowState.ts`); shares are by tokens.
 - `utils/burnTracker.ts` samples the real 5h % every 5 s (1 h buffer) and raises a spike banner when it climbs 4+ points within 5 minutes (critical at 10). It is inactive until limits are connected. `SpikeAnalysisOverlay` + `SpikeHeuristics` explain the spike from sessions, prompts and tools in that interval.
 
 ### Badges (`scripts/badges.mjs`)
@@ -187,7 +187,7 @@ Computed server-side after every parse (`updateBadges` in the API), because they
 - **Level** n starts at 4 × (n − 1)² XP: a few levels on day one, then one every week or two for a heavy user (a heavy user with months of history opens around level 25). Titles change at levels 5, 10, 15, 20, 25, 30, 40 and 50.
 - **Today** is the XP of the sessions worked in since local midnight (whenever they started) plus badges unlocked today.
 - **Current streak** uses the badge streak's rule over all non-ghost sessions: quiet weekends are skipped, a quiet weekday ends it. A quiet weekday *today* doesn't end it yet; it is `atRisk` (the flame dims in the header and the Now page says "not yet today").
-- **Moments** (`utils/progress.ts`, `useProgressEvents`): `localStorage` `ccblackbox:progress` holds the unlocks already announced, the unlocks already seen on the Progress page and the highest level announced. A new unlock or level-up raises an achievement toast (several unlocks at once share one); unlocks not yet seen count on the Progress tab and are flagged "new" there. The first run records the current state silently; a payload without a level (before the first parse) is ignored; nothing is announced while the tab is hidden, so a background tab doesn't use up a toast. Toasts pause while hovered, focused or hidden. The header chip shows "+N XP" for a moment whenever XP grows while the dashboard is open.
+- **Moments** (`utils/progress.ts`, `useProgressEvents`): `localStorage` `marey:progress` holds the unlocks already announced, the unlocks already seen on the Progress page and the highest level announced. A new unlock or level-up raises an achievement toast (several unlocks at once share one); unlocks not yet seen count on the Progress tab and are flagged "new" there. The first run records the current state silently; a payload without a level (before the first parse) is ignored; nothing is announced while the tab is hidden, so a background tab doesn't use up a toast. Toasts pause while hovered, focused or hidden. The header chip shows "+N XP" for a moment whenever XP grows while the dashboard is open.
 - `sniper` and `comeback` need `/insights` facets; `hygiene` needs scored sessions (5+ turns). They are hidden (`available: false`) when no session has that data.
 - The shell-based families only see commands run by Claude, not ones typed in another terminal.
 
@@ -218,7 +218,7 @@ Rules: context quality, context headroom, compactions, prompt cache, startup cos
 Shared by the production server and the Vite dev server, so both expose the same routes with the same checks.
 
 **Cache and refresh.** `startApi()` parses once, then keeps the in-memory cache (`sessions`, `byId`, `errors`, serialized list + ETag) fresh:
-- `fs.watch` on `sessions/`, `usage-data/session-meta/`, `usage-data/facets/`, `ccblackbox/cache/` (missing dirs are skipped with a warning);
+- `fs.watch` on `sessions/`, `usage-data/session-meta/`, `usage-data/facets/`, `marey/cache/` (missing dirs are skipped with a warning);
 - a 10 s interval (transcripts under `projects/` are not watched);
 - events are coalesced: at most one parse every 5 s (minimum 600 ms delay), and a parse requested during a parse runs right after it.
 - An `onParsed` callback runs after each parse (the dev server uses it for HMR).
@@ -253,7 +253,7 @@ The API serves prompts, file snapshots and account info, and can delete files, s
 - **Destructive actions are narrow.** Deletes only apply to sessions the parser currently classifies as ghosts; parse-error cleanup moves to a trash rather than unlinking.
 - **Generated HTML is sandboxed.** `/usage-report.html` is served with a CSP `sandbox` so it cannot run scripts on the API origin.
 - **Hook output is private.** Plugin cache files are created with mode `0600` (previews can contain secrets from tool I/O).
-- **No personal data in the repo or package.** `pnpm parse` writes to `~/.claude/ccblackbox/`, and `public/sessions.json` / `dist/sessions.json` are gitignored and excluded from the npm `files`.
+- **No personal data in the repo or package.** `pnpm parse` writes to `~/.claude/marey/`, and `public/sessions.json` / `dist/sessions.json` are gitignored and excluded from the npm `files`.
 
 ---
 
@@ -264,11 +264,11 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 ### Data loading
 
 - [`src/data/loadSessions.ts`](src/data/loadSessions.ts): `loadSessions()` fetches `/api/sessions` with `cache: "no-cache"` (ETag revalidation) and applies the `models` overrides; `loadSessionDetail(id)` fetches `/api/sessions/:id` when a session is opened. If the API is unreachable or returns no sessions, the app falls back to `src/data/mockSessions.ts` (shown as an amber status dot and "mock data" in the profile menu).
-- **Polling / HMR.** In production `App.tsx` refreshes every 5 s (cheap thanks to 304s). In dev, polling is off and the app refetches on the `ccblackbox:sessions-updated` HMR event pushed after each server-side parse. `/api/report-status` is fetched on each refresh; `/api/limits` and `/api/live-context` are polled separately (5 s).
+- **Polling / HMR.** In production `App.tsx` refreshes every 5 s (cheap thanks to 304s). In dev, polling is off and the app refetches on the `marey:sessions-updated` HMR event pushed after each server-side parse. `/api/report-status` is fetched on each refresh; `/api/limits` and `/api/live-context` are polled separately (5 s).
 
 ### State and routing (`App.tsx`)
 
-- Page (`now` / `sessions` / `usage` / `health` / `badges`, the last labeled "Progress", see `utils/pages.ts`), selected session, range (`today` / `7d` / `30d` / `all`), list filter (`all`, `live`, `ghost`, `friction`, `failed`, `lowquality`), project and search are mirrored to the URL hash (`#<page>?range=…&filter=…&project=…&q=…`, or `#session/<id>?…` while a session is open; Now has no path) and to `localStorage` (`ccblackbox:state`).
+- Page (`now` / `sessions` / `usage` / `health` / `badges`, the last labeled "Progress", see `utils/pages.ts`), selected session, range (`today` / `7d` / `30d` / `all`), list filter (`all`, `live`, `ghost`, `friction`, `failed`, `lowquality`), project and search are mirrored to the URL hash (`#<page>?range=…&filter=…&project=…&q=…`, or `#session/<id>?…` while a session is open; Now has no path) and to `localStorage` (`marey:state`).
 - **Scope.** Sessions, Usage and Health follow the range and filters and show the scope bar and the headline tiles (`StatsRow`); Now and Progress ignore them and say so in their headings. The table sort (`utils/sortSessions.ts`) also orders ↑ / ↓ in the session view.
 - The detail view merges the list summary with the fetched full session.
 - Keyboard: `1`–`5` (Now, Sessions, Usage, Health, Progress), `j`/`k` or arrows (next/previous session while one is open), `Esc` (close), `?` (help).
@@ -281,7 +281,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 | `ScopeBar` / `SessionFilters` | Range, project and status pickers (counts from the range, before filtering; ghosts split by crashed / empty in the tooltip; Claude Code / Codex when both are present), search, the resulting count and a reset. Clicking a project in the sessions table filters on it. |
 | `Kpi` / `KpiRow` | The one headline-tile style (label, value, context line), used by `StatsRow`, the session view and the 5h window. Up to six tiles share a row. |
 | `LimitsPill` | The 5h and 7-day usage windows (fill, elapsed-time tick, reset countdown); rendered in the top bar and in the session view so they are always on screen. |
-| `units` (`utils/units.ts`, `UnitSetting`) | Display unit for usage: **tokens** (fresh = input + output + cache writes; cached reads are shown apart) or **API value** ($ at API prices, read as a relative weight, since a subscription is limited by the 5h / 7d windows rather than dollars). Persisted in `localStorage` (`ccblackbox:unit`), set from the profile menu. Rankings by weight (podium "Heaviest", project league) use API value. The podium "Longest" ranks by `longestRunMs` (longest main-thread stretch with no pause over 15 min), not `durationMs`, which adds up to 5 min per gap and so favors sessions left open for days. |
+| `units` (`utils/units.ts`, `UnitSetting`) | Display unit for usage: **tokens** (fresh = input + output + cache writes; cached reads are shown apart) or **API value** ($ at API prices, read as a relative weight, since a subscription is limited by the 5h / 7d windows rather than dollars). Persisted in `localStorage` (`marey:unit`), set from the profile menu. Rankings by weight (podium "Heaviest", project league) use API value. The podium "Longest" ranks by `longestRunMs` (longest main-thread stretch with no pause over 15 min), not `durationMs`, which adds up to 5 min per gap and so favors sessions left open for days. |
 | `ParseErrors` / `ProfileMenu` | Top-bar badge listing unreadable session-meta files with a Trash action (only shown when there are some). Profile chip (data status dot, level, XP bar, streak, dimmed when at risk; "+N XP" when XP comes in) opening a menu: level progress and today's XP (opens Progress), Health link, usage unit, data status and insights report, `LimitsSection`, keyboard shortcuts, bug report link. |
 | `StatsStrip` (`StatsRow`) | Headline tiles of the scope: sessions, active time, API value, fresh tokens. |
 | `SessionList` | The sessions table: status glyph (live, ghost, cleared, or an outcome dot filled as far as the goal was met), goal, project, flags (Codex tag, friction, plugin capture), usage, active time, start; sortable headers; day headers when sorted by date; virtualized. Also renders the short lists of the Now page, and `BulkGhostBar`. |
@@ -307,10 +307,10 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 
 ## 9. Plugin packaging
 
-- [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) and [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): plugin `ccblackbox`, source `./` (the repo root is the plugin).
+- [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) and [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): plugin `marey`, source `./` (the repo root is the plugin).
 - [`hooks/hooks.json`](hooks/hooks.json): runs [`hooks/capture.mjs`](hooks/capture.mjs) on `PostToolUse` (tool name + truncated input/output previews) and on `Stop` (`--stop` marker). The hook validates the session id, reads stdin with a timeout, never writes to stdout and swallows every error so it cannot break Claude Code.
-- [`commands/replay.md`](commands/replay.md) → `/ccblackbox:replay`: starts `scripts/serve.mjs` (flags forwarded: `--port <n>`, `--no-open`).
-- [`commands/limits.md`](commands/limits.md) → `/ccblackbox:limits`: runs `install-statusline.mjs` (`--uninstall` forwarded).
+- [`commands/replay.md`](commands/replay.md) → `/marey:replay`: starts `scripts/serve.mjs` (flags forwarded: `--port <n>`, `--no-open`).
+- [`commands/limits.md`](commands/limits.md) → `/marey:limits`: runs `install-statusline.mjs` (`--uninstall` forwarded).
 - The server needs the prebuilt `dist/`, which is why it is committed (plugins install from the repo, with no build step).
 
 ---
@@ -321,8 +321,8 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 |---|---|
 | `pnpm dev` | Vite dev server with the API middleware (`vite.config.ts`) and HMR push. |
 | `pnpm build` | `tsc -b && vite build` → `dist/`. |
-| `pnpm serve` | `node scripts/serve.mjs` (default port 3333; `--port`, `--no-open`). Also the `ccblackbox` bin. If the port is taken it assumes an instance is running, opens it and exits. |
-| `pnpm parse` | One-off parse to `~/.claude/ccblackbox/sessions.json`. |
+| `pnpm serve` | `node scripts/serve.mjs` (default port 3333; `--port`, `--no-open`). Also the `marey` bin. If the port is taken it assumes an instance is running, opens it and exits. |
+| `pnpm parse` | One-off parse to `~/.claude/marey/sessions.json`. |
 | `pnpm lint`, `pnpm typecheck` | ESLint, `tsc -b --noEmit`. |
 | `pnpm seed:demo` | Writes synthetic data to `.demo-claude/` and `.demo-codex/` (`scripts/seed-demo.mjs`). |
 

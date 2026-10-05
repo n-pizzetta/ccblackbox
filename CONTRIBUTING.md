@@ -1,13 +1,13 @@
-# Contributing to ccblackbox
+# Contributing to Marey
 
-Thanks for helping. ccblackbox is a small local tool: a parser for Claude Code's own files, a local API and a React dashboard. Issues and pull requests are welcome.
+Thanks for helping. Marey is a small local tool: a parser for Claude Code's own files, a local API and a React dashboard. Issues and pull requests are welcome.
 
 ## Setup
 
 Requirements: Node 20+ and pnpm.
 
 ```sh
-git clone https://github.com/n-pizzetta/ccblackbox && cd ccblackbox
+git clone https://github.com/n-pizzetta/marey && cd marey
 pnpm install
 pnpm dev            # dashboard on http://localhost:5173, reading your ~/.claude
 ```
@@ -102,7 +102,7 @@ This tool reads people's prompts, code and file snapshots. Contributions must ke
 
 - Never commit real data from `~/.claude`: no transcripts, session dumps, screenshots of real sessions, or absolute paths from your machine. Use `pnpm seed:demo`.
 - No network calls, telemetry or remote assets (fonts and icons are bundled).
-- The server listens on `127.0.0.1` only and rejects cross-site requests; keep new endpoints behind the same checks in `scripts/api.mjs`, and don't add endpoints that write outside `~/.claude/ccblackbox/` without a clear user action.
+- The server listens on `127.0.0.1` only and rejects cross-site requests; keep new endpoints behind the same checks in `scripts/api.mjs`, and don't add endpoints that write outside `~/.claude/marey/` without a clear user action.
 
 ## Security issues
 
