@@ -151,7 +151,7 @@ Claude Code exposes the real limits (`rate_limits.five_hour` / `seven_day`, as i
 
 1. `/marey:limits` runs [`scripts/install-statusline.mjs`](scripts/install-statusline.mjs): copies [`scripts/statusline.mjs`](scripts/statusline.mjs) to `~/.claude/marey/statusline.mjs` (stable path across plugin updates), saves the current `statusLine` to `statusline.json`, and points `settings.json` at the wrapper.
 2. On every status line refresh the wrapper writes `limits.json`, then pipes the untouched payload to the user's previous status line command, or prints a minimal `model · 5h n% · 7d n%` line if there was none.
-3. `/api/limits` serves `readLimits()`; [`src/utils/rateLimits.ts`](src/utils/rateLimits.ts) polls it every 5 s (`useRateLimits`).
+3. `/api/limits` serves `readLimits()` merged into what the server already holds (`mergeLimits`); [`src/utils/rateLimits.ts`](src/utils/rateLimits.ts) polls it every 5 s (`useRateLimits`). Every running session's status line overwrites `limits.json` with its own last-known limits, so an idle session writes a lower %, a window that has already reset, or no 5h window, every few seconds. The merge keeps, per window, the later reset and within a window the higher %, and never lets a reading without an open window replace one that is still open.
 
 ### Context and prompt-cache advice
 

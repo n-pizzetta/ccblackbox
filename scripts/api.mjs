@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import { promises as fsp, watch, existsSync, statSync, createReadStream } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { parseAllSessions, readLimits, readLiveContext, summarizeSession } from "./parse-sessions.mjs";
+import { mergeLimits, parseAllSessions, readLimits, readLiveContext, summarizeSession } from "./parse-sessions.mjs";
 import { badgeStatePath, computeBadges, loadBadgeState, saveBadgeState } from "./badges.mjs";
 import { dataDir } from "./data-dir.mjs";
 
@@ -45,6 +45,8 @@ const cache = {
   byId: new Map(),
   errors: [],
   badges: null,
+  /** Freshest usage limits read so far (`mergeLimits`): limits.json flips between sessions. */
+  limits: null,
 };
 
 let badgeState = null;
@@ -297,7 +299,8 @@ async function handleApi(req, res) {
 
   if (url === "/api/limits") {
     res.setHeader("cache-control", "no-store");
-    return sendJson(res, 200, await readLimits());
+    cache.limits = mergeLimits(cache.limits, await readLimits());
+    return sendJson(res, 200, cache.limits);
   }
 
   if (url === "/api/live-context") {
