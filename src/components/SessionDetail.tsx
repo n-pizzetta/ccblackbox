@@ -1,6 +1,5 @@
 import { LimitsPill } from "./LimitsGauge";
-import { SessionStatus } from "./SessionStatus";
-import { StatusSep } from "./ContextCard";
+import { SessionContext, StatusSep } from "./ContextCard";
 import { GoalSummary } from "./GoalSummary";
 import { TimelineTab } from "./SessionTimeline";
 import { SessionKpis, TabPreviews } from "./SessionOverview";
@@ -369,20 +368,23 @@ export function SessionDetail({
           </div>
           <div className="goal-row">
             <div className="goal">{session.goal}</div>
-            {canOpenTerminal(session) ? (
-              <button className="resume-btn" onClick={openSessionTerminal} disabled={opening} title="Bring the terminal running this session to the front">
-                {opening ? "Opening…" : "Open terminal"}
-              </button>
-            ) : (
-              <button className="resume-btn" onClick={copyResume} title={resumeCmd}>
-                {resumeCopied ? "✓ Copied" : "Copy resume command"}
-              </button>
-            )}
+            {/* on the title's first line, right-aligned: the context figures and verdict, then the primary action */}
+            <div className="goal-actions">
+              <SessionContext sessionId={session.id} />
+              {canOpenTerminal(session) ? (
+                <button className="resume-btn" onClick={openSessionTerminal} disabled={opening} title="Bring the terminal running this session to the front">
+                  {opening ? "Opening…" : "Open terminal"}
+                </button>
+              ) : (
+                <button className="resume-btn" onClick={copyResume} title={resumeCmd}>
+                  {resumeCopied ? "✓ Copied" : "Copy resume command"}
+                </button>
+              )}
+            </div>
           </div>
           <GoalSummary summary={session.summary} goal={session.goal} />
         </div>
 
-        <SessionStatus session={session} />
         {(session.clearedFrom || session.clearedInto) && (
           <ClearedBanner session={session} />
         )}

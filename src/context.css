@@ -1,4 +1,4 @@
-/* Context & prompt-cache: session row line and the context part of the session view's status strip. */
+/* Context & prompt-cache: session row line and the context figures in the session view's title row. */
 
 /* ---- Row line (session list) ---- */
 .ctx-line { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: var(--fs-xs); color: var(--c-text-dim); }
@@ -18,16 +18,17 @@
 .ctx-cache.cold { color: var(--c-red); }
 .ctx-cache.cold i { background: var(--c-red); }
 
-/* ---- Session view: context part of the status strip ---- */
-/* figures split by dots, then the pill; colour only where the state calls for it (fill level, an
-   expiring or cold cache, the verdict) */
-.status-context { display: flex; flex: none; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
-/* alone in the strip (an ended session): the pill still ends the row */
-.status-context:first-child { flex: 1 1 auto; }
+/* ---- Session view: context figures in the title row ---- */
+/* figures split by faint dots (shared with the meta line), then the pill; colour only where the
+   state calls for it (fill level, an expiring or cold cache, the verdict) */
+.status-sep { flex: none; color: var(--c-text-ghost); }
+.status-fig { flex: none; }
+.status-fig b { font-weight: 600; color: var(--c-text); }
+.status-context { display: flex; flex: 0 1 auto; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
 .status-fill { display: inline-flex; align-items: center; gap: 6px; }
 .ctx-ring { flex: none; }
 .status-context .ctx-cache.warm { color: var(--c-text-dim); }
-/* the pill reads as a chip until the verdict asks for something; it discloses the reasons */
+/* the pill reads as a chip until the verdict asks for something; it opens the reasons */
 .status-verdict {
   display: inline-flex;
   flex: 0 1 auto;
@@ -36,7 +37,7 @@
   min-width: 0;
   max-width: 100%;
   height: 32px;
-  margin-left: 8px;
+  margin-left: 6px;
   padding: 0 10px 0 12px;
   font-size: var(--fs-md);
   font-weight: 600;
@@ -45,7 +46,6 @@
   border-radius: 16px;
   transition: filter var(--t-fast);
 }
-.status-context:first-child .status-verdict { margin-left: auto; }
 .status-verdict:hover { filter: brightness(1.2); }
 .status-verdict.level-watch { color: var(--c-amber); background: color-mix(in srgb, var(--c-amber) 14%, transparent); }
 .status-verdict.level-act { color: var(--c-red); background: color-mix(in srgb, var(--c-red) 14%, transparent); }
@@ -55,5 +55,25 @@
 .status-verdict-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status-verdict-chevron { flex: none; opacity: 0.7; transition: transform var(--t-fast); }
 .status-verdict[aria-expanded="true"] .status-verdict-chevron { transform: rotate(180deg); }
-.status-reasons { flex-basis: 100%; margin: 0; padding: 0 12px 0 0; font-size: var(--fs-md); line-height: 1.5; color: var(--c-text-dim); }
-.status-reasons-label { display: none; font-weight: 600; color: var(--c-text-soft); }
+/* the reasons: a popover under the pill (positioned from script) */
+.status-reasons {
+  position: fixed;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  white-space: normal;
+  color: var(--c-text-soft);
+  background: var(--c-bg-panel);
+  border: 1px solid var(--c-hairline-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+}
+.status-reasons ul { display: flex; flex-direction: column; gap: 4px; margin: 0; padding-left: 16px; }
+.status-reasons-label { font-weight: 600; color: var(--c-text); }
+.status-reasons-label.level-watch { color: var(--c-amber); }
+.status-reasons-label.level-act { color: var(--c-red); }
+
