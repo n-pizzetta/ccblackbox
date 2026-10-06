@@ -26,7 +26,7 @@ export function UpdateNotice() {
   return (
     <span
       className="update-notice mono tabular"
-      title={`Marey ${update.latest} is available (you have ${update.current}). Run /marey:update in Claude Code, or git pull if you run Marey from source.`}
+      title={`Marey ${update.latest} is available (you have ${update.current}). Use Marey's update skill in Codex, /marey:update in Claude Code, or git pull if you run Marey from source.`}
     >
       ↑ {update.latest}
     </span>

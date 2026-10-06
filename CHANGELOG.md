@@ -8,6 +8,7 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Fixed
 
+- Codex installations now expose native `replay` and `update` skills through an explicit plugin manifest. The dashboard launcher resolves bundled scripts from the installed package, and updates use Codex's plugin manager.
 - `/marey:replay` no longer prints `no matches found: …/marey-*.log` under zsh: old logs are cleared with `find` instead of a shell glob.
 
 ### Planned

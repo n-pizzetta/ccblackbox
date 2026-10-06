@@ -1,0 +1,19 @@
+{
+  "name": "marey",
+  "version": "0.7.0",
+  "description": "Open the local Marey dashboard to replay and analyze Claude Code and Codex sessions.",
+  "author": {
+    "name": "Nathan Pizzetta",
+    "url": "https://github.com/n-pizzetta"
+  },
+  "homepage": "https://github.com/n-pizzetta/marey",
+  "repository": "https://github.com/n-pizzetta/marey",
+  "license": "MIT",
+  "skills": "./codex-skills/",
+  "hooks": { "hooks": {} },
+  "interface": {
+    "displayName": "Marey",
+    "shortDescription": "Replay and analyze local coding sessions",
+    "defaultPrompt": ["Open the Marey dashboard"]
+  }
+}

@@ -4,6 +4,8 @@ description: Update Marey to the latest version
 
 Update the Marey plugin to the latest published version.
 
+**Check the host first.** If this command was imported into Codex as `source-command-update`, use the native `marey:update` skill instead. If that skill is unavailable, direct the user to update Marey in Codex's plugin management UI. The CLI commands and slash commands below apply only to Claude Code; do not run them from Codex.
+
 Run this command:
 
 ```sh

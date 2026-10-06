@@ -5,9 +5,10 @@
  * Serves the prebuilt dashboard (dist/) and the API from scripts/api.mjs
  * (also used by the Vite dev server), on 127.0.0.1 only.
  *
- * Used in two modes:
+ * Used in three modes:
  *   1. `npx marey` (or `pnpm serve`)
  *   2. The `/replay` slash command from the Claude Code plugin
+ *   3. The Codex `replay` skill, via scripts/launch.mjs
  */
 
 import { createServer } from "node:http";
