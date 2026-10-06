@@ -97,13 +97,37 @@ function readConfig() {
   }
 }
 
-/** Append the context / cache segment to the last line of what the previous status line printed. */
+/** x.y.z comparison (this file is installed alone, so it can't import takeover.mjs). */
+function newer(a, b) {
+  const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  return false;
+}
+
+/** "↑ Marey 0.6.0 · /marey:update" while the daily check (update-check.json) knows a newer version than the one running. */
+function updateSegment() {
+  try {
+    if (JSON.parse(readFileSync(join(DIR, "config.json"), "utf8")).updateCheck === false) return null;
+  } catch {
+    /* no config: the check is on */
+  }
+  try {
+    const { installed, latest } = JSON.parse(readFileSync(join(DIR, "update-check.json"), "utf8"));
+    return installed && latest && newer(latest, installed) ? `\x1b[33m↑ Marey ${latest} · /marey:update\x1b[0m` : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Append the context / cache segment and the update notice to the last line of what the previous status line printed. */
 function withVerdict(out, snap) {
-  if (!advice || !snap || readConfig().verdict === false) return out;
-  const seg = advice.statusSegment(snap);
+  const segs = [];
+  if (advice && snap && readConfig().verdict !== false) segs.push(advice.statusSegment(snap));
+  segs.push(updateSegment());
+  const seg = segs.filter(Boolean).join(advice?.SEP ?? " · ");
   if (!seg) return out;
   const body = out.replace(/\n+$/, "");
-  return body ? `${body}${advice.SEP ?? " "}${seg}${out.endsWith("\n") ? "\n" : ""}` : seg;
+  return body ? `${body}${advice?.SEP ?? " "}${seg}${out.endsWith("\n") ? "\n" : ""}` : seg;
 }
 
 function previousCommand() {

@@ -80,6 +80,17 @@
 }
 .app-nav-count.warn { font-weight: 600; color: var(--c-amber); }
 .app-header-right { display: flex; align-items: center; justify-content: flex-end; gap: 16px; min-width: 0; }
+/* a newer Marey is published: quiet, but in the one place everyone looks */
+.update-notice {
+  padding: 2px 10px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--c-amber);
+  border: 1px solid color-mix(in srgb, var(--c-amber) 35%, transparent);
+  border-radius: 999px;
+  cursor: help;
+  white-space: nowrap;
+}
 
 /* no blur support or "reduce transparency": the glass becomes a solid capsule */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

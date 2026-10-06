@@ -101,7 +101,7 @@ Claude Code's files are not a public API and change between versions. If a parse
 This tool reads people's prompts, code and file snapshots. Contributions must keep it local and private:
 
 - Never commit real data from `~/.claude`: no transcripts, session dumps, screenshots of real sessions, or absolute paths from your machine. Use `pnpm seed:demo`.
-- No network calls, telemetry or remote assets (fonts and icons are bundled).
+- No network calls, telemetry or remote assets (fonts and icons are bundled). The one exception is the daily update check in `scripts/update-check.mjs` (a GET of the repo's `plugin.json`, nothing sent, off with `updateCheck: false`); don't add others.
 - The server listens on `127.0.0.1` only and rejects cross-site requests; keep new endpoints behind the same checks in `scripts/api.mjs`, and don't add endpoints that write outside `~/.claude/marey/` without a clear user action.
 
 ## Security issues

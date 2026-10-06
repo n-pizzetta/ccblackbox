@@ -19,6 +19,8 @@ Use the **Report a vulnerability** button on the [Security tab](https://github.c
   anything on your behalf).
 - Third-party tooling outside this repository.
 
-Marey is designed to run locally with no network calls and no telemetry; a
-report that demonstrates a way around that property is the most valuable thing
-you can send.
+Marey is designed to run locally with no telemetry. Its only network request is
+the daily update check (a GET of its own `plugin.json` on GitHub, off with
+`{"updateCheck": false}` in `~/.claude/marey/config.json`); a report that shows
+Marey sending anything else, or anything about the user, is the most valuable
+thing you can send.

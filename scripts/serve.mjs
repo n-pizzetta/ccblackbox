@@ -19,6 +19,7 @@ import { existsSync, statSync, createReadStream } from "node:fs";
 import { VERSION, handleRequest, startApi } from "./api.mjs";
 import { dataDir } from "./data-dir.mjs";
 import { isOlder, refreshStatusline, runningServer, stopServer } from "./takeover.mjs";
+import { recordInstalled } from "./update-check.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -112,6 +113,7 @@ async function main() {
   }
 
   if (refreshStatusline(dataDir(), __dirname)) console.log(`[marey] status line wrapper updated to ${VERSION}`);
+  recordInstalled(dataDir(), VERSION);
 
   await startApi();
 
