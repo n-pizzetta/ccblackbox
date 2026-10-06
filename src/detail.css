@@ -2,7 +2,6 @@
 
 /* ---- Frame: the session view is a true full-screen page, content centered on very wide screens ---- */
 .session-overlay-host {
-  --detail-pad: max(24px, calc((100vw - 1640px) / 2));
   /* the same ambient backdrop as the app, so the tabs' glass reads */
   background:
     radial-gradient(52% 70% at 8% -8%, rgba(94, 125, 166, 0.22), transparent 72%),
@@ -20,8 +19,9 @@
 /* flat toolbar: ghost buttons, the limits inline, nothing boxed */
 .session-overlay-host .detail-sticky { background: transparent; border-bottom: none; }
 .session-overlay-host .detail-toolbar { padding-block: 12px 4px; background: transparent; border-bottom: none; }
-.session-overlay-host .detail-header { padding-inline: var(--detail-pad); }
-.session-overlay-host .detail-sticky > :not(.detail-toolbar):not(.detail-header):not(.tabs) { margin-inline: var(--detail-pad); }
+/* vertical rhythm: meta line, title and subtitle 6px apart, then 18px to the cleared / ghost banner and to the tabs, 28px from the tabs to the content */
+.session-overlay-host .detail-header { gap: 6px; padding: 16px var(--detail-pad) 0; }
+.session-overlay-host .detail-sticky > :not(.detail-toolbar):not(.detail-header):not(.tabs) { margin: 18px var(--detail-pad) 0; }
 .session-overlay-host .detail-footer { padding-inline: var(--detail-pad); background: transparent; border-top: none; }
 .detail-footer .cost { color: var(--c-text); }
 
@@ -35,16 +35,25 @@
 }
 .toolbar-btn:hover:not(:disabled) { background: var(--c-fill); border-color: transparent; }
 .toolbar-btn.wide { width: auto; padding: 0 14px; font-size: var(--fs-base); font-weight: 500; }
-.toolbar-pos { font-family: var(--f-ui); font-size: var(--fs-base); color: var(--c-text-dim); }
+.toolbar-pos { font-family: var(--f-ui); font-size: var(--fs-base); color: var(--c-text-dim); white-space: nowrap; }
+/* phones: the limits take a row of their own under the toolbar, so Export and close stay on screen */
+@media (max-width: 640px) {
+  .session-overlay-host .detail-toolbar { flex-wrap: wrap; gap: 4px 6px; }
+  .session-overlay-host .detail-toolbar-right { display: contents; }
+  .session-overlay-host .detail-toolbar .limits-pill { order: 1; flex-basis: 100%; }
+  .session-overlay-host .detail-toolbar .toolbar-btn.wide { margin-left: auto; }
+}
 
-/* the tabs: the one glass element of the session view */
+/* the tabs: the one glass element of the session view, built like the page navigation (.app-nav):
+   same capsule, item height, padding and gap, a line icon before the label, plain counts after it */
 .session-overlay-host .tabs {
   display: flex;
   gap: 2px;
   width: fit-content;
   max-width: calc(100% - 2 * var(--detail-pad));
+  height: 44px;
   overflow-x: auto;
-  margin: 10px var(--detail-pad) 14px;
+  margin: 18px var(--detail-pad) 22px;
   padding: 4px;
   border-bottom: none;
   border-radius: 22px;
@@ -54,10 +63,13 @@
   box-shadow: var(--shadow-glass);
 }
 .session-overlay-host .tab {
+  flex: none;
   height: 36px;
   padding: 0 16px;
   gap: 6px;
   margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 500;
   white-space: nowrap;
   color: var(--c-text-dim);
   border-bottom: none;
@@ -66,8 +78,15 @@
 }
 .session-overlay-host .tab:hover { color: var(--c-text); background: rgba(255, 255, 255, 0.05); }
 .session-overlay-host .tab.active { font-weight: 600; color: var(--c-text); background: var(--c-lens); box-shadow: var(--shadow-lens); }
-.session-overlay-host .tab-count { min-width: 0; padding: 0; font-family: var(--f-ui); font-size: var(--fs-md); font-weight: 500; color: var(--c-text-faint); background: none; }
-.session-overlay-host .tab-badge { height: 18px; padding: 0 6px; color: var(--c-amber); background: color-mix(in srgb, var(--c-amber) 16%, transparent); border-radius: 9px; }
+.session-overlay-host .tab-icon { flex: none; margin-left: -4px; }
+.session-overlay-host .tab.active .tab-icon { color: var(--c-cyan); }
+.session-overlay-host .tab-count.warn { font-weight: 600; color: var(--c-amber); }
+/* phones: the capsule spans the width and scrolls, like the page navigation on small screens */
+@media (max-width: 640px) {
+  .session-overlay-host .tabs { width: auto; }
+  .session-overlay-host .tab { padding: 0 12px; }
+  .session-overlay-host .tab-icon { display: none; }
+}
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .session-overlay-host .tabs { background: #2a2c33; }
 }
@@ -131,8 +150,7 @@
 .detail-body .tool-view-btn:last-child { border-radius: 13px; margin-left: 0; }
 .detail-body .tool-view-btn.active { font-weight: 600; color: var(--c-text); background: var(--c-lens); box-shadow: var(--shadow-lens); }
 .detail-body .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--c-fill); border-radius: 16px; }
-.detail-body .prompt-view-toggle > .mono,
-.detail-body .tool-view-toggle > .mono { font-family: var(--f-ui); font-size: var(--fs-base); font-weight: 400; letter-spacing: 0; color: var(--c-text-dim); }
+.detail-body .prompt-view-toggle > .mono { font-family: var(--f-ui); font-size: var(--fs-base); font-weight: 400; letter-spacing: 0; color: var(--c-text-dim); }
 .detail .section-title > .dim:not(.seg) { font-family: var(--f-ui); font-size: var(--fs-base); font-weight: 400; letter-spacing: 0; color: var(--c-text-dim); }
 
 /* the context banners read as a quiet capsule under the title */
@@ -151,10 +169,46 @@
 .detail .cleared-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ---- Header ---- */
-.detail-header .badge-row { flex-wrap: wrap; gap: 10px; align-items: center; }
-.detail-meta { font-size: var(--fs-sm); color: var(--c-text-faint); }
-.goal-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.goal-row .goal { min-width: 0; }
+/* the title wraps on the left; the context figures, the verdict and the primary action stay on its first line */
+.goal-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 24px; }
+.goal-row .goal { flex: 1 1 auto; min-width: 0; }
+/* 36px tall, centred on the title's first line (32px) */
+.goal-actions { display: flex; flex: none; align-items: center; gap: 16px; margin-top: -2px; font-size: var(--fs-base); color: var(--c-text-dim); }
+/* up to laptop widths the figures shrink to the ring, the fill and the cache, so the title keeps its room */
+@media (max-width: 1240px) {
+  .goal-actions .status-fill-label,
+  .goal-actions .status-fill-tokens { display: none; }
+}
+/* narrow screens: the cluster drops under the title and its subtitle, the button at the end of the line */
+@media (max-width: 900px) {
+  .goal-row { display: contents; }
+  .goal-row .goal { order: 1; }
+  .goal-summary-row { order: 2; }
+  .goal-actions { order: 3; flex-wrap: wrap; gap: 10px 16px; margin-top: 6px; }
+  .goal-actions .resume-btn { margin-left: auto; }
+}
+/* phones: the ring and its %, the pill, the button */
+@media (max-width: 640px) {
+  .goal-actions { gap: 10px; font-size: var(--fs-md); }
+  .goal-actions .status-cache { display: none; }
+}
+/* the summary as a quiet subtitle, tight under the title: two lines at most, the rest behind "more" */
+.goal-summary-row { display: flex; align-items: flex-end; gap: 10px; max-width: 110ch; }
+.goal-summary {
+  display: -webkit-box;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--c-text-dim);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.goal-summary.open { display: block; -webkit-line-clamp: unset; line-clamp: none; }
+.goal-summary-toggle { flex: none; font-size: var(--fs-md); line-height: 21px; color: var(--c-cyan); }
+.goal-summary-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
 /* the primary action of the view: the one filled accent button */
 .resume-btn {
   flex: none;
@@ -178,6 +232,13 @@
 @media (max-width: 1100px) {
   .overview-grid { grid-template-columns: minmax(0, 1fr); }
 }
+/* Tools tab: the same two columns; the per-tool card stays in view while the calls scroll, and goes
+   above them once the columns stack */
+.tools-grid { align-items: start; }
+.tools-grid > .overview-rail { position: sticky; top: 0; }
+@media (max-width: 1100px) {
+  .tools-grid > .overview-rail { position: static; order: -1; }
+}
 /* real frictions first, the "nothing to report" line last */
 .overview-rail > .friction-panel { order: -1; }
 .overview-rail > .clean-row { order: 2; }
@@ -185,7 +246,6 @@
 /* the prompts panel takes the height left by the rail, so both columns end on the same line */
 .overview-main > .d-panel:last-child { flex: 1; display: flex; flex-direction: column; }
 .overview-main > .d-panel:last-child .prompt-chart-wrap { flex: 1; grid-template-rows: minmax(130px, 1fr) auto; }
-.summary { margin: 0; }
 
 /* ---- Tab previews ---- */
 .preview-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }

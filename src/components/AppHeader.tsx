@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Level, Streak } from "../utils/gamify";
 import { PRODUCT_NAME } from "../utils/brand";
+import { keepFocus } from "../utils/keepFocus";
 import { NAV_PAGES, type Page } from "../utils/pages";
 import { LimitsPill } from "./LimitsGauge";
 import { BrandMark } from "./BrandMark";
@@ -87,6 +88,7 @@ export function AppHeader({
             key={p.id}
             className={`app-nav-item ${page === p.id ? "active" : ""}`}
             aria-current={page === p.id ? "page" : undefined}
+            onMouseDown={keepFocus}
             onClick={() => onPageChange(p.id)}
             title={`${p.label} (${i + 1})`}
           >

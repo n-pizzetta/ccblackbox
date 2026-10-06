@@ -1,4 +1,4 @@
-/* Context & prompt-cache: session row line and session-view banner. */
+/* Context & prompt-cache: session row line and the context figures in the session view's title row. */
 
 /* ---- Row line (session list) ---- */
 .ctx-line { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: var(--fs-xs); color: var(--c-text-dim); }
@@ -18,42 +18,62 @@
 .ctx-cache.cold { color: var(--c-red); }
 .ctx-cache.cold i { background: var(--c-red); }
 
-/* ---- Banner (session view) ---- */
-.ctx-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: start;
-  margin: 0 0 12px;
-  padding: 10px 14px;
-  border: 1px solid var(--c-hairline);
-  border-radius: var(--radius-lg);
-}
-.ctx-card.level-watch { border-color: color-mix(in srgb, var(--c-amber) 40%, var(--c-hairline)); }
-.ctx-card.level-act { border-color: color-mix(in srgb, var(--c-red) 45%, var(--c-hairline)); }
-.ctx-ring { position: relative; display: inline-flex; width: 46px; height: 46px; }
-.ctx-ring-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--f-mono); font-size: var(--fs-sm); font-weight: 600; }
-.ctx-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-top: 4px; }
-.ctx-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: var(--fs-sm); color: var(--c-text-soft); }
-.ctx-reasons { margin: 0; font-size: var(--fs-sm); line-height: 1.5; color: var(--c-text-dim); }
-.ctx-sep { color: var(--c-text-faint); }
-.ctx-verdict {
+/* ---- Session view: context figures in the title row ---- */
+/* figures split by faint dots (shared with the meta line), then the pill; colour only where the
+   state calls for it (fill level, an expiring or cold cache, the verdict) */
+.status-sep { flex: none; color: var(--c-text-ghost); }
+.status-fig { flex: none; }
+.status-fig b { font-weight: 600; color: var(--c-text); }
+.status-context { display: flex; flex: 0 1 auto; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
+.status-fill { display: inline-flex; align-items: center; gap: 6px; }
+.ctx-ring { flex: none; }
+.status-context .ctx-cache.warm { color: var(--c-text-dim); }
+/* the pill reads as a chip until the verdict asks for something; it opens the reasons */
+.status-verdict {
   display: inline-flex;
+  flex: 0 1 auto;
   align-items: center;
   gap: 8px;
-  max-width: 220px;
-  padding: 6px 12px;
+  min-width: 0;
+  max-width: 100%;
+  height: 32px;
+  margin-left: 6px;
+  padding: 0 10px 0 12px;
   font-size: var(--fs-md);
   font-weight: 600;
-  line-height: 1.25;
-  text-align: left;
-  color: var(--vc);
-  background: color-mix(in srgb, var(--vc) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--vc) 40%, transparent);
-  border-radius: var(--radius-lg);
+  color: var(--c-text-soft);
+  background: var(--c-fill);
+  border-radius: 16px;
+  transition: filter var(--t-fast);
 }
-.ctx-verdict-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--vc); }
-@media (max-width: 720px) {
-  .ctx-card { grid-template-columns: auto minmax(0, 1fr); }
-  .ctx-verdict { grid-column: 1 / -1; max-width: none; }
+.status-verdict:hover { filter: brightness(1.2); }
+.status-verdict.level-watch { color: var(--c-amber); background: color-mix(in srgb, var(--c-amber) 14%, transparent); }
+.status-verdict.level-act { color: var(--c-red); background: color-mix(in srgb, var(--c-red) 14%, transparent); }
+.status-verdict-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--c-green); }
+.status-verdict.level-watch .status-verdict-dot { background: var(--c-amber); }
+.status-verdict.level-act .status-verdict-dot { background: var(--c-red); }
+.status-verdict-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.status-verdict-chevron { flex: none; opacity: 0.7; transition: transform var(--t-fast); }
+.status-verdict[aria-expanded="true"] .status-verdict-chevron { transform: rotate(180deg); }
+/* the reasons: a popover under the pill (positioned from script) */
+.status-reasons {
+  position: fixed;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  white-space: normal;
+  color: var(--c-text-soft);
+  background: var(--c-bg-panel);
+  border: 1px solid var(--c-hairline-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
 }
+.status-reasons ul { display: flex; flex-direction: column; gap: 4px; margin: 0; padding-left: 16px; }
+.status-reasons-label { font-weight: 600; color: var(--c-text); }
+.status-reasons-label.level-watch { color: var(--c-amber); }
+.status-reasons-label.level-act { color: var(--c-red); }
+

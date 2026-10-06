@@ -9,10 +9,16 @@ versioning follows [SemVer](https://semver.org/).
 ### Changed
 
 - The glass page navigation and session tabs are lit by a soft glint in the middle of their top edge instead of a white rim, and the selected tab by an even ring.
+- **Session view header.** Calmer and shorter. The outcome, quality and project chips become one dim meta line over the title (*● project · model · date · Outcome in progress · Quality B 84.7*, colour on the values only; their explanations open under the title instead of over it). The summary leaves its Overview card for a dim two-line subtitle under the title, with "more" for the rest, and is skipped when it only repeats the title. The live status and context cards are gone: the context figures (*Context 7% · 67.5k / 1M · cache 57m*) and the verdict pill, whose reasons open from it, sit on the title's first line next to *Open terminal*, and the live state (running tool or idle, prompt and turns) is left to the session table, the Now page and the Tools tab. The tabs are built like the page navigation (a line icon before each label, the friction count as a plain amber number) and follow the title closely: the content starts up to about 190 px higher on a live session.
+- The session view uses the same width and side gutter as the other pages instead of a narrower centred column, so its edges line up with the app header.
+- **Tools tab.** The calls in order fill the main column, and a *By tool* card beside them counts the calls per tool, like the Overview's sidebar, instead of a Sequence / Summary toggle whose summary stretched across the whole width.
+- The scope bar ends with the session count and the search field; the range and the filters stay on the left.
 
 ### Fixed
 
 - `/marey:replay` opens the dashboard at once: the server takes the port before reading the sessions (a cold start could take 20 s, longer than the command waited), and the dashboard shows its loading screen until the first read is done. Each launch writes its own log, so a server being replaced can't garble it.
+- On phones, the session view's close button is no longer pushed off screen by the usage limits: they move to a row of their own under the toolbar.
+- The page navigation, the session tabs and the segmented toggles no longer show a focus ring after a mouse click followed by a key press; keyboard focus (Tab) still shows it.
 
 ### Planned
 

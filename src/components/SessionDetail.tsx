@@ -1,11 +1,12 @@
 import { LimitsPill } from "./LimitsGauge";
-import { SessionContext } from "./ContextCard";
+import { SessionContext, StatusSep } from "./ContextCard";
+import { GoalSummary } from "./GoalSummary";
 import { TimelineTab } from "./SessionTimeline";
 import { SessionKpis, TabPreviews } from "./SessionOverview";
 import { KpiRow } from "./Kpi";
 import { freshTokens, useUnit } from "../utils/units";
 import { projectColor } from "../utils/fleetStats";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPatch } from "diff";
 import type { Session, SessionQuality, ToolName } from "../types";
 import { estimateHint, formatBytes, formatClockAt, formatCost, formatDuration, formatTokens, outcomeColor, outcomeLabel } from "../utils/format";
@@ -15,6 +16,7 @@ import { classifyPrompt, PROMPT_KIND_COLOR, PROMPT_KIND_LABEL } from "../utils/c
 import { costOf, modelLabel, priceFor, type CostTokens, type ModelPrice } from "../../scripts/models.mjs";
 import { toastError } from "../utils/toast";
 import { canOpenTerminal, openTerminal } from "../utils/openTerminal";
+import { keepFocus } from "../utils/keepFocus";
 
 function gradeColor(grade: string): string {
   if (grade === "S" || grade === "A") return "var(--c-green)";
@@ -77,20 +79,26 @@ const SIGNAL_INFO: Record<string, string> = {
   agent_efficiency: "How effectively sub-agents were used. Zero agents in a long session often means work that could have been parallelized.",
 };
 
+/** Popovers opened from the meta line go under the title, so they never hide it; elsewhere, under their trigger. */
+function popoverTop(trigger: Element, gap: number): number {
+  const title = trigger.closest(".meta-line")?.parentElement?.querySelector(".goal-row");
+  return (title ?? trigger).getBoundingClientRect().bottom + gap;
+}
+
 function QualityChip({ quality }: { quality: SessionQuality }) {
   const c = gradeColor(quality.grade);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const updatePos = () => {
-      const btn = wrapRef.current?.querySelector(".quality-chip") as HTMLElement | null;
+      const btn = btnRef.current;
       if (!btn) return;
-      const r = btn.getBoundingClientRect();
-      setPos({ top: r.bottom + 8, left: r.left });
+      setPos({ top: popoverTop(btn, 8), left: btn.getBoundingClientRect().left });
     };
     updatePos();
     const onClick = (e: MouseEvent) => {
@@ -112,23 +120,17 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
   const sortedSignals = [...quality.signals].sort((a, b) => a.score - b.score);
 
   return (
-    <div className="quality-chip-wrap" ref={wrapRef}>
+    <span className="meta-item" ref={wrapRef}>
       <button
+        ref={btnRef}
         type="button"
-        className="quality-chip"
+        className="meta-quality"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label="Quality score details"
-        style={{
-          "--badge-bg": `${c}14`,
-          "--badge-c": c,
-          "--badge-border": `${c}40`,
-        } as React.CSSProperties}
+        aria-label={`Quality ${quality.grade} ${quality.score.toFixed(1)}: score details`}
       >
-        <span className="quality-label">Quality</span>
-        <span className="quality-grade">{quality.grade}</span>
-        <span className="quality-score tabular">{quality.score.toFixed(1)}</span>
-        <span className="badge-info" aria-hidden>ⓘ</span>
+        Quality <b className="tabular" style={{ color: c }}>{quality.grade} {quality.score.toFixed(1)}</b>
+        <span className="meta-info" aria-hidden="true">ⓘ</span>
       </button>
       {open && pos && (
         <div
@@ -136,7 +138,7 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
           className="quality-popover"
           role="dialog"
           aria-label="Quality breakdown"
-          style={{ top: pos.top, left: pos.left }}
+          style={{ top: pos.top, left: pos.left, maxHeight: `calc(100vh - ${Math.round(pos.top) + 16}px)` }}
         >
           <div className="quality-pop-head">
             <span className="mono dim">Measured from the transcript</span>
@@ -178,7 +180,7 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
           </div>
         </div>
       )}
-    </div>
+    </span>
   );
 }
 
@@ -196,12 +198,37 @@ interface Props {
 
 type Tab = "overview" | "timeline" | "tools" | "tokens" | "files";
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "timeline", label: "Timeline" },
-  { id: "tools", label: "Tools" },
-  { id: "tokens", label: "Tokens" },
-  { id: "files", label: "Files" },
+/** Line icons on a 24 grid, drawn like the page navigation's. */
+const TABS: Array<{ id: Tab; label: string; icon: ReactNode }> = [
+  {
+    id: "overview",
+    label: "Overview",
+    icon: (
+      <>
+        <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+        <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+        <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+        <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      </>
+    ),
+  },
+  { id: "timeline", label: "Timeline", icon: <path d="M4 4.5v15h16M7.5 15.5l3.5-4.5 3 2.5 5-6.5" /> },
+  {
+    id: "tools",
+    label: "Tools",
+    icon: <path d="M15 3.8a5 5 0 0 0-5 6.6l-5.6 5.6a2.3 2.3 0 0 0 3.3 3.3l5.6-5.6a5 5 0 0 0 6.6-5l-2.9 2.9-2.8-.5-.5-2.8z" />,
+  },
+  {
+    id: "tokens",
+    label: "Tokens",
+    icon: (
+      <>
+        <circle cx="9.5" cy="9.5" r="5.5" />
+        <path d="M15.6 9.9a5.5 5.5 0 1 1-5.7 5.7" />
+      </>
+    ),
+  },
+  { id: "files", label: "Files", icon: <path d="M13.5 3.5h-6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-10zM13.5 3.5v5h5" /> },
 ];
 
 export function SessionDetail({
@@ -302,64 +329,63 @@ export function SessionDetail({
         </div>
 
         <div className="detail-header">
-          <div className="badge-row">
-            <div
-              className="outcome-badge"
-              style={
-                {
-                  "--badge-bg": `${c}14`,
-                  "--badge-c": c,
-                  "--badge-border": `${c}40`,
-                } as React.CSSProperties
-              }
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 999,
-                  background: c,
-                  boxShadow: `0 0 8px ${c}`,
-                }}
-              />
-              <span>Outcome: {outcomeLabel(session.outcome)}</span>
-              <InfoDot
-                title={
-                  session.outcome === "in_progress"
-                    ? "Session is currently running. Outcome is set to 'in progress' while live; an outcome is assessed later when /insights analyzes it."
-                    : session.agent === "codex"
-                    ? "Outcome unknown: /insights only analyzes Claude Code sessions."
-                    : session.outcome === "unknown"
-                    ? "Outcome unknown: /insights hasn't analyzed this session yet (it assesses sessions in batch). Run /insights in Claude Code to fill it in."
-                    : "Outcome assessed by /insights from the transcript. Subjective: 'fully / mostly / partially / not' achieved. Not a hard metric — useful as a rough signal."
-                }
-              />
-            </div>
-            {session.quality && <QualityChip quality={session.quality} />}
-            <span className="st-project">
-              <span className="project-dot" style={{ background: projectColor(session.project) }} aria-hidden="true" />
-              <span className="mono">{session.project}</span>
+          {/* one quiet line over the title: where and when, then how it went; colour only on the values */}
+          <div className="meta-line">
+            <span className="meta-group">
+              <span className="meta-item">
+                <span className="project-dot" style={{ background: projectColor(session.project) }} aria-hidden="true" />
+                {session.project}
+              </span>
+              <StatusSep />
+              <span className="meta-item">{modelLabel(session.model)}</span>
+              <StatusSep />
+              <span className="meta-item tabular">
+                {new Date(session.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+              </span>
             </span>
-            <span className="detail-meta">
-              {modelLabel(session.model)} · {new Date(session.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            <StatusSep className="meta-group-sep" />
+            <span className="meta-group">
+              <span className="meta-item">
+                Outcome <b style={{ color: c }}>{outcomeLabel(session.outcome)}</b>
+                <InfoDot
+                  title={
+                    session.outcome === "in_progress"
+                      ? "Session is currently running. Outcome is set to 'in progress' while live; an outcome is assessed later when /insights analyzes it."
+                      : session.agent === "codex"
+                      ? "Outcome unknown: /insights only analyzes Claude Code sessions."
+                      : session.outcome === "unknown"
+                      ? "Outcome unknown: /insights hasn't analyzed this session yet (it assesses sessions in batch). Run /insights in Claude Code to fill it in."
+                      : "Outcome assessed by /insights from the transcript. Subjective: 'fully / mostly / partially / not' achieved. Not a hard metric — useful as a rough signal."
+                  }
+                />
+              </span>
+              {session.quality && (
+                <>
+                  <StatusSep />
+                  <QualityChip quality={session.quality} />
+                </>
+              )}
             </span>
           </div>
           <div className="goal-row">
             <div className="goal">{session.goal}</div>
-            {canOpenTerminal(session) ? (
-              <button className="resume-btn" onClick={openSessionTerminal} disabled={opening} title="Bring the terminal running this session to the front">
-                {opening ? "Opening…" : "Open terminal"}
-              </button>
-            ) : (
-              <button className="resume-btn" onClick={copyResume} title={resumeCmd}>
-                {resumeCopied ? "✓ Copied" : "Copy resume command"}
-              </button>
-            )}
+            {/* on the title's first line, right-aligned: the context figures and verdict, then the primary action */}
+            <div className="goal-actions">
+              <SessionContext sessionId={session.id} />
+              {canOpenTerminal(session) ? (
+                <button className="resume-btn" onClick={openSessionTerminal} disabled={opening} title="Bring the terminal running this session to the front">
+                  {opening ? "Opening…" : "Open terminal"}
+                </button>
+              ) : (
+                <button className="resume-btn" onClick={copyResume} title={resumeCmd}>
+                  {resumeCopied ? "✓ Copied" : "Copy resume command"}
+                </button>
+              )}
+            </div>
           </div>
+          <GoalSummary summary={session.summary} goal={session.goal} />
         </div>
 
-        {session.live && <LiveStatus session={session} />}
-        <SessionContext sessionId={session.id} />
         {(session.clearedFrom || session.clearedInto) && (
           <ClearedBanner session={session} />
         )}
@@ -370,11 +396,17 @@ export function SessionDetail({
             <button
               key={t.id}
               className={`tab ${tab === t.id ? "active" : ""}`}
+              onMouseDown={keepFocus}
               onClick={() => setTab(t.id)}
             >
+              <svg className="tab-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                {t.icon}
+              </svg>
               {t.label}
               {t.id === "overview" && session.frictions.length > 0 && (
-                <span className="tab-badge">{session.frictions.length}</span>
+                <span className="tab-count warn mono tabular" title={`${session.frictions.length} friction${session.frictions.length > 1 ? "s" : ""}`}>
+                  {session.frictions.length}
+                </span>
               )}
               {t.id === "tools" && <span className="tab-count mono tabular">{toolCallCount}</span>}
               {t.id === "files" && <span className="tab-count mono tabular">{session.filesChanged}</span>}
@@ -407,81 +439,6 @@ export function SessionDetail({
           </button>
         </span>
       </div>
-    </div>
-  );
-}
-
-function useNow(intervalMs: number) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-  return now;
-}
-
-function formatElapsed(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-  if (m < 60) return `${m}m${String(rem).padStart(2, "0")}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h${String(m % 60).padStart(2, "0")}m`;
-}
-
-function LiveStatus({ session }: { session: Session }) {
-  const now = useNow(1000);
-  const lastTs = session.lastEventAt ? Date.parse(session.lastEventAt) : now;
-  const elapsed = Math.max(0, now - lastTs);
-  const running = session.runningTool;
-  const prompts = session.prompts ?? [];
-  const turns = session.turns ?? [];
-  const lastPromptIdx = prompts.length > 0 ? prompts.length - 1 : -1;
-  const lastPrompt = lastPromptIdx >= 0 ? prompts[lastPromptIdx] : null;
-  const turnsOnLast = lastPromptIdx >= 0
-    ? turns.filter((t) => t.promptIdx === lastPromptIdx).length
-    : 0;
-
-  // state classification
-  let kind: "tool" | "thinking" | "idle" | "done";
-  let label: string;
-  if (running) {
-    kind = "tool";
-    label = `Running ${running.tool}`;
-  } else if (elapsed < 5_000) {
-    kind = "thinking";
-    label = "Claude is thinking";
-  } else if (elapsed < 30_000) {
-    kind = "done";
-    label = "Turn complete";
-  } else {
-    kind = "idle";
-    label = "Idle — waiting for input";
-  }
-
-  return (
-    <div className={`live-status live-status-${kind}`}>
-      <div className="live-status-head">
-        <span className="live-dot" aria-hidden />
-        <strong className="live-status-label">{label}</strong>
-        <span className="mono dim tabular live-status-elapsed">· {formatElapsed(elapsed)} since last event</span>
-      </div>
-      {running && (
-        <div className="live-status-body mono">
-          <span className="dim">input:</span>
-          <span className="live-status-preview">{running.preview.slice(0, 140)}</span>
-        </div>
-      )}
-      {lastPrompt && (
-        <div className="live-status-prompt mono">
-          <span className="dim">on prompt </span>
-          <strong>#{lastPromptIdx + 1}</strong>
-          <span className="dim"> · {turnsOnLast} turn{turnsOnLast === 1 ? "" : "s"} so far · </span>
-          <span className="dim live-status-prompt-preview">{lastPrompt.preview.slice(0, 100)}</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -680,23 +637,11 @@ function OverviewTab({
     );
   }
 
-  const summaryAddsInfo = !!session.summary && session.summary.trim() !== session.goal.trim();
-
   return (
     <>
       <div className="overview-grid">
         <div className="overview-main">
           <SessionKpis session={session} />
-{summaryAddsInfo && (
-      <div className="d-panel">
-        <div className="section-title">
-          <span>
-            Summary <InfoDot title="Short description of what the session was about. Comes from /insights when it has analyzed the session; otherwise the first user prompt." />
-          </span>
-        </div>
-        <p className="summary">{session.summary}</p>
-      </div>
-)}
       <div className="d-panel">
         <div className="section-title">
           <span>User prompts</span>
@@ -704,12 +649,14 @@ function OverviewTab({
             <span className="seg">
               <button
                 className={`tool-view-btn ${promptView === "timeline" ? "active" : ""}`}
+                onMouseDown={keepFocus}
                 onClick={() => setPromptView("timeline")}
               >
                 Timeline
               </button>
               <button
                 className={`tool-view-btn ${promptView === "list" ? "active" : ""}`}
+                onMouseDown={keepFocus}
                 onClick={() => setPromptView("list")}
               >
                 List
@@ -982,7 +929,6 @@ function ToolsTab({
   focus: { promptIdx: number; start: number; end: number } | null;
   onClearFocus: () => void;
 }) {
-  const [view, setView] = useState<"sequence" | "summary">("sequence");
   const sortedTools = (Object.entries(session.toolCounts) as Array<[ToolName, number]>)
     .filter(([, v]) => v > 0)
     .sort(([, a], [, b]) => b - a);
@@ -994,88 +940,75 @@ function ToolsTab({
     : allSequence;
   const sequence = [...filtered].reverse();
 
+  // the calls in order on the left; their count per tool in a card on the right (above it on narrow screens)
   return (
-    <div className="tools-tab">
-      <div className="section-title">
-        <span>
-          Tool calls <InfoDot title="Every tool Claude invoked during the session (Read, Edit, Bash, Grep, Glob, Write, Agent, etc.). Sequence view shows chronological calls with their result size; Summary view shows aggregate counts per tool. Click a row to expand the result preview." />
-        </span>
-        <div className="tool-view-toggle">
-          <span className="seg">
-            <button
-              className={`tool-view-btn ${view === "sequence" ? "active" : ""}`}
-              onClick={() => setView("sequence")}
-            >
-              Sequence
-            </button>
-            <button
-              className={`tool-view-btn ${view === "summary" ? "active" : ""}`}
-              onClick={() => setView("summary")}
-            >
-              Summary
-            </button>
-          </span>
-          <span className="dim mono tabular" style={{ marginLeft: 10 }}>
-            {focus ? `${sequence.length} of ${total}` : `${total} total`}
-          </span>
-        </div>
-      </div>
-      {focus && (
-        <div className="tools-focus-chip mono">
-          <span>
-            Showing tools after prompt <strong>#{focus.promptIdx + 1}</strong>
-            <span className="dim">
-              {" "}· {formatClockAt(session.startedAt, focus.start)}
-              {focus.end !== Infinity && ` → ${formatClockAt(session.startedAt, focus.end)}`}
+    <div className="overview-grid tools-grid">
+      <div className="overview-main">
+        <div className="d-panel tools-tab">
+          <div className="section-title">
+            <span>
+              Tool calls <InfoDot title="Every tool Claude invoked during the session (Read, Edit, Bash, Grep, Glob, Write, Agent, etc.), in order, with their result size. Click a row to expand the result preview. The By tool card counts the calls per tool." />
             </span>
-          </span>
-          <button className="tools-focus-clear" onClick={onClearFocus} aria-label="Show all tools">
-            show all ✕
-          </button>
-        </div>
-      )}
-      {view === "summary" && (
-        <div className="tool-list">
-          {sortedTools.map(([name, count]) => (
-            <div key={name} className="tool-row">
-              <span className="tool-name mono" title={name}>{name}</span>
-              <div className="tool-meter">
-                <div className="tool-meter-fill" style={{ width: `${(count / maxTool) * 100}%` }} />
-              </div>
-              <span className="tool-count tabular mono">{count}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {view === "sequence" && (
-        sequence.length === 0 ? (
-          <div className="placeholder">
-            No tool sequence available. Summary view shows aggregated counts.
+            <span className="dim mono tabular">
+              {focus ? `${sequence.length} of ${total}` : `${total} total`}
+            </span>
           </div>
-        ) : (
-          <div className="tool-sequence">
-            {sequence.map((s, i) => {
-              const isLastPending =
-                session.live &&
-                i === 0 &&
-                !s.result;
-              return (
+          {focus && (
+            <div className="tools-focus-chip mono">
+              <span>
+                Showing tools after prompt <strong>#{focus.promptIdx + 1}</strong>
+                <span className="dim">
+                  {" "}· {formatClockAt(session.startedAt, focus.start)}
+                  {focus.end !== Infinity && ` → ${formatClockAt(session.startedAt, focus.end)}`}
+                </span>
+              </span>
+              <button className="tools-focus-clear" onClick={onClearFocus} aria-label="Show all tools">
+                show all ✕
+              </button>
+            </div>
+          )}
+          {sequence.length === 0 ? (
+            <div className="placeholder">No tool sequence available. The By tool card has the counts.</div>
+          ) : (
+            <div className="tool-sequence">
+              {sequence.map((s, i) => (
                 <ToolSeqRow
                   key={i}
                   entry={s}
                   startedAt={session.startedAt}
-                  pending={isLastPending}
+                  pending={session.live && i === 0 && !s.result}
                 />
-              );
-            })}
-            {sequence.length >= 300 && (
-              <div className="mono dim" style={{ padding: "8px 10px", fontSize: "var(--fs-sm)" }}>
-                (older tool calls truncated — showing first 300 captured)
-              </div>
-            )}
+              ))}
+              {sequence.length >= 300 && (
+                <div className="mono dim" style={{ padding: "8px 10px", fontSize: "var(--fs-sm)" }}>
+                  (older tool calls truncated — showing first 300 captured)
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="overview-rail">
+        <div className="d-panel preview">
+          <div className="preview-head">
+            <span className="preview-title">By tool</span>
+            <span className="preview-meta mono tabular">{total} calls</span>
           </div>
-        )
-      )}
+          {sortedTools.length === 0 ? (
+            <div className="preview-note mono dim">No tool calls.</div>
+          ) : (
+            <div className="preview-bars">
+              {sortedTools.map(([name, count]) => (
+                <div key={name} className="preview-bar-row">
+                  <span className="mono preview-bar-name" title={name}>{name}</span>
+                  <span className="preview-bar-track"><span style={{ width: `${(count / maxTool) * 100}%` }} /></span>
+                  <span className="mono tabular preview-bar-n">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1194,12 +1127,12 @@ function InfoDot({ title }: { title: string }) {
   useEffect(() => {
     if (!open) return;
     const updatePos = () => {
-      const r = btnRef.current?.getBoundingClientRect();
-      if (!r) return;
+      const btn = btnRef.current;
+      if (!btn) return;
       const POP_W = 300;
-      let left = r.left;
+      let left = btn.getBoundingClientRect().left;
       if (left + POP_W > window.innerWidth - 16) left = window.innerWidth - POP_W - 16;
-      setPos({ top: r.bottom + 6, left });
+      setPos({ top: popoverTop(btn, 6), left });
     };
     updatePos();
     const onClick = (e: MouseEvent) => {

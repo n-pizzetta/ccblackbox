@@ -1,3 +1,4 @@
+import { keepFocus } from "../utils/keepFocus";
 import { UNITS, setUnit, useUnit } from "../utils/units";
 
 /** Settings row: which unit session lists and rankings lead with. */
@@ -14,6 +15,7 @@ export function UnitSetting() {
             className={`unit-opt ${unit === u.id ? "active" : ""}`}
             aria-pressed={unit === u.id}
             title={u.hint}
+            onMouseDown={keepFocus}
             onClick={() => setUnit(u.id)}
           >
             {u.label}

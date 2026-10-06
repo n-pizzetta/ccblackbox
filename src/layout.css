@@ -112,7 +112,7 @@
 /* the Sessions page: the table scrolls, not the page */
 .app-content.fill { overflow: hidden; padding-bottom: var(--page-gap); }
 
-/* ---- Scope bar: range, filters, search, and what they add up to ---- */
+/* ---- Scope bar: range and filters on the left, what they add up to and the search on the right ---- */
 /* flat: one fill track for the range, ghost selects, one fill search; no glass, no panel */
 .scope-bar {
   flex: none;
@@ -215,6 +215,8 @@
 .scope-summary .mono { font-family: var(--f-ui); font-weight: 600; color: var(--c-text); }
 .scope-reset { font-size: var(--fs-md); color: var(--c-cyan); }
 .scope-reset:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* the search ends the row, a little apart from the count */
+.scope-summary + .scope-search { margin-left: 10px; }
 
 /* ---- Pages ---- */
 .page { display: flex; flex-direction: column; gap: var(--page-gap); min-width: 0; }
@@ -512,7 +514,7 @@
   .app-nav-item { padding: 0 12px; }
 }
 @media (max-width: 900px) {
-  .scope-search { width: 100%; order: 5; }
+  .scope-search, .scope-summary + .scope-search { width: 100%; order: 5; margin-left: 0; }
   .scope-summary { margin-left: 0; }
 }
 
@@ -664,38 +666,31 @@
 .tool-seq-command { margin-left: 114px; }
 
 /* ---- Session view: frame, header chips, tabs ---- */
-/* content centered at a readable width on wide screens */
-.session-overlay-host { --detail-pad: max(24px, calc((100vw - 1360px) / 2)); }
+/* the pages' width and side gutter (--content-max, --pad-x), so the edges line up with the rest of the app */
+.session-overlay-host { --detail-pad: var(--pad-x); }
 .session-overlay-host .detail-toolbar { padding-inline: var(--detail-pad); }
 .toolbar-btn { width: 32px; height: 32px; border-radius: 16px; }
 .toolbar-btn.wide { width: auto; padding: 0 14px; font-size: var(--fs-base); }
 .toolbar-pos { font-size: var(--fs-base); }
 
-/* one chip style for outcome, quality, project: neutral fill capsules, state in a dot or a letter */
-.detail-header .badge-row { gap: 8px; }
-.detail-header .outcome-badge,
-.quality-chip {
-  height: 28px;
-  padding: 0 12px;
-  font-family: var(--f-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  border-radius: 14px;
+/* the meta line over the title: plain dim text split by faint dots, no chip per item;
+   outcome and grade keep their colour on the value only */
+.meta-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--fs-base); color: var(--c-text-dim); }
+.meta-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.meta-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.meta-item b { font-weight: 600; }
+.meta-item .project-dot { width: 7px; height: 7px; }
+.meta-item .info-dot { margin-left: 0; }
+.meta-quality { display: inline-flex; align-items: center; gap: 6px; color: inherit; }
+.meta-info { font-size: var(--fs-xs); color: var(--c-text-faint); }
+.meta-quality:hover .meta-info, .meta-quality[aria-expanded="true"] .meta-info { color: var(--c-cyan); }
+/* the popovers render inside the items: they don't inherit the line's type */
+.meta-item .info-popover,
+.meta-item .quality-popover { font-size: var(--fs-md); white-space: normal; color: var(--c-text); }
+.meta-item .quality-popover { font-size: var(--fs-body); }
+@media (max-width: 640px) {
+  .meta-group-sep { display: none; }
 }
-.detail-header .outcome-badge,
-.detail-header .quality-chip { background: var(--c-fill); border-color: transparent; }
-.detail-header .outcome-badge { color: var(--c-text-dim); }
-/* the grade keeps its colour, the rest of the chip stays neutral */
-.detail-header .quality-chip { color: var(--c-text); }
-.detail-header .quality-chip .quality-label { color: var(--c-text-dim); }
-.detail-header .quality-chip .quality-grade { color: var(--badge-c); }
-.quality-chip .quality-label { font-size: var(--fs-md); font-weight: 500; letter-spacing: 0; text-transform: none; }
-.quality-chip .quality-grade { font-family: var(--f-ui); font-size: var(--fs-md); font-weight: 700; letter-spacing: 0; }
-.quality-chip .quality-score { font-family: var(--f-ui); font-variant-numeric: tabular-nums; }
-.detail-header .st-project { height: 28px; padding: 0 12px 0 10px; font-size: var(--fs-md); border-radius: 14px; }
-.detail-meta { font-family: var(--f-ui); font-size: var(--fs-base); color: var(--c-text-dim); }
 .detail-header .goal { font-size: var(--fs-2xl); font-weight: 700; line-height: 1.15; letter-spacing: -0.025em; }
 
 /* counts read as plain numbers next to a label */
