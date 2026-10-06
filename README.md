@@ -14,7 +14,7 @@
   Replay every turn, see where the tokens went, and spot the sessions that went sideways — all from data already on your disk.
 </p>
 
-<h3 align="center"><a href="#install"><ins>Install as a Claude Code plugin</ins></a></h3>
+<h3 align="center"><a href="#install"><ins>Install for Claude Code or Codex</ins></a></h3>
 
 <p align="center">
   <img src="./docs/readme/hero.png" alt="The Marey dashboard, with a Claude Code terminal in front showing the context and prompt-cache segment Marey adds to the status line (synthetic demo data)" width="960" />
@@ -107,7 +107,7 @@ Empty sessions and sessions whose Claude Code process died are flagged. Get the 
 
 ## Install
 
-### As a Claude Code plugin (recommended)
+### As a Claude Code plugin
 
 **1. Add the plugin.** In Claude Code:
 
@@ -138,7 +138,7 @@ Without it, the dashboard still shows tokens and cost for an inferred 5h window,
 
 The plugin also registers a `PostToolUse` hook that records fine-grained tool sequences to `~/.claude/marey/cache/{sessionId}.jsonl`, so sessions can be replayed call by call.
 
-### Updating
+### Updating in Claude Code
 
 When a new version is out, Marey tells you as a session starts (*Marey 0.6.0 is available (you have 0.5.2) · run /marey:update*), in its status line segment and in the dashboard header. `/marey:update` refreshes the marketplace and updates the plugin; then run `/reload-plugins` and `/marey:replay`.
 
@@ -159,6 +159,29 @@ Marey was called ccblackbox. The plugin id changed, so Claude Code won't update 
 ```
 
 Your data moves on its own: the first run moves `~/.claude/ccblackbox/` (XP, badges, limits history, tool cache, model overrides) to `~/.claude/marey/` and leaves a link at the old path, so nothing breaks in between. `/marey:limits` points your status line at the new folder; your previous status line is kept. Dashboard settings saved in the browser carry over too.
+
+### As a Codex plugin
+
+Needs Node 20+ on your `PATH` and a Codex client with plugin support.
+
+**1. Add the marketplace and install Marey.** In Codex's plugin management UI, add `https://github.com/n-pizzetta/marey.git`, then install and enable `marey@marey`. With a CLI that supports `codex plugin add`, you can also run:
+
+```sh
+codex plugin marketplace add https://github.com/n-pizzetta/marey.git
+codex plugin add marey@marey
+```
+
+**2. Open the dashboard.** In Codex CLI or the IDE extension, open `/skills` or type `$` and select **Marey → replay** (namespaced as `marey:replay`). You can also ask “Open the Marey dashboard.” The launcher opens `http://localhost:3333`; request `--port 4444` for another port or `--no-open` to get the link without opening a browser. It reads both `~/.claude/` and `~/.codex/` (or their configured locations).
+
+Codex uses skills rather than Claude Code's `/marey:replay` slash command. If an older install only shows `source-command-update`, update the plugin and restart Codex/start a fresh session to reload the skills.
+
+Some clients also list the imported `source-command-update` alias alongside the native skills; it redirects to Codex's `update` skill.
+
+**3. Update in Codex.** Select **Marey → update**, or run `codex plugin marketplace upgrade marey` followed by `codex plugin add marey@marey` on clients supporting those commands. Otherwise use Codex's plugin management UI to refresh/update Marey. Reload the session, then invoke **replay** again to replace an older running dashboard.
+
+The status-line integration, `/marey:limits`, and capture hooks are **Claude Code-only**. The Codex plugin exposes the dashboard and update skills; it does not install a Claude status line or capture hooks. Marey's local dashboard state still lives in `~/.claude/marey/`, even when launched from Codex.
+
+See OpenAI's [plugin packaging](https://developers.openai.com/plugins/build/plugins) and [skill invocation](https://learn.chatgpt.com/docs/build-skills) documentation for client support and discovery.
 
 ### From source
 
