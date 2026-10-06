@@ -1,4 +1,5 @@
 import type { Session } from "../types";
+import { keepFocus } from "../utils/keepFocus";
 import { RANGE_OPTIONS, rangeLabel, type Range } from "../utils/range";
 import { SessionFilters, type FilterId } from "./SessionFilters";
 
@@ -45,6 +46,7 @@ export function ScopeBar({
             role="radio"
             aria-checked={range === r.id}
             className={`range-opt ${range === r.id ? "active" : ""}`}
+            onMouseDown={keepFocus}
             onClick={() => onRangeChange(r.id)}
           >
             {r.label}

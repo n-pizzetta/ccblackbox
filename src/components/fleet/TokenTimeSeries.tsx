@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Session } from "../../types";
 import type { Range } from "../../utils/range";
+import { keepFocus } from "../../utils/keepFocus";
 import {
   bucketizeByProject,
   rangeBoundsMs,
@@ -115,8 +116,8 @@ export function TokenTimeSeries({ sessions, range }: Props) {
       <div className="section-title">
         <span>Tokens over time · stacked by project</span>
         <span className="timeseries-toggle">
-          <button className={axis === "tokens" ? "active" : ""} onClick={() => setAxis("tokens")}>tokens</button>
-          <button className={axis === "cost" ? "active" : ""} onClick={() => setAxis("cost")}>$</button>
+          <button className={axis === "tokens" ? "active" : ""} onMouseDown={keepFocus} onClick={() => setAxis("tokens")}>tokens</button>
+          <button className={axis === "cost" ? "active" : ""} onMouseDown={keepFocus} onClick={() => setAxis("cost")}>$</button>
         </span>
       </div>
       <div className="timeseries-wrap">

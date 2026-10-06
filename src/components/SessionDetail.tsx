@@ -16,6 +16,7 @@ import { classifyPrompt, PROMPT_KIND_COLOR, PROMPT_KIND_LABEL } from "../utils/c
 import { costOf, modelLabel, priceFor, type CostTokens, type ModelPrice } from "../../scripts/models.mjs";
 import { toastError } from "../utils/toast";
 import { canOpenTerminal, openTerminal } from "../utils/openTerminal";
+import { keepFocus } from "../utils/keepFocus";
 
 function gradeColor(grade: string): string {
   if (grade === "S" || grade === "A") return "var(--c-green)";
@@ -395,6 +396,7 @@ export function SessionDetail({
             <button
               key={t.id}
               className={`tab ${tab === t.id ? "active" : ""}`}
+              onMouseDown={keepFocus}
               onClick={() => setTab(t.id)}
             >
               <svg className="tab-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
@@ -647,12 +649,14 @@ function OverviewTab({
             <span className="seg">
               <button
                 className={`tool-view-btn ${promptView === "timeline" ? "active" : ""}`}
+                onMouseDown={keepFocus}
                 onClick={() => setPromptView("timeline")}
               >
                 Timeline
               </button>
               <button
                 className={`tool-view-btn ${promptView === "list" ? "active" : ""}`}
+                onMouseDown={keepFocus}
                 onClick={() => setPromptView("list")}
               >
                 List
