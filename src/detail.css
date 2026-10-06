@@ -218,6 +218,23 @@
 /* ---- Header ---- */
 .goal-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .goal-row .goal { min-width: 0; }
+/* the summary as a quiet subtitle, tight under the title: two lines at most, the rest behind "more" */
+.goal-summary-row { display: flex; align-items: flex-end; gap: 10px; max-width: 110ch; }
+.goal-summary {
+  display: -webkit-box;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--fs-body);
+  line-height: 1.5;
+  color: var(--c-text-dim);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.goal-summary.open { display: block; -webkit-line-clamp: unset; line-clamp: none; }
+.goal-summary-toggle { flex: none; font-size: var(--fs-md); line-height: 21px; color: var(--c-cyan); }
+.goal-summary-toggle:hover { text-decoration: underline; text-underline-offset: 3px; }
 /* the primary action of the view: the one filled accent button */
 .resume-btn {
   flex: none;
@@ -250,7 +267,6 @@
 /* the prompts panel takes the height left by the rail, so both columns end on the same line */
 .overview-main > .d-panel:last-child { flex: 1; display: flex; flex-direction: column; }
 .overview-main > .d-panel:last-child .prompt-chart-wrap { flex: 1; grid-template-rows: minmax(130px, 1fr) auto; }
-.summary { margin: 0; }
 
 /* ---- Tab previews ---- */
 .preview-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }

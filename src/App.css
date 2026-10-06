@@ -1655,12 +1655,6 @@ a:focus-visible,
   justify-content: space-between;
 }
 
-.summary {
-  font-size: var(--fs-body);
-  color: var(--c-text);
-  line-height: 1.6;
-}
-
 /* timeline */
 
 /* tools list */

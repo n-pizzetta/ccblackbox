@@ -1,6 +1,7 @@
 import { LimitsPill } from "./LimitsGauge";
 import { SessionStatus } from "./SessionStatus";
 import { StatusSep } from "./ContextCard";
+import { GoalSummary } from "./GoalSummary";
 import { TimelineTab } from "./SessionTimeline";
 import { SessionKpis, TabPreviews } from "./SessionOverview";
 import { KpiRow } from "./Kpi";
@@ -378,6 +379,7 @@ export function SessionDetail({
               </button>
             )}
           </div>
+          <GoalSummary summary={session.summary} goal={session.goal} />
         </div>
 
         <SessionStatus session={session} />
@@ -631,23 +633,11 @@ function OverviewTab({
     );
   }
 
-  const summaryAddsInfo = !!session.summary && session.summary.trim() !== session.goal.trim();
-
   return (
     <>
       <div className="overview-grid">
         <div className="overview-main">
           <SessionKpis session={session} />
-{summaryAddsInfo && (
-      <div className="d-panel">
-        <div className="section-title">
-          <span>
-            Summary <InfoDot title="Short description of what the session was about. Comes from /insights when it has analyzed the session; otherwise the first user prompt." />
-          </span>
-        </div>
-        <p className="summary">{session.summary}</p>
-      </div>
-)}
       <div className="d-panel">
         <div className="section-title">
           <span>User prompts</span>
