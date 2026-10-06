@@ -99,7 +99,7 @@ Empty sessions and sessions whose Claude Code process died are flagged. Get the 
 </tr>
 </table>
 
-**Codex sessions** from the Codex CLI and IDE extension show up next to Claude Code ones, tagged `codex`, with their tokens, GPT pricing, prompts, commands, patches and timeline. A Claude Code / Codex filter appears once both have sessions.
+**Codex sessions** from the Codex CLI and IDE extension show up next to Claude Code ones, tagged `codex`, with their tokens, GPT pricing, prompts, commands, patches and timeline. The provider switcher beside the logo shows the detected providers: choose **All providers**, **Claude Code** or **Codex**. The selection is remembered and applies to every page, including Now. Codex's Now view shows today's activity; Claude's quota gauges and badges stay in Claude views and are labelled in the combined view.
 
 <p align="center"><sub>All screenshots use synthetic data from <code>pnpm seed:demo</code>.</sub></p>
 
