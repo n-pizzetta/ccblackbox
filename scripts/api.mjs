@@ -41,6 +41,10 @@ const HTML_TYPE = "text/html; charset=utf-8";
 
 let onParsed = () => {};
 
+/** Resolves once the first parse is done: until then data routes wait (the dashboard shows its loading screen). */
+let markReady;
+const ready = new Promise((resolve) => (markReady = resolve));
+
 let parsing = false;
 let parsePending = false;
 const cache = {
@@ -232,7 +236,11 @@ function serveUsageReport(_req, res) {
   createReadStream(REPORT_HTML).pipe(res);
 }
 
+/** Routes that answer without the parsed sessions, so they work while the first parse runs. */
+const NO_PARSE_NEEDED = new Set(["/api/version", "/api/update", "/api/limits"]);
+
 async function handleApi(req, res) {
+  if (!NO_PARSE_NEEDED.has((req.url || "").split("?")[0])) await ready;
   const url = req.url || "";
 
   if (url === "/api/sessions" || url.startsWith("/api/sessions?")) {
@@ -411,7 +419,11 @@ async function handleApi(req, res) {
  */
 export async function startApi({ onParsed: onParsedCb } = {}) {
   if (onParsedCb) onParsed = onParsedCb;
-  await runParser();
+  try {
+    await runParser();
+  } finally {
+    markReady();
+  }
   watchClaude();
   setInterval(scheduleParse, 10_000).unref();
 }

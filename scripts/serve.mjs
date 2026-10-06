@@ -115,8 +115,6 @@ async function main() {
   if (refreshStatusline(dataDir(), __dirname)) console.log(`[marey] status line wrapper updated to ${VERSION}`);
   recordInstalled(dataDir(), VERSION);
 
-  await startApi();
-
   const server = createServer(async (req, res) => {
     try {
       if (await handleRequest(req, res)) return;
@@ -153,10 +151,16 @@ async function main() {
     process.exit(1);
   });
 
+  // Take the port first, then parse: the browser opens at once and shows the dashboard's
+  // loading screen while data routes wait for the first parse (a cold start can take a while).
   server.on("listening", () => {
     const url = `http://localhost:${args.port}`;
     console.log(`[marey] ${VERSION} listening on ${url}`);
     if (args.open) openBrowser(url);
+    startApi().catch((err) => {
+      console.error("[marey] fatal:", err);
+      process.exit(1);
+    });
   });
   listen();
 }
