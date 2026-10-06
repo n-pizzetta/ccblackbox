@@ -10,7 +10,7 @@ import { projectColor } from "../utils/fleetStats";
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPatch } from "diff";
 import type { Session, SessionQuality, ToolCall, ToolName } from "../types";
-import { callsBetween, callsPerPrompt, countCalls, countFailed, countSubCalls, onlyFailed } from "../utils/toolCalls";
+import { callsBetween, callsPerPrompt, countCalls, countFailed, countSubCalls, flattenCalls, onlyFailed } from "../utils/toolCalls";
 import { estimateHint, formatBytes, formatClockAt, formatCost, formatDuration, formatTokens, outcomeColor, outcomeLabel } from "../utils/format";
 import { SESSION_IDLE_GAP_MS } from "../utils/fleetStats";
 import { downloadSessionHtml } from "../utils/exportSession";
@@ -424,7 +424,7 @@ export function SessionDetail({
                 </span>
               )}
               {t.id === "tools" && <span className="tab-count mono tabular">{toolCallCount}</span>}
-              {t.id === "files" && <span className="tab-count mono tabular">{session.filesChanged}</span>}
+              {t.id === "files" && session.filesChanged > 0 && <span className="tab-count mono tabular">{session.filesChanged}</span>}
             </button>
           ))}
         </div>
@@ -1606,18 +1606,34 @@ function TurnBreakdown({ details }: { details: PromptStats["turnDetails"] }) {
   );
 }
 
+const GIT_COMMIT_RE = /\bgit\s+commit\b/;
 
+/** The message of a `git commit -m "…"` command, else the command. */
+function commitMessage(command: string): string {
+  const m = /\s-m\s+(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+))/.exec(command);
+  return (m?.[1] ?? m?.[2] ?? m?.[3] ?? command).trim();
+}
+
+/** What changed: the files Claude edited, their versions and diffs, and the commits it made. */
 function FilesTab({ session }: { session: Session }) {
   const history = session.fileHistory ?? [];
   const [openHash, setOpenHash] = useState<string | null>(null);
+  // the commits the session counts (main thread), from its Bash calls
+  const commits = flattenCalls(session.toolSequence ?? []).filter((c) => !c.sub && c.tool === "Bash" && GIT_COMMIT_RE.test(c.full ?? c.preview));
+  const totalVersions = history.reduce((a, f) => a + f.versions.length, 0);
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const meta = [
+    history.length > 0 ? `${plural(history.length, "file")} · ${plural(totalVersions, "version")}` : `${session.filesChanged} changed`,
+    plural(session.commits, "commit"),
+  ].join(" · ");
 
-  if (history.length === 0) {
-    return (
-      <div>
-        <div className="section-title">
-          <span>Files</span>
-          <span className="dim mono tabular">{session.filesChanged} tracked · {session.commits} commits</span>
-        </div>
+  return (
+    <div>
+      <div className="section-title">
+        <span>Files</span>
+        <span className="dim tabular">{meta}</span>
+      </div>
+      {history.length === 0 ? (
         <div className="placeholder">
           No file history recorded for this session.
           <div className="mono dim" style={{ marginTop: 6 }}>
@@ -1628,31 +1644,45 @@ function FilesTab({ session }: { session: Session }) {
             )}
           </div>
         </div>
-      </div>
-    );
-  }
-
-  const totalVersions = history.reduce((a, f) => a + f.versions.length, 0);
-
-  return (
-    <div>
-      <div className="section-title">
-        <span>Files</span>
-        <span className="dim mono tabular">{history.length} files · {totalVersions} versions</span>
-      </div>
-      <div className="file-list">
-        {history.map((f) => (
-          <FileEntry
-            key={f.hash}
-            sessionId={session.id}
-            hash={f.hash}
-            versions={f.versions}
-            path={f.path}
-            open={openHash === f.hash}
-            onToggle={() => setOpenHash(openHash === f.hash ? null : f.hash)}
-          />
-        ))}
-      </div>
+      ) : (
+        <div className="file-list">
+          {history.map((f) => (
+            <FileEntry
+              key={f.hash}
+              sessionId={session.id}
+              hash={f.hash}
+              versions={f.versions}
+              path={f.path}
+              open={openHash === f.hash}
+              onToggle={() => setOpenHash(openHash === f.hash ? null : f.hash)}
+            />
+          ))}
+        </div>
+      )}
+      {commits.length > 0 && (
+        <div className="files-commits">
+          <div className="section-title">
+            <span>Commits</span>
+            <span className="dim tabular">{plural(commits.length, "commit")}</span>
+          </div>
+          <div className="tool-sequence">
+            {commits.map((c, i) => {
+              const failed = !!c.result?.isError;
+              return (
+                <div key={i} className="tool-seq-row">
+                  <div className="tool-seq-main files-commit-row" title={c.full ?? c.preview}>
+                    <span className="tool-seq-time mono dim tabular">{formatClockAt(session.startedAt, c.t)}</span>
+                    <span className={`tool-seq-status ${failed ? "err" : c.result ? "ok" : ""}`} title={failed ? "the commit command failed" : "committed"}>
+                      {failed ? "✗" : c.result ? "✓" : "·"}
+                    </span>
+                    <span className="files-commit-msg mono">{commitMessage(c.full ?? c.preview)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -292,3 +292,8 @@
 /* Frictions: count, then the link to their place on the Timeline */
 .friction-panel .section-title { justify-content: flex-start; gap: 10px; }
 .friction-panel .friction-go { margin-left: auto; font-weight: 400; }
+
+/* ---- Files tab: the commits made ---- */
+.files-commits { margin-top: 18px; }
+.files-commit-row { grid-template-columns: 64px 14px minmax(0, 1fr); }
+.files-commit-msg { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--c-text); }
