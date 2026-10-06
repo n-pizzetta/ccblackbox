@@ -224,8 +224,6 @@
 }
 
 /* ---- Header ---- */
-.detail-header .badge-row { flex-wrap: wrap; gap: 10px; align-items: center; }
-.detail-meta { font-size: var(--fs-sm); color: var(--c-text-faint); }
 .goal-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .goal-row .goal { min-width: 0; }
 /* the primary action of the view: the one filled accent button */

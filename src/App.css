@@ -1021,52 +1021,6 @@ a:focus-visible,
   letter-spacing: -0.4px;
   line-height: 1.3;
 }
-.detail-header .outcome-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-family: var(--f-mono);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: var(--badge-bg);
-  color: var(--badge-c);
-  border: 1px solid var(--badge-border);
-  align-self: flex-start;
-  cursor: default;
-}
-.badge-info {
-  opacity: 0.5;
-  font-size: var(--fs-xs);
-  margin-left: 2px;
-}
-.detail-header .badge-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.quality-chip-wrap { position: relative; }
-.quality-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-family: var(--f-mono);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  background: var(--badge-bg);
-  color: var(--badge-c);
-  border: 1px solid var(--badge-border);
-  align-self: flex-start;
-  cursor: pointer;
-}
-.quality-chip:hover { filter: brightness(1.15); }
-
 .quality-popover {
   position: fixed;
   z-index: 1000;
@@ -1159,22 +1113,6 @@ a:focus-visible,
 }
 .quality-pop-detail { font-size: var(--fs-sm); line-height: 1.3; }
 .quality-pop-waste-line { font-size: var(--fs-xs); }
-.quality-chip .quality-label {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  letter-spacing: 1.2px;
-  opacity: 0.65;
-  padding-right: 4px;
-  border-right: 1px solid color-mix(in srgb, var(--badge-c) 25%, transparent);
-}
-.quality-chip .quality-grade {
-  font-size: var(--fs-md);
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-.quality-chip .quality-score {
-  opacity: 0.8;
-}
 
 .file-list {
   display: flex;

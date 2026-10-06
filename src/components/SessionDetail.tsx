@@ -1,5 +1,6 @@
 import { LimitsPill } from "./LimitsGauge";
 import { SessionStatus } from "./SessionStatus";
+import { StatusSep } from "./ContextCard";
 import { TimelineTab } from "./SessionTimeline";
 import { SessionKpis, TabPreviews } from "./SessionOverview";
 import { KpiRow } from "./Kpi";
@@ -77,20 +78,26 @@ const SIGNAL_INFO: Record<string, string> = {
   agent_efficiency: "How effectively sub-agents were used. Zero agents in a long session often means work that could have been parallelized.",
 };
 
+/** Popovers opened from the meta line go under the title, so they never hide it; elsewhere, under their trigger. */
+function popoverTop(trigger: Element, gap: number): number {
+  const title = trigger.closest(".meta-line")?.parentElement?.querySelector(".goal-row");
+  return (title ?? trigger).getBoundingClientRect().bottom + gap;
+}
+
 function QualityChip({ quality }: { quality: SessionQuality }) {
   const c = gradeColor(quality.grade);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const updatePos = () => {
-      const btn = wrapRef.current?.querySelector(".quality-chip") as HTMLElement | null;
+      const btn = btnRef.current;
       if (!btn) return;
-      const r = btn.getBoundingClientRect();
-      setPos({ top: r.bottom + 8, left: r.left });
+      setPos({ top: popoverTop(btn, 8), left: btn.getBoundingClientRect().left });
     };
     updatePos();
     const onClick = (e: MouseEvent) => {
@@ -112,23 +119,17 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
   const sortedSignals = [...quality.signals].sort((a, b) => a.score - b.score);
 
   return (
-    <div className="quality-chip-wrap" ref={wrapRef}>
+    <span className="meta-item" ref={wrapRef}>
       <button
+        ref={btnRef}
         type="button"
-        className="quality-chip"
+        className="meta-quality"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        aria-label="Quality score details"
-        style={{
-          "--badge-bg": `${c}14`,
-          "--badge-c": c,
-          "--badge-border": `${c}40`,
-        } as React.CSSProperties}
+        aria-label={`Quality ${quality.grade} ${quality.score.toFixed(1)}: score details`}
       >
-        <span className="quality-label">Quality</span>
-        <span className="quality-grade">{quality.grade}</span>
-        <span className="quality-score tabular">{quality.score.toFixed(1)}</span>
-        <span className="badge-info" aria-hidden>ⓘ</span>
+        Quality <b className="tabular" style={{ color: c }}>{quality.grade} {quality.score.toFixed(1)}</b>
+        <span className="meta-info" aria-hidden="true">ⓘ</span>
       </button>
       {open && pos && (
         <div
@@ -136,7 +137,7 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
           className="quality-popover"
           role="dialog"
           aria-label="Quality breakdown"
-          style={{ top: pos.top, left: pos.left }}
+          style={{ top: pos.top, left: pos.left, maxHeight: `calc(100vh - ${Math.round(pos.top) + 16}px)` }}
         >
           <div className="quality-pop-head">
             <span className="mono dim">Measured from the transcript</span>
@@ -178,7 +179,7 @@ function QualityChip({ quality }: { quality: SessionQuality }) {
           </div>
         </div>
       )}
-    </div>
+    </span>
   );
 }
 
@@ -327,46 +328,42 @@ export function SessionDetail({
         </div>
 
         <div className="detail-header">
-          <div className="badge-row">
-            <div
-              className="outcome-badge"
-              style={
-                {
-                  "--badge-bg": `${c}14`,
-                  "--badge-c": c,
-                  "--badge-border": `${c}40`,
-                } as React.CSSProperties
-              }
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 999,
-                  background: c,
-                  boxShadow: `0 0 8px ${c}`,
-                }}
-              />
-              <span>Outcome: {outcomeLabel(session.outcome)}</span>
-              <InfoDot
-                title={
-                  session.outcome === "in_progress"
-                    ? "Session is currently running. Outcome is set to 'in progress' while live; an outcome is assessed later when /insights analyzes it."
-                    : session.agent === "codex"
-                    ? "Outcome unknown: /insights only analyzes Claude Code sessions."
-                    : session.outcome === "unknown"
-                    ? "Outcome unknown: /insights hasn't analyzed this session yet (it assesses sessions in batch). Run /insights in Claude Code to fill it in."
-                    : "Outcome assessed by /insights from the transcript. Subjective: 'fully / mostly / partially / not' achieved. Not a hard metric — useful as a rough signal."
-                }
-              />
-            </div>
-            {session.quality && <QualityChip quality={session.quality} />}
-            <span className="st-project">
-              <span className="project-dot" style={{ background: projectColor(session.project) }} aria-hidden="true" />
-              <span className="mono">{session.project}</span>
+          {/* one quiet line over the title: where and when, then how it went; colour only on the values */}
+          <div className="meta-line">
+            <span className="meta-group">
+              <span className="meta-item">
+                <span className="project-dot" style={{ background: projectColor(session.project) }} aria-hidden="true" />
+                {session.project}
+              </span>
+              <StatusSep />
+              <span className="meta-item">{modelLabel(session.model)}</span>
+              <StatusSep />
+              <span className="meta-item tabular">
+                {new Date(session.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+              </span>
             </span>
-            <span className="detail-meta">
-              {modelLabel(session.model)} · {new Date(session.startedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+            <StatusSep className="meta-group-sep" />
+            <span className="meta-group">
+              <span className="meta-item">
+                Outcome <b style={{ color: c }}>{outcomeLabel(session.outcome)}</b>
+                <InfoDot
+                  title={
+                    session.outcome === "in_progress"
+                      ? "Session is currently running. Outcome is set to 'in progress' while live; an outcome is assessed later when /insights analyzes it."
+                      : session.agent === "codex"
+                      ? "Outcome unknown: /insights only analyzes Claude Code sessions."
+                      : session.outcome === "unknown"
+                      ? "Outcome unknown: /insights hasn't analyzed this session yet (it assesses sessions in batch). Run /insights in Claude Code to fill it in."
+                      : "Outcome assessed by /insights from the transcript. Subjective: 'fully / mostly / partially / not' achieved. Not a hard metric — useful as a rough signal."
+                  }
+                />
+              </span>
+              {session.quality && (
+                <>
+                  <StatusSep />
+                  <QualityChip quality={session.quality} />
+                </>
+              )}
             </span>
           </div>
           <div className="goal-row">
@@ -1148,12 +1145,12 @@ function InfoDot({ title }: { title: string }) {
   useEffect(() => {
     if (!open) return;
     const updatePos = () => {
-      const r = btnRef.current?.getBoundingClientRect();
-      if (!r) return;
+      const btn = btnRef.current;
+      if (!btn) return;
       const POP_W = 300;
-      let left = r.left;
+      let left = btn.getBoundingClientRect().left;
       if (left + POP_W > window.innerWidth - 16) left = window.innerWidth - POP_W - 16;
-      setPos({ top: r.bottom + 6, left });
+      setPos({ top: popoverTop(btn, 6), left });
     };
     updatePos();
     const onClick = (e: MouseEvent) => {
