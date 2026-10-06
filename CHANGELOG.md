@@ -9,7 +9,7 @@ versioning follows [SemVer](https://semver.org/).
 ### Changed
 
 - The glass page navigation and session tabs are lit by a soft glint in the middle of their top edge instead of a white rim, and the selected tab by an even ring.
-- **Session view header.** The tabs are built like the page navigation (a line icon before each label, the friction count as a plain amber number), and the live status and context cards above them are merged into one strip that reads at a glance: *Idle · 3m ago · prompt 1 · 5 turns* on the left, *Context 7% · 67.5k / 1M · cache 57m* and the verdict on the right, whose reasons open from its pill. The content starts about 140 px higher on a live session.
+- **Session view header.** Calmer and shorter. The outcome, quality and project chips become one dim meta line over the title (*● project · model · date · Outcome in progress · Quality B 84.7*, colour on the values only; their explanations open under the title instead of over it). The live status and context cards are merged into one line of text under the title that reads at a glance: *Idle · 3m ago · prompt 1 · 5 turns* on the left, *Context 7% · 67.5k / 1M · cache 57m* and the verdict pill on the right, whose reasons open from the pill. The tabs are built like the page navigation (a line icon before each label, the friction count as a plain amber number). Clear steps separate the title, the status line, the tabs and the content, which starts about 130 px higher on a live session.
 - The session view uses the same width and side gutter as the other pages instead of a narrower centred column, so its edges line up with the app header.
 
 ### Fixed
