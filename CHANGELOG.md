@@ -6,6 +6,21 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Planned
+
+- Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
+- Sub-Agent Tree component.
+- Cross-Session Patterns component.
+- Delta vs `~/.claude/usage-data/report.html` view.
+- Tests: parser unit tests around `mapFrictions`, `linkClearedChains`,
+  `reassignLiveToChainTail`, plugin-cache merge.
+- CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
+  macOS/Linux).
+- Per-session disk cache (`~/.claude/marey/cache/parsed/{id}.json`)
+  with mtime invalidation, so cold start doesn't re-parse the full set.
+
+## [0.7.0] — 2026-10-06
+
 ### Changed
 
 - The glass page navigation and session tabs are lit by a soft glint in the middle of their top edge instead of a white rim, and the selected tab by an even ring.
@@ -23,19 +38,6 @@ versioning follows [SemVer](https://semver.org/).
 - The page navigation, the session tabs and the segmented toggles no longer show a focus ring after a mouse click followed by a key press; keyboard focus (Tab) still shows it.
 - **Tool-call counts agree.** Sub-agent calls were counted in the tab, the headline tile and the By tool card, but missing from the list, the Timeline and the prompt badges (39 counted, 26 listed). The parser now nests each sub-agent's calls under the Agent call that ran it, matched by the agent id Claude Code writes in the call's result, else by its prompt, else by time, so every count is the same, the HTML export's list included.
 - **One unit per figure.** A prompt shown in fresh tokens got its share of the session's API value (24.8k shown as 9.5% when it was 7.8% of the tokens); the share now follows the shown unit. The Overview's "Tokens" card, which drew API value shares under a token total, is now "API value by kind".
-
-### Planned
-
-- Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
-- Sub-Agent Tree component.
-- Cross-Session Patterns component.
-- Delta vs `~/.claude/usage-data/report.html` view.
-- Tests: parser unit tests around `mapFrictions`, `linkClearedChains`,
-  `reassignLiveToChainTail`, plugin-cache merge.
-- CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
-  macOS/Linux).
-- Per-session disk cache (`~/.claude/marey/cache/parsed/{id}.json`)
-  with mtime invalidation, so cold start doesn't re-parse the full set.
 
 ## [0.6.0] — 2026-10-06
 
