@@ -19,8 +19,9 @@
 /* flat toolbar: ghost buttons, the limits inline, nothing boxed */
 .session-overlay-host .detail-sticky { background: transparent; border-bottom: none; }
 .session-overlay-host .detail-toolbar { padding-block: 12px 4px; background: transparent; border-bottom: none; }
-.session-overlay-host .detail-header { padding-inline: var(--detail-pad); }
-.session-overlay-host .detail-sticky > :not(.detail-toolbar):not(.detail-header):not(.tabs) { margin-inline: var(--detail-pad); }
+/* vertical rhythm: meta line tight over the title, then 22px to the status line and banners, 28px to the tabs and from the tabs to the content */
+.session-overlay-host .detail-header { gap: 6px; padding: 16px var(--detail-pad) 0; }
+.session-overlay-host .detail-sticky > :not(.detail-toolbar):not(.detail-header):not(.tabs) { margin: 22px var(--detail-pad) 0; }
 .session-overlay-host .detail-footer { padding-inline: var(--detail-pad); background: transparent; border-top: none; }
 .detail-footer .cost { color: var(--c-text); }
 
@@ -52,7 +53,7 @@
   max-width: calc(100% - 2 * var(--detail-pad));
   height: 44px;
   overflow-x: auto;
-  margin: 10px var(--detail-pad) 14px;
+  margin: 28px var(--detail-pad) 22px;
   padding: 4px;
   border-bottom: none;
   border-radius: 22px;
@@ -168,27 +169,21 @@
 .detail .cleared-link { font-weight: 500; text-decoration: none; }
 .detail .cleared-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-/* ---- Status strip: the live state and the context snapshot in one quiet row above the tabs ----
-   read at a glance: short figures split by dots, the two groups apart with a hairline between;
-   flat capsule, no coloured frame; the verdict pill sits 8px in, concentric with it */
+/* ---- Status strip: the live state and the context snapshot as one line of text under the title ----
+   no capsule: short figures split by dots, the two groups apart with a hairline between;
+   the verdict pill is its one filled element */
 .status-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 24px;
-  min-height: 48px;
-  margin-top: 2px;
-  padding: 8px 8px 8px 20px;
   font-size: var(--fs-base);
   color: var(--c-text-dim);
-  background: rgba(255, 255, 255, 0.035);
-  border-radius: var(--radius-lg);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 .status-sep { flex: none; color: var(--c-text-ghost); }
 .status-fig { flex: none; }
 .status-fig b { font-weight: 600; color: var(--c-text); }
-.status-live { display: flex; flex: 1 1 0; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
+.status-live { display: flex; flex: 1 1 0; align-items: center; gap: 10px; min-width: 0; min-height: 32px; white-space: nowrap; }
 .status-live + .status-context { padding-left: 24px; box-shadow: inset 1px 0 0 var(--c-hairline-strong); }
 .status-label { display: inline-flex; flex: none; align-items: center; gap: 8px; font-weight: 600; color: var(--c-text); }
 .status-live .live-dot { flex: none; }
@@ -196,18 +191,15 @@
 .status-live.done .live-dot { box-shadow: none; animation: none; }
 .status-live.idle .live-dot { background: var(--c-text-faint); box-shadow: none; animation: none; }
 .status-elapsed { flex: none; }
-/* the running tool's input: a short mono chip, cut before it crowds the figures */
+/* the running tool's input: short mono text, cut before it crowds the figures */
 .status-input {
   flex: 0 1 auto;
   min-width: 0;
   max-width: min(360px, 26vw);
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 2px 8px;
   font-size: var(--fs-md);
   color: var(--c-text-soft);
-  background: rgba(0, 0, 0, 0.22);
-  border-radius: var(--radius-sm);
 }
 /* below the app's small-screen width the context drops to its own row */
 @media (max-width: 900px) {
@@ -218,7 +210,7 @@
 }
 /* phones: two rows at most; the tool input, the "Context" label and the token figures go (they stay in the tooltips) */
 @media (max-width: 640px) {
-  .status-strip { padding-left: 16px; font-size: var(--fs-md); }
+  .status-strip { font-size: var(--fs-md); }
   .status-input, .status-fill-label, .status-fill-tokens { display: none; }
   .status-reasons-label { display: inline; }
 }
@@ -230,6 +222,8 @@
 .resume-btn {
   flex: none;
   height: 36px;
+  /* centred on the title's first line (32px) */
+  margin-top: -2px;
   padding: 0 18px;
   font-size: var(--fs-base);
   font-weight: 600;

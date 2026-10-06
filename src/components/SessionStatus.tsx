@@ -64,15 +64,15 @@ function LiveState({ session }: { session: Session }) {
         <span className="live-dot" aria-hidden="true" />
         {label}
       </span>
-      <StatusSep />
-      <span className="status-elapsed tabular" title={`${formatElapsed(elapsed)} since the last event in the transcript`}>
-        {formatAgo(elapsed)} ago
-      </span>
       {running && (
         <code className="status-input mono" title={running.preview}>
           {running.preview.slice(0, 140)}
         </code>
       )}
+      <StatusSep />
+      <span className="status-elapsed tabular" title={`${formatElapsed(elapsed)} since the last event in the transcript`}>
+        {formatAgo(elapsed)} ago
+      </span>
       {lastPrompt && (
         <>
           <StatusSep />

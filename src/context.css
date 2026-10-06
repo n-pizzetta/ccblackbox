@@ -55,5 +55,5 @@
 .status-verdict-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status-verdict-chevron { flex: none; opacity: 0.7; transition: transform var(--t-fast); }
 .status-verdict[aria-expanded="true"] .status-verdict-chevron { transform: rotate(180deg); }
-.status-reasons { flex-basis: 100%; margin: 0; padding: 0 12px 6px 0; font-size: var(--fs-md); line-height: 1.5; color: var(--c-text-dim); }
+.status-reasons { flex-basis: 100%; margin: 0; padding: 0 12px 0 0; font-size: var(--fs-md); line-height: 1.5; color: var(--c-text-dim); }
 .status-reasons-label { display: none; font-weight: 600; color: var(--c-text-soft); }
