@@ -1695,20 +1695,6 @@ a:focus-visible,
   color: var(--c-text);
   border-bottom-color: var(--c-cyan);
 }
-.tab-badge {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 6px;
-  background: var(--c-red-dim);
-  color: var(--c-red);
-  border-radius: 999px;
-  font-family: var(--f-mono);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
 
 .detail-body {
   padding: 20px 24px;

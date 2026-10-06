@@ -5,7 +5,7 @@ import { SessionKpis, TabPreviews } from "./SessionOverview";
 import { KpiRow } from "./Kpi";
 import { freshTokens, useUnit } from "../utils/units";
 import { projectColor } from "../utils/fleetStats";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPatch } from "diff";
 import type { Session, SessionQuality, ToolName } from "../types";
 import { estimateHint, formatBytes, formatClockAt, formatCost, formatDuration, formatTokens, outcomeColor, outcomeLabel } from "../utils/format";
@@ -196,12 +196,37 @@ interface Props {
 
 type Tab = "overview" | "timeline" | "tools" | "tokens" | "files";
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "timeline", label: "Timeline" },
-  { id: "tools", label: "Tools" },
-  { id: "tokens", label: "Tokens" },
-  { id: "files", label: "Files" },
+/** Line icons on a 24 grid, drawn like the page navigation's. */
+const TABS: Array<{ id: Tab; label: string; icon: ReactNode }> = [
+  {
+    id: "overview",
+    label: "Overview",
+    icon: (
+      <>
+        <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+        <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+        <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+        <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      </>
+    ),
+  },
+  { id: "timeline", label: "Timeline", icon: <path d="M4 4.5v15h16M7.5 15.5l3.5-4.5 3 2.5 5-6.5" /> },
+  {
+    id: "tools",
+    label: "Tools",
+    icon: <path d="M15 3.8a5 5 0 0 0-5 6.6l-5.6 5.6a2.3 2.3 0 0 0 3.3 3.3l5.6-5.6a5 5 0 0 0 6.6-5l-2.9 2.9-2.8-.5-.5-2.8z" />,
+  },
+  {
+    id: "tokens",
+    label: "Tokens",
+    icon: (
+      <>
+        <circle cx="9.5" cy="9.5" r="5.5" />
+        <path d="M15.6 9.9a5.5 5.5 0 1 1-5.7 5.7" />
+      </>
+    ),
+  },
+  { id: "files", label: "Files", icon: <path d="M13.5 3.5h-6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-10zM13.5 3.5v5h5" /> },
 ];
 
 export function SessionDetail({
@@ -372,9 +397,14 @@ export function SessionDetail({
               className={`tab ${tab === t.id ? "active" : ""}`}
               onClick={() => setTab(t.id)}
             >
+              <svg className="tab-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                {t.icon}
+              </svg>
               {t.label}
               {t.id === "overview" && session.frictions.length > 0 && (
-                <span className="tab-badge">{session.frictions.length}</span>
+                <span className="tab-count warn mono tabular" title={`${session.frictions.length} friction${session.frictions.length > 1 ? "s" : ""}`}>
+                  {session.frictions.length}
+                </span>
               )}
               {t.id === "tools" && <span className="tab-count mono tabular">{toolCallCount}</span>}
               {t.id === "files" && <span className="tab-count mono tabular">{session.filesChanged}</span>}

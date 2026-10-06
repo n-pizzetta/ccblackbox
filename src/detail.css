@@ -37,12 +37,14 @@
 .toolbar-btn.wide { width: auto; padding: 0 14px; font-size: var(--fs-base); font-weight: 500; }
 .toolbar-pos { font-family: var(--f-ui); font-size: var(--fs-base); color: var(--c-text-dim); }
 
-/* the tabs: the one glass element of the session view */
+/* the tabs: the one glass element of the session view, built like the page navigation (.app-nav):
+   same capsule, item height, padding and gap, a line icon before the label, plain counts after it */
 .session-overlay-host .tabs {
   display: flex;
   gap: 2px;
   width: fit-content;
   max-width: calc(100% - 2 * var(--detail-pad));
+  height: 44px;
   overflow-x: auto;
   margin: 10px var(--detail-pad) 14px;
   padding: 4px;
@@ -54,10 +56,13 @@
   box-shadow: var(--shadow-glass);
 }
 .session-overlay-host .tab {
+  flex: none;
   height: 36px;
   padding: 0 16px;
   gap: 6px;
   margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 500;
   white-space: nowrap;
   color: var(--c-text-dim);
   border-bottom: none;
@@ -66,8 +71,15 @@
 }
 .session-overlay-host .tab:hover { color: var(--c-text); background: rgba(255, 255, 255, 0.05); }
 .session-overlay-host .tab.active { font-weight: 600; color: var(--c-text); background: var(--c-lens); box-shadow: var(--shadow-lens); }
-.session-overlay-host .tab-count { min-width: 0; padding: 0; font-family: var(--f-ui); font-size: var(--fs-md); font-weight: 500; color: var(--c-text-faint); background: none; }
-.session-overlay-host .tab-badge { height: 18px; padding: 0 6px; color: var(--c-amber); background: color-mix(in srgb, var(--c-amber) 16%, transparent); border-radius: 9px; }
+.session-overlay-host .tab-icon { flex: none; margin-left: -4px; }
+.session-overlay-host .tab.active .tab-icon { color: var(--c-cyan); }
+.session-overlay-host .tab-count.warn { font-weight: 600; color: var(--c-amber); }
+/* phones: the capsule spans the width and scrolls, like the page navigation on small screens */
+@media (max-width: 640px) {
+  .session-overlay-host .tabs { width: auto; }
+  .session-overlay-host .tab { padding: 0 12px; }
+  .session-overlay-host .tab-icon { display: none; }
+}
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .session-overlay-host .tabs { background: #2a2c33; }
 }
