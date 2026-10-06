@@ -1,6 +1,6 @@
 # Architecture
 
-Marey is a local dashboard for Claude Code and Codex sessions, shipped both as an npm package (`npx marey`) and as a Claude Code plugin (`/marey:replay`). A Node server parses the files Claude Code already writes under `~/.claude/` (and Codex under `~/.codex/`, §3), keeps the result in memory and serves it to a React single-page app over a small local API.
+Marey is a local dashboard for Claude Code and Codex sessions, packaged for npm (`npx marey`), Claude Code (`/marey:replay`) and Codex (the `marey:replay` skill). A Node server parses the files Claude Code already writes under `~/.claude/` (and Codex under `~/.codex/`, §3), keeps the result in memory and serves it to a React single-page app over a small local API.
 
 There is no database, no network access beyond loopback except the daily update check (`scripts/update-check.mjs`), and no runtime dependency besides Node's standard library on the server side.
 
@@ -318,6 +318,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 
 ## 9. Plugin packaging
 
+- [`.codex-plugin/plugin.json`](.codex-plugin/plugin.json): native Codex manifest declaring [`codex-skills/`](codex-skills/) with `replay` and `update`. The separate skill directory avoids exposing Codex update instructions through Claude Code's default `skills/` discovery. Codex reuses the repository-root entry in `.claude-plugin/marketplace.json`. The replay skill resolves [`scripts/launch.mjs`](scripts/launch.mjs) relative to its installed `SKILL.md`; the launcher detaches `serve.mjs`, waits for startup and prints the URL or error plus a private per-launch log path. The update skill uses Codex's plugin manager; clients that also migrate `commands/update.md` get a redirect to it. The inline `"hooks": { "hooks": {} }` overrides default discovery of Claude's `hooks/hooks.json` (an empty array still falls back to that file in Codex CLI 0.160.1).
 - [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) and [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): plugin `marey`, source `./` (the repo root is the plugin).
 - [`hooks/hooks.json`](hooks/hooks.json): runs [`hooks/capture.mjs`](hooks/capture.mjs) on `PostToolUse` (tool name + truncated input/output previews) and on `Stop` (`--stop` marker). The hook validates the session id, reads stdin with a timeout, never writes to stdout and swallows every error so it cannot break Claude Code. On `SessionStart`, [`hooks/session-start.mjs`](hooks/session-start.mjs) runs the update check: at most once a day it reads the `version` of the repo's `.claude-plugin/plugin.json` on GitHub (2 s timeout; offline keeps the last answer), caches it in `~/.claude/marey/update-check.json` with the version running, and prints a `systemMessage` when a newer one is out. The status line wrapper appends `↑ Marey <latest> · /marey:update` from that file, and `GET /api/update` feeds the dashboard header's notice. Off with `{"updateCheck": false}` in `~/.claude/marey/config.json` or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`. [`commands/update.md`](commands/update.md) → `/marey:update` runs `claude plugin marketplace update marey && claude plugin update marey@marey`.
 - [`commands/replay.md`](commands/replay.md) → `/marey:replay`: starts `scripts/serve.mjs` (flags forwarded: `--port <n>`, `--no-open`).
@@ -338,7 +339,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 | `pnpm seed:demo` | Writes synthetic data to `.demo-claude/` and `.demo-codex/` (`scripts/seed-demo.mjs`). |
 
 - `dist/` is committed (`!dist/` in `.gitignore`); rebuild and commit it with UI changes.
-- npm `files`: `dist` (minus `sessions.json`), `scripts`, `hooks`, `commands`, `.claude-plugin`, `ARCHITECTURE.md`. Runtime dependencies are only needed for the bundle; the server uses the Node standard library. Node ≥ 20.
+- npm `files`: `dist` (minus `sessions.json`), `scripts`, `hooks`, `commands`, `.claude-plugin`, `.codex-plugin`, `codex-skills`, `ARCHITECTURE.md`. Runtime dependencies are only needed for the bundle; the server uses the Node standard library. Node ≥ 20.
 
 ---
 

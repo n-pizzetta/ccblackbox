@@ -68,7 +68,7 @@ Resolve conflicts in `src/` normally first; `pnpm build` must run on the final s
 
 Maintainers cut releases from `main`; contributors don't need to bump anything. Existing users get nothing until `version` changes, so every release bumps it.
 
-1. Open a `chore(release): vX.Y.Z` PR that sets the same version in `.claude-plugin/plugin.json` and `package.json` ([SemVer](https://semver.org/)), and moves the `[Unreleased]` entries of `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`.
+1. Open a `chore(release): vX.Y.Z` PR that sets the same version in `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` and `package.json` ([SemVer](https://semver.org/)), and moves the `[Unreleased]` entries of `CHANGELOG.md` under `## [X.Y.Z] - YYYY-MM-DD`.
 2. Once it is merged, tag that commit and publish the GitHub release with the changelog section as notes:
 
    ```sh
@@ -85,7 +85,7 @@ Maintainers cut releases from `main`; contributors don't need to bump anything. 
 | Reading Claude Code's data | `scripts/parse-sessions.mjs` |
 | Model names and prices | `scripts/models.mjs` |
 | Local API (prod and dev) | `scripts/api.mjs`, mounted by `scripts/serve.mjs` and `vite.config.ts` |
-| Plugin | `.claude-plugin/`, `commands/`, `hooks/capture.mjs`, `scripts/statusline.mjs` |
+| Plugins | `.claude-plugin/`, `commands/`, `hooks/capture.mjs`, `scripts/statusline.mjs`; `.codex-plugin/`, `codex-skills/`, `scripts/launch.mjs` for Codex |
 | Dashboard | `src/` |
 
 ### Updating model prices

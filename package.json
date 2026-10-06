@@ -41,6 +41,8 @@
     "hooks",
     "commands",
     ".claude-plugin",
+    ".codex-plugin",
+    "codex-skills",
     "ARCHITECTURE.md"
   ],
   "scripts": {
