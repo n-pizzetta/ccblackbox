@@ -331,7 +331,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 |---|---|
 | `pnpm dev` | Vite dev server with the API middleware (`vite.config.ts`) and HMR push. |
 | `pnpm build` | `tsc -b && vite build` → `dist/`. |
-| `pnpm serve` | `node scripts/serve.mjs` (default port 3333; `--port`, `--no-open`). Also the `marey` bin. If the port is taken by an older Marey or ccblackbox server (`/api/version` older or missing, recognized by its command line and page title; `scripts/takeover.mjs`), it stops that server and takes the port; if the same or a newer version runs there, it opens it and exits. On start it also refreshes an installed status line wrapper whose copy differs from this version. |
+| `pnpm serve` | `node scripts/serve.mjs` (default port 3333; `--port`, `--no-open`). Also the `marey` bin. If the port is taken by an older Marey or ccblackbox server (`/api/version` older or missing, recognized by its command line and page title; `scripts/takeover.mjs`), it stops that server and takes the port; if the same or a newer version runs there, it opens it and exits. On start it also refreshes an installed status line wrapper whose copy differs from this version. It takes the port before the first parse, so the browser opens at once: data routes wait for that parse (the dashboard shows its loading screen), while `/api/version`, `/api/update` and `/api/limits` answer right away. |
 | `pnpm parse` | One-off parse to `~/.claude/marey/sessions.json`. |
 | `pnpm lint`, `pnpm typecheck` | ESLint, `tsc -b --noEmit`. |
 | `pnpm seed:demo` | Writes synthetic data to `.demo-claude/` and `.demo-codex/` (`scripts/seed-demo.mjs`). |

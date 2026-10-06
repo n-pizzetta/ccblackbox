@@ -10,6 +10,10 @@ versioning follows [SemVer](https://semver.org/).
 
 - The glass page navigation and session tabs are lit by a soft glint in the middle of their top edge instead of a white rim, and the selected tab by an even ring.
 
+### Fixed
+
+- `/marey:replay` opens the dashboard at once: the server takes the port before reading the sessions (a cold start could take 20 s, longer than the command waited), and the dashboard shows its loading screen until the first read is done. Each launch writes its own log, so a server being replaced can't garble it.
+
 ### Planned
 
 - Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).
@@ -20,7 +24,7 @@ versioning follows [SemVer](https://semver.org/).
   `reassignLiveToChainTail`, plugin-cache merge.
 - CI: `.github/workflows/ci.yml` (lint + typecheck + build matrix
   macOS/Linux).
-- Per-session disk cache (`~/.claude/ccblackbox/cache/parsed/{id}.json`)
+- Per-session disk cache (`~/.claude/marey/cache/parsed/{id}.json`)
   with mtime invalidation, so cold start doesn't re-parse the full set.
 
 ## [0.6.0] — 2026-10-06
