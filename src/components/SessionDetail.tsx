@@ -4,9 +4,10 @@ import { GoalSummary } from "./GoalSummary";
 import { TimelineTab } from "./SessionTimeline";
 import { SessionKpis, TabPreviews } from "./SessionOverview";
 import { KpiRow } from "./Kpi";
-import { freshTokens, useUnit } from "../utils/units";
+import { freshTokens, useUnit, type Unit } from "../utils/units";
+import { promptWeights } from "../utils/promptShare";
 import { projectColor } from "../utils/fleetStats";
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPatch } from "diff";
 import type { Session, SessionQuality, ToolCall, ToolName } from "../types";
 import { callsBetween, callsPerPrompt, countCalls, countFailed, countSubCalls, onlyFailed } from "../utils/toolCalls";
@@ -245,6 +246,9 @@ export function SessionDetail({
 }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const [toolFocus, setToolFocus] = useState<{ promptIdx: number; start: number; end: number } | null>(null);
+  // a link from the Overview into the Tokens tab, consumed once it has scrolled there
+  const [tokensFocus, setTokensFocus] = useState<TokensFocus | null>(null);
+  const clearTokensFocus = useCallback(() => setTokensFocus(null), []);
   const [resumeCopied, setResumeCopied] = useState(false);
   const c = outcomeColor(session.outcome);
   const toolCallCount = Object.values(session.toolCounts ?? {}).reduce((a, n) => a + n, 0);
@@ -424,7 +428,7 @@ export function SessionDetail({
         {tab === "tools" && (
           <ToolsTab session={session} focus={toolFocus} onClearFocus={() => setToolFocus(null)} />
         )}
-        {tab === "tokens" && <TokensTab session={session} />}
+        {tab === "tokens" && <TokensTab session={session} focus={tokensFocus} onFocusDone={clearTokensFocus} />}
         {tab === "files" && <FilesTab session={session} />}
       </div>
 
@@ -1219,8 +1223,13 @@ function InfoDot({ title }: { title: string }) {
   );
 }
 
-function TokensTab({ session }: { session: Session }) {
-  const totalTokens =
+/** Where a link from the Overview lands in the Tokens tab: the By kind section, or one prompt's detail. */
+type TokensFocus = { section: "kind" } | { section: "prompt"; idx: number };
+
+/** Where the tokens and their API value went: by kind (with the cache), then by prompt. */
+function TokensTab({ session, focus, onFocusDone }: { session: Session; focus: TokensFocus | null; onFocusDone: () => void }) {
+  const unit = useUnit();
+  const allTokens =
     session.tokens.input +
     session.tokens.output +
     session.tokens.cacheRead +
@@ -1250,6 +1259,14 @@ function TokensTab({ session }: { session: Session }) {
   const hitTone = cacheHit >= 0.9 ? "green" : cacheHit >= 0.4 ? undefined : "red";
   const estimated = session.unpricedModels?.length ? "~" : "";
 
+  // a link from the Overview to By kind: scroll there, once (a link to a prompt is By prompt's to handle)
+  const kindRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focus?.section !== "kind") return;
+    kindRef.current?.scrollIntoView({ block: "start" });
+    onFocusDone();
+  }, [focus, onFocusDone]);
+
   return (
     <>
       <KpiRow
@@ -1263,35 +1280,35 @@ function TokensTab({ session }: { session: Session }) {
           {
             label: "Cache hit",
             value: `${(cacheHit * 100).toFixed(1)}%`,
-            sub: `${formatTokens(session.tokens.cacheRead)} of ${formatTokens(session.tokens.input + session.tokens.cacheRead)} input`,
+            sub: `${formatTokens(session.tokens.cacheRead)} of ${formatTokens(session.tokens.input + session.tokens.cacheRead)} input tokens`,
             tone: hitTone,
             title: "cacheRead / (cacheRead + input): input served from the prompt cache instead of billed fresh. Aim for 90% or more.",
           },
           {
             label: "Cache savings",
             value: formatCost(savings),
-            sub: `${savingsPct.toFixed(0)}% off the no-cache cost`,
+            sub: `${savingsPct.toFixed(0)}% off the API value without cache`,
             tone: savings > 0 ? "green" : undefined,
-            title: "Actual cost vs every cached token billed as fresh input: what the prompt cache is worth here.",
+            title: "API value vs every cached token billed as fresh input: what the prompt cache is worth here.",
           },
           {
             label: "Per prompt",
             value: promptCount > 0 ? formatCost(costPerPrompt) : "—",
-            sub: promptCount > 0 ? `${promptCount} user prompts` : "no prompts captured",
+            sub: promptCount > 0 ? `API value ÷ ${promptCount} user prompts` : "no prompts captured",
             title: "API value ÷ user prompts: a rough weight of each turn, inflated by tool-heavy turns and long replies.",
           },
         ]}
       />
 
-      <div className="d-panel">
+      <div className="d-panel" ref={kindRef}>
         <div className="section-title">
           <span>
-            Breakdown <InfoDot title="Token volume and cost per kind. Volume ≠ cost: cache reads are cheap, output costs several times input, so cost is often dominated by output and cache writes even when cache reads dominate volume." />
+            By kind <InfoDot title="Tokens and API value per kind. They differ: cache reads are cheap, output costs several times input, so the API value is often dominated by output and cache writes even when cache reads dominate the tokens." />
           </span>
-          <span className="dim mono tabular">{formatTokens(totalTokens)} tokens · {estimated}{formatCost(totalCost)}</span>
+          <span className="dim tabular">{formatTokens(allTokens)} tokens in all · {estimated}{formatCost(totalCost)} API value</span>
         </div>
         <div className="tokens-bars">
-          {([["Volume", "tokens"], ["Cost", "cost"]] as const).map(([label, field]) => (
+          {([["Tokens", "tokens"], ["API value", "cost"]] as const).map(([label, field]) => (
             <div key={field} className="tokens-bars-row">
               <span className="tokens-bars-label">{label}</span>
               <div className="tokens-bar" aria-label={`${label} by token kind`}>
@@ -1300,7 +1317,7 @@ function TokensTab({ session }: { session: Session }) {
                     key={r.key}
                     className={`tokens-seg ${r.cls}`}
                     style={{ flex: r[field] || 0.0001 }}
-                    title={`${r.label}: ${field === "tokens" ? formatTokens(r.tokens) : formatCost(r.cost)} (${pct(r[field], field === "tokens" ? totalTokens : totalCost).toFixed(1)}%)`}
+                    title={`${r.label}: ${field === "tokens" ? `${formatTokens(r.tokens)} tokens` : `${formatCost(r.cost)} API value`} (${pct(r[field], field === "tokens" ? allTokens : totalCost).toFixed(1)}%)`}
                   />
                 ))}
               </div>
@@ -1312,9 +1329,9 @@ function TokensTab({ session }: { session: Session }) {
             <span />
             <span>Kind</span>
             <span className="tabular right">Tokens</span>
-            <span className="tabular right">Volume</span>
-            <span className="tabular right">Cost</span>
-            <span className="tabular right">Cost share</span>
+            <span className="tabular right">Share</span>
+            <span className="tabular right">API value</span>
+            <span className="tabular right">Share</span>
           </div>
           {rows.map((r) => (
             <div key={r.key} className="tokens-table-row">
@@ -1323,14 +1340,125 @@ function TokensTab({ session }: { session: Session }) {
                 {r.label} <InfoDot title={tokenInfo(session.model)[r.key]} />
               </span>
               <span className="tabular mono right">{formatTokens(r.tokens)}</span>
-              <span className="tabular mono dim right">{pct(r.tokens, totalTokens).toFixed(1)}%</span>
+              <span className="tabular mono dim right">{pct(r.tokens, allTokens).toFixed(1)}%</span>
               <span className="tabular mono right">{formatCost(r.cost)}</span>
               <span className="tabular mono dim right">{pct(r.cost, totalCost).toFixed(1)}%</span>
             </div>
           ))}
         </div>
       </div>
+
+      <TokensByPrompt
+        session={session}
+        unit={unit}
+        openIdx={focus?.section === "prompt" ? focus.idx : null}
+        onOpened={onFocusDone}
+      />
     </>
+  );
+}
+
+/** Each prompt's fresh tokens and API value, its share, its costliest kind and idle cache rewrite; a row opens its detail. */
+function TokensByPrompt({ session, unit, openIdx, onOpened }: { session: Session; unit: Unit; openIdx: number | null; onOpened: () => void }) {
+  const prompts = session.prompts ?? [];
+  const stats = session.turns && prompts.length > 0 ? aggregateByPrompt(session.turns, session.model, prompts) : [];
+  const weights = promptWeights(stats.map((s) => ({ fresh: freshTokens(s.tokens), cost: s.cost })), unit);
+  // a link from the Overview opens the tab on that prompt: it starts open, and is brought into view
+  const [open, setOpen] = useState<number | null>(openIdx);
+  const [heaviest, setHeaviest] = useState(false);
+  const rowRefs = useRef(new Map<number, HTMLDivElement>());
+  useEffect(() => {
+    if (openIdx === null) return;
+    rowRefs.current.get(openIdx)?.scrollIntoView({ block: "center" });
+    onOpened();
+  }, [openIdx, onOpened]);
+
+  if (stats.length === 0) return null;
+  const rewrites = stats.filter((s) => s.cacheRewriteFlag);
+  const rewriteCost = rewrites.reduce((a, s) => a + (s.cacheRewriteFlag?.cacheWriteCost ?? 0), 0);
+  const order = stats.map((_, i) => i);
+  if (heaviest) order.sort((a, b) => weights[b].value - weights[a].value);
+  const unitLabel = unit === "tokens" ? "fresh tokens" : "API value";
+
+  return (
+    <div className="d-panel tok-prompts">
+      <div className="section-title">
+        <span>
+          By prompt <InfoDot title="What each prompt's turns used, sub-agents included. Share is of the session's fresh tokens or API value, following the usage unit. Open a prompt for its tokens and API value per kind, cache rewrites and turns." />
+        </span>
+        <span className="tools-head-meta">
+          <span className="dim tabular">
+            {stats.length} prompts
+            {rewrites.length > 0 && (
+              <span className="tok-rewrite-meta"> · {rewrites.length} idle cache rewrite{rewrites.length > 1 ? "s" : ""}, {formatCost(rewriteCost)} API value</span>
+            )}
+          </span>
+          <span className="seg" role="group" aria-label="Order">
+            <button className={`tool-view-btn ${heaviest ? "" : "active"}`} onMouseDown={keepFocus} onClick={() => setHeaviest(false)} aria-pressed={!heaviest}>In order</button>
+            <button className={`tool-view-btn ${heaviest ? "active" : ""}`} onMouseDown={keepFocus} onClick={() => setHeaviest(true)} aria-pressed={heaviest}>Heaviest first</button>
+          </span>
+        </span>
+      </div>
+      <div className="prompt-list">
+        <div className="prompt-row prompt-row-head mono dim caps">
+          <span>#</span>
+          <span>Time</span>
+          <span className="right">Fresh tokens</span>
+          <span className="right">API value</span>
+          <span className="right" title={`Share of the session's ${unitLabel}`}>Share</span>
+          <span>Costliest</span>
+          <span />
+          <span>Prompt</span>
+        </div>
+        {order.map((i) => {
+          const s = stats[i];
+          const p = prompts[i];
+          const isOpen = open === i;
+          const toggle = () => setOpen(isOpen ? null : i);
+          return (
+            <Fragment key={i}>
+              <div
+                ref={(el) => { if (el) rowRefs.current.set(i, el); else rowRefs.current.delete(i); }}
+                className={`prompt-row ${isOpen ? "selected" : ""}`}
+                role="button"
+                tabIndex={0}
+                aria-expanded={isOpen}
+                onClick={toggle}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggle();
+                  }
+                }}
+              >
+                <span className="mono dim tabular">{String(i + 1).padStart(2, "0")}</span>
+                <span className="mono dim tabular">{formatClockAt(session.startedAt, s.t)}</span>
+                <span className="mono tabular right">{formatTokens(freshTokens(s.tokens))}</span>
+                <span className="mono tabular right">{formatCost(s.cost)}</span>
+                <span className="mono tabular right dim">{(weights[i].share * 100).toFixed(1)}%</span>
+                <span className="tok-kind">
+                  <span className={`swatch ${KIND_CLS[s.dominantKind]}`} aria-hidden="true" />
+                  {KIND_LABEL[s.dominantKind]}
+                </span>
+                <span
+                  className="prompt-row-warn"
+                  title={s.cacheRewriteFlag ? `${formatDuration(s.cacheRewriteFlag.gapMs)} idle, then the cache was rewritten: ${formatCost(s.cacheRewriteFlag.cacheWriteCost)} API value in cache writes` : ""}
+                >
+                  {s.cacheRewriteFlag ? "⚠" : ""}
+                </span>
+                <span className="prompt-row-preview mono">{p?.preview}</span>
+              </div>
+              {isOpen && (
+                <div className="prompt-panel">
+                  <PromptCostBreakdown s={s} model={session.model} />
+                  {p && <pre className="prompt-panel-body">{p.text}</pre>}
+                </div>
+              )}
+            </Fragment>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1470,14 +1598,20 @@ const KIND_CLS: Record<PromptStats["dominantKind"], string> = {
   cacheRead: "cache-read",
   cacheWrite: "cache-write",
 };
+const KIND_LABEL: Record<PromptStats["dominantKind"], string> = {
+  input: "input",
+  output: "output",
+  cacheRead: "cache read",
+  cacheWrite: "cache write",
+};
 
 function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
   const pr = priceFor(model);
   const rows: Array<{ key: "input" | "output" | "cacheRead" | "cacheWrite"; label: string; cls: string; val: number; cost: number }> = [
     { key: "input",      label: "input",  cls: "input",       val: s.tokens.input,      cost: (s.tokens.input / 1e6) * pr.in },
     { key: "output",     label: "output", cls: "output",      val: s.tokens.output,     cost: (s.tokens.output / 1e6) * pr.out },
-    { key: "cacheRead",  label: "cacheR", cls: "cache-read",  val: s.tokens.cacheRead,  cost: (s.tokens.cacheRead / 1e6) * pr.cacheRead },
-    { key: "cacheWrite", label: "cacheW", cls: "cache-write", val: s.tokens.cacheWrite, cost: cacheWriteCost(pr, s.tokens) },
+    { key: "cacheRead",  label: "cache read", cls: "cache-read",  val: s.tokens.cacheRead,  cost: (s.tokens.cacheRead / 1e6) * pr.cacheRead },
+    { key: "cacheWrite", label: "cache write", cls: "cache-write", val: s.tokens.cacheWrite, cost: cacheWriteCost(pr, s.tokens) },
   ];
   return (
     <div className="prompt-cost-panel-body">
@@ -1489,7 +1623,7 @@ function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
               <span className={`swatch ${r.cls}`} />
               <span className="dim">{r.label}</span>
               <span className="tabular mono">{formatTokens(r.val)}</span>
-              <span className="tabular mono prompt-cost-panel-cell-usd" title={`$${r.cost.toFixed(4)}`}>
+              <span className="tabular mono prompt-cost-panel-cell-usd" title={`$${r.cost.toFixed(4)} API value`}>
                 {formatCost(r.cost)}
               </span>
             </div>
@@ -1497,7 +1631,7 @@ function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
         })}
       </div>
       <div className="prompt-cost-panel-note mono dim">
-        dominant = highest $ cost, not highest token count (on {modelLabel(model)}, a cache write costs{" "}
+        costliest kind = the highest API value, not the most tokens (on {modelLabel(model)}, a cache write costs{" "}
         {ratio(pr.cacheWrite / pr.cacheRead)} a cache read).
       </div>
       {s.cacheRewriteFlag && (
@@ -1505,10 +1639,9 @@ function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
           <span className="prompt-cost-warn-icon">{s.cacheRewriteFlag.severity === "warn" ? "⚠" : "ℹ"}</span>
           <div>
             <div className="prompt-cost-warn-title">
-              Cache rewritten after {formatDuration(s.cacheRewriteFlag.gapMs)} idle
-              {" — cacheW cost "}
-              <strong className="tabular">{formatCost(s.cacheRewriteFlag.cacheWriteCost)}</strong>
-              {" ("}{(s.cacheRewriteFlag.cacheWriteShare * 100).toFixed(0)}% of this prompt).
+              Cache rewritten after {formatDuration(s.cacheRewriteFlag.gapMs)} idle:{" "}
+              <strong className="tabular">{formatCost(s.cacheRewriteFlag.cacheWriteCost)}</strong> API value in cache writes
+              {" ("}{(s.cacheRewriteFlag.cacheWriteShare * 100).toFixed(0)}% of this prompt's API value).
             </div>
             <div className="prompt-cost-warn-detail">
               The prompt cache expires (5 min, or 1 h for the extended cache). Resuming after that re-uploads the context as a fresh
@@ -1522,11 +1655,11 @@ function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
       )}
       {s.tokens.cacheWrite > 0 && (
         <div className="prompt-cost-cw-split mono dim">
-          cacheW split:
+          cache writes:
           {" "}
-          <span className="tabular">{formatTokens(s.tokens.cacheWrite1h)}</span> in 1h block
+          <span className="tabular">{formatTokens(s.tokens.cacheWrite1h)}</span> in the 1h block
           {" · "}
-          <span className="tabular">{formatTokens(s.tokens.cacheWrite5m)}</span> in 5m block
+          <span className="tabular">{formatTokens(s.tokens.cacheWrite5m)}</span> in the 5m block
           {" "}
           <InfoDot title="Anthropic prompt cache has two TTL tiers. 1h block = system prompt, tools, memory (the long-lived prefix). 5m block = recent conversation. Writes to the 1h block usually mean the system block changed (new tool, hook, env var) or the 1h TTL expired. Writes to the 5m block are normal when conversation extends past the previous breakpoint or 5m idle elapsed." />
         </div>
@@ -1552,7 +1685,7 @@ function TurnBreakdown({ details }: { details: PromptStats["turnDetails"] }) {
         onClick={() => setOpen((p) => !p)}
       >
         {open ? "▾" : "▸"} per-turn breakdown · {details.length} turns
-        {cacheWTurns > 0 && `, ${cacheWTurns} with cacheW`}
+        {cacheWTurns > 0 && `, ${cacheWTurns} with cache writes`}
         {totalIn + totalOut > 0 && ` · added ${formatBytes(totalIn)} in / ${formatBytes(totalOut)} out`}
       </button>
       {open && (
@@ -1562,8 +1695,8 @@ function TurnBreakdown({ details }: { details: PromptStats["turnDetails"] }) {
             <span className="right">Gap</span>
             <span className="right">In</span>
             <span className="right">Out</span>
-            <span className="right">Cache R</span>
-            <span className="right">Cache W</span>
+            <span className="right">Cache read</span>
+            <span className="right">Cache write</span>
             <span className="right">1h</span>
             <span className="right">5m</span>
             <span>Tools</span>

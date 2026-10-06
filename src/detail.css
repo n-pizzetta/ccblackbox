@@ -267,3 +267,17 @@
 .preview-files { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-sm); }
 .preview-files li { display: flex; justify-content: space-between; gap: 12px; }
 .preview-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-text-soft); }
+
+/* ---- Tokens tab: By prompt ---- */
+.tok-prompts .prompt-row { grid-template-columns: 32px 64px 92px 76px 56px 104px 16px minmax(0, 1fr); }
+.tok-kind { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-ui); color: var(--c-text-dim); }
+.tok-kind .swatch { flex: none; }
+.tok-rewrite-meta { color: var(--c-amber); }
+.tok-prompts .prompt-panel { border-bottom: 1px solid var(--c-hairline); }
+@media (max-width: 640px) {
+  .tok-prompts .prompt-row { grid-template-columns: 24px 64px 56px 44px minmax(0, 1fr); }
+  .tok-prompts .prompt-row > :nth-child(2),
+  .tok-prompts .prompt-row > :nth-child(6),
+  .tok-prompts .prompt-row > :nth-child(7) { display: none; }
+  .tok-prompts .section-title { flex-wrap: wrap; gap: 8px; }
+}
