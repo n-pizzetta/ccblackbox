@@ -247,6 +247,16 @@ test("lists every tool call once, sub-agent calls under the Agent call that ran 
   assert.ok(nested > 0);
 });
 
+test("reads the file history of edited files, with their paths", () => {
+  const edited = claude.filter((s) => s.toolSequence.some((e) => e.tool === "Edit" || e.tool === "Write"));
+  assert.ok(edited.length > 0);
+  for (const s of edited) {
+    assert.ok(s.fileHistory.length > 0, `session ${s.id}`);
+    assert.equal(s.filesChanged, s.fileHistory.length, `session ${s.id}`);
+    assert.ok(s.fileHistory.every((f) => f.path?.startsWith("/Users/demo/") && f.versions.length >= 2), `session ${s.id}`);
+  }
+});
+
 test("names Codex sessions from session_index.jsonl", () => {
   const names = readFileSync(join(CODEX, "session_index.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
   assert.ok(names.length > 0);
