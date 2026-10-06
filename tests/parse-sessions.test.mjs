@@ -223,6 +223,30 @@ test("merges Codex sub-agent rollouts into their parent", () => {
   assert.ok(merged > 0);
 });
 
+test("lists every tool call once, sub-agent calls under the Agent call that ran them", async () => {
+  const { countNestedCalls } = await import("../scripts/subagent-calls.mjs");
+  let nested = 0;
+  for (const s of parsed.sessions) {
+    const total = Object.values(s.toolCounts).reduce((a, n) => a + n, 0);
+    // the tab, the KPI and the list count the same calls
+    assert.equal(countNestedCalls(s.toolSequence), total, `session ${s.id}`);
+    if (s.agent !== "claude") continue;
+    const subDir = transcriptsOf(s.id).find((f) => f.includes("/subagents/"))?.replace(/\/[^/]+$/, "");
+    for (const e of s.toolSequence) {
+      if (!e.children) continue;
+      assert.ok(!e.orphan, `session ${s.id}: every seeded sub-agent has its Agent call`);
+      assert.equal(e.tool, "Agent");
+      assert.ok(e.children.every((c) => c.t >= e.t), "a sub-agent's calls come after the call that started it");
+      nested++;
+    }
+    if (subDir) {
+      const runs = readdirSync(subDir).filter((f) => f.endsWith(".jsonl"));
+      assert.equal(s.toolSequence.filter((e) => e.children).length, runs.length, `session ${s.id}`);
+    }
+  }
+  assert.ok(nested > 0);
+});
+
 test("names Codex sessions from session_index.jsonl", () => {
   const names = readFileSync(join(CODEX, "session_index.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
   assert.ok(names.length > 0);

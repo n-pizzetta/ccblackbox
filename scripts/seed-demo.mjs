@@ -86,16 +86,22 @@ function writeJsonl(path, lines) {
   writeFileSync(path, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
 }
 
-/** One transcript: prompts, assistant turns with tool calls, tool results. */
-function transcript({ id, cwd, start, prompts, model, sidechain = false }) {
+/**
+ * One transcript: prompts, assistant turns with tool calls, tool results. In the main thread, an
+ * Agent call runs a sub-agent (returned in `subs`, written to subagents/agent-<id>.jsonl) and its
+ * result names it, like Claude Code's `toolUseResult.agentId`; a few results are plain text, like
+ * older versions, so the parser has to match those on the prompt.
+ */
+function transcript({ id, cwd, start, prompts, model, sidechain = false, agentId = null }) {
   const lines = [];
+  const subs = [];
   let t = start;
   let ctx = int(8_000, 20_000);
-  const base = { sessionId: id, cwd, ...(sidechain ? { isSidechain: true, agentId: hex(16) } : {}) };
+  const base = { sessionId: id, cwd, ...(sidechain ? { isSidechain: true, agentId } : {}) };
   const stamp = () => new Date(t).toISOString();
   for (const text of prompts) {
     lines.push({ ...base, type: "user", timestamp: stamp(), message: { role: "user", content: text } });
-    const turns = int(3, 12);
+    const turns = sidechain ? int(2, 5) : int(3, 12);
     for (let i = 0; i < turns; i++) {
       t += int(4, 40) * 1000;
       // Long main-thread sessions get compacted, like Claude Code's auto-compact.
@@ -104,7 +110,9 @@ function transcript({ id, cwd, start, prompts, model, sidechain = false }) {
         ctx = int(20_000, 35_000);
         t += int(20, 60) * 1000;
       }
-      const [name, input] = pick(TOOLS);
+      // sub-agents don't start sub-agents
+      const [name, makeInput] = pick(sidechain ? TOOLS.filter(([n]) => n !== "Agent") : TOOLS);
+      const input = makeInput();
       const toolId = `toolu_${hex(20)}`;
       const write = int(1_000, 12_000);
       const oneHour = rand() < 0.7 ? write : 0;
@@ -120,14 +128,30 @@ function transcript({ id, cwd, start, prompts, model, sidechain = false }) {
       // Claude Code writes one line per content block, repeating id and usage.
       const message = (content) => ({ id: msgId, role: "assistant", model, usage, content });
       lines.push({ ...base, type: "assistant", timestamp: stamp(), requestId: `req_${hex(16)}`, message: message([{ type: "text", text: "Let me look at that." }]) });
-      lines.push({ ...base, type: "assistant", timestamp: stamp(), message: message([{ type: "tool_use", id: toolId, name, input: input() }]) });
+      lines.push({ ...base, type: "assistant", timestamp: stamp(), message: message([{ type: "tool_use", id: toolId, name, input }]) });
+      let ranAgent = null;
+      if (name === "Agent" && !sidechain) {
+        // The sub-agent runs while the call waits for its result.
+        const subId = hex(17);
+        const sub = transcript({ id, cwd, start: t + 1000, prompts: [input.prompt], model: "claude-haiku-4-5-20251001", sidechain: true, agentId: subId });
+        subs.push({ agentId: subId, lines: sub.lines, description: "Find the callers of the old API" });
+        t = sub.end;
+        if (rand() < 0.8) ranAgent = subId;
+      }
       t += int(1, 20) * 1000;
       const failed = rand() < 0.08;
-      lines.push({ ...base, type: "user", timestamp: stamp(), message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolId, content: failed ? "Error: command exited with code 1" : "ok", ...(failed ? { is_error: true } : {}) }] } });
+      lines.push({
+        ...base,
+        type: "user",
+        timestamp: stamp(),
+        message: { role: "user", content: [{ type: "tool_result", tool_use_id: toolId, content: failed ? "Error: command exited with code 1" : "ok", ...(failed ? { is_error: true } : {}) }] },
+        ...(ranAgent ? { toolUseResult: { status: "completed", agentId: ranAgent, agentType: "general-purpose" } } : {}),
+      });
     }
-    t += rand() < 0.2 ? int(8, 40) * MIN : int(20, 180) * 1000;
+    // the pause before the next prompt (a sub-agent returns as soon as it is done)
+    if (!sidechain) t += rand() < 0.2 ? int(8, 40) * MIN : int(20, 180) * 1000;
   }
-  return { lines, end: t };
+  return { lines, subs, end: t };
 }
 
 rmSync(CLAUDE, { recursive: true, force: true });
@@ -145,16 +169,15 @@ for (let day = 6; day >= 0; day--) {
     const goal = pick(PROJECTS[project]);
     const prompts = [goal, ...Array.from({ length: int(1, 5) }, () => pick(FOLLOW_UPS))];
     const model = pick(MODELS);
-    const { lines } = transcript({ id, cwd, start, prompts, model });
+    const { lines, subs } = transcript({ id, cwd, start, prompts, model });
     if (rand() < 0.3) lines.push({ type: "custom-title", customTitle: goal.toLowerCase().split(" ").slice(0, 4).join("-"), sessionId: id });
     writeJsonl(join(CLAUDE, "projects", slug, `${id}.jsonl`), lines);
 
-    // Some sessions delegate to sub-agents.
-    if (rand() < 0.35) {
-      for (let a = 0; a < int(1, 3); a++) {
-        const sub = transcript({ id, cwd, start: start + int(2, 20) * MIN, prompts: ["Survey the relevant files and report back."], model: "claude-haiku-4-5-20251001", sidechain: true });
-        writeJsonl(join(CLAUDE, "projects", slug, id, "subagents", `agent-${hex(16)}.jsonl`), sub.lines);
-      }
+    // The sub-agents its Agent calls ran, with the meta file Claude Code writes beside them.
+    const subDir = join(CLAUDE, "projects", slug, id, "subagents");
+    for (const sub of subs) {
+      writeJsonl(join(subDir, `agent-${sub.agentId}.jsonl`), sub.lines);
+      writeFileSync(join(subDir, `agent-${sub.agentId}.meta.json`), JSON.stringify({ agentType: "general-purpose", description: sub.description }));
     }
 
     // /insights enrichment for older sessions.

@@ -27,6 +27,7 @@ import {
 import { CODEX, codexRootOf, indexCodexRollouts, isCodexLive, isCodexRunning, parseCodexRollout } from "./codex.mjs";
 import { costOf, DEFAULT_MODEL, isKnownModel, normalizeModel, priceFor, setModelOverrides } from "./models.mjs";
 import { dataDir } from "./data-dir.mjs";
+import { nestSubagentCalls } from "./subagent-calls.mjs";
 
 // `pnpm parse` dump. Never under public/ or dist/: it holds real prompts and paths.
 // Claude Code moves ~/.claude when CLAUDE_CONFIG_DIR is set; so do we.
@@ -268,6 +269,11 @@ async function parseTranscriptFile(path, sidechain) {
   const seenToolUse = new Set();
   const pathByHash = new Map();
   const resultById = new Map();
+  // Agent / Task calls: the sub-agent id Claude Code writes in the call's result (`toolUseResult.agentId`).
+  const agentIdByToolUse = new Map();
+  // Sub-agent transcripts: their own id and the instructions they were given (their first user message).
+  let agentId = null;
+  let subPrompt = null;
   let userMessages = 0;
   let commits = 0;
   const shell = { prs: 0, tests: 0, lints: 0, infra: 0 };
@@ -291,6 +297,7 @@ async function parseTranscriptFile(path, sidechain) {
     try { j = JSON.parse(line); } catch { continue; }
     if (!cwd && j.cwd) cwd = j.cwd;
     if (typeof j.version === "string") version = j.version;
+    if (sidechain && !agentId && typeof j.agentId === "string") agentId = j.agentId;
     if (!customTitle && j.type === "custom-title" && typeof j.customTitle === "string") {
       customTitle = j.customTitle;
     }
@@ -363,7 +370,7 @@ async function parseTranscriptFile(path, sidechain) {
           const hash = createHash("sha256").update(input.file_path).digest("hex").slice(0, 16);
           if (!pathByHash.has(hash)) pathByHash.set(hash, input.file_path);
         }
-        if (!sidechain && toolSequence.length < 300) {
+        if (toolSequence.length < 300) {
           let preview = "";
           let full = "";
           if (typeof input.file_path === "string") preview = input.file_path;
@@ -385,8 +392,10 @@ async function parseTranscriptFile(path, sidechain) {
       else if (Array.isArray(content)) {
         const toolResults = content.filter((c) => c && c.type === "tool_result");
         if (toolResults.length > 0) {
+          const ranAgent = typeof j.toolUseResult?.agentId === "string" ? j.toolUseResult.agentId : null;
           for (const tr of toolResults) {
             if (!tr.tool_use_id) continue;
+            if (ranAgent) agentIdByToolUse.set(tr.tool_use_id, ranAgent);
             let body = "";
             if (typeof tr.content === "string") body = tr.content;
             else if (Array.isArray(tr.content)) {
@@ -414,6 +423,7 @@ async function parseTranscriptFile(path, sidechain) {
       // Sub-agent transcripts start with the parent's instructions, not a user prompt.
       if (sidechain || (text && NON_PROMPT_RE.test(text))) {
         if (text) pendingInBytes += text.length;
+        if (sidechain && text && subPrompt === null) subPrompt = text.slice(0, 1500);
         continue;
       }
       userMessages++;
@@ -431,6 +441,7 @@ async function parseTranscriptFile(path, sidechain) {
 
   for (const entry of toolSequence) {
     if (entry.id && resultById.has(entry.id)) entry.result = resultById.get(entry.id);
+    if (entry.id && agentIdByToolUse.has(entry.id)) entry.agentId = agentIdByToolUse.get(entry.id);
   }
   // runningTool: latest tool_use in sequence without a result yet
   let runningTool = null;
@@ -468,6 +479,7 @@ async function parseTranscriptFile(path, sidechain) {
     customTitle,
     version,
     quality: quality?.finish(turns) ?? null,
+    ...(sidechain ? { agentId, subPrompt } : {}),
   };
 }
 
@@ -497,6 +509,7 @@ function relativizeToolSequence(seq, startedAt) {
     preview: s.preview,
     ...(s.full ? { full: s.full } : {}),
     ...(s.result ? { result: s.result } : {}),
+    ...(s.agentId ? { agentId: s.agentId } : {}),
   }));
 }
 
@@ -600,14 +613,24 @@ async function indexTranscripts() {
   return index;
 }
 
-/** Sub-agent transcripts: <project>/<sessionId>/subagents/agent-*.jsonl. */
+/**
+ * Sub-agent transcripts: <project>/<sessionId>/subagents/agent-<agentId>.jsonl, with an optional
+ * agent-<agentId>.meta.json ({ agentType, description }) that names the run.
+ */
 async function readSubagents(entry, sessionId) {
   const dir = join(entry.dir, sessionId, "subagents");
   const files = (await readDirSafe(dir)).filter((f) => f.endsWith(".jsonl"));
   const out = [];
   for (const f of files) {
     const t = await readTranscriptFile(join(dir, f), { sidechain: true });
-    if (t) out.push(t);
+    if (!t) continue;
+    const meta = await readJsonSafe(join(dir, f.replace(/\.jsonl$/, ".meta.json")));
+    const label = [meta?.agentType, meta?.description].filter((s) => typeof s === "string" && s).join(" · ");
+    out.push({
+      ...t,
+      agentId: t.agentId ?? (/^agent-(.+)\.jsonl$/.exec(f)?.[1] ?? null),
+      ...(label ? { label } : {}),
+    });
   }
   return out;
 }
@@ -726,7 +749,17 @@ async function buildSession(id, { entry, meta, facet, live, dead, history, now, 
     ...(t?.contextWindow ? { contextWindow: t.contextWindow } : {}),
     fileHistory,
     prompts: relativizePrompts(t?.prompts ?? [], startedAtMs),
-    toolSequence: mergeToolSequences(relativizeToolSequence(t?.toolSequence ?? [], startedAtMs), pluginCache.entries),
+    // Sub-agent calls nested under the call that started each sub-agent: every call listed once.
+    toolSequence: nestSubagentCalls(
+      mergeToolSequences(relativizeToolSequence(t?.toolSequence ?? [], startedAtMs), pluginCache.entries),
+      subs.map((sub) => ({
+        agentId: sub.agentId ?? null,
+        prompt: sub.subPrompt ?? sub.firstUserText ?? null,
+        firstT: sub.firstTs ? Math.max(0, sub.firstTs - startedAtMs) : 0,
+        label: sub.label ?? null,
+        calls: relativizeToolSequence(sub.toolSequence ?? [], startedAtMs),
+      })),
+    ),
     turns,
     runningTool: isLive && t?.runningTool
       ? { tool: t.runningTool.tool, preview: t.runningTool.preview, t: Math.max(0, (t.runningTool.tsMs ?? startedAtMs) - startedAtMs) }

@@ -49,6 +49,21 @@ export interface SessionQuality {
   signals: QualitySignal[];
 }
 
+export interface ToolCall {
+  t: number;
+  tool: string;
+  preview: string;
+  full?: string;
+  result?: { text: string; truncated: boolean; isError: boolean; bytes?: number };
+  source?: "plugin";
+  /** Calls made by the sub-agent this call started (Agent / Task / spawn_agent). */
+  children?: ToolCall[];
+  /** The sub-agent's type and description, when Claude Code wrote them. */
+  agentLabel?: string;
+  /** A sub-agent whose starting call wasn't found: this row stands for it and is not a call itself. */
+  orphan?: boolean;
+}
+
 export interface Session {
   id: string;
   /** Absent in mock data and older payloads: Claude Code. */
@@ -109,14 +124,8 @@ export interface Session {
   quality?: SessionQuality | null;
   fileHistory?: Array<{ hash: string; versions: number[]; path?: string }>;
   prompts?: Array<{ t: number; text: string; preview: string }>;
-  toolSequence?: Array<{
-    t: number;
-    tool: string;
-    preview: string;
-    full?: string;
-    result?: { text: string; truncated: boolean; isError: boolean; bytes?: number };
-    source?: "plugin";
-  }>;
+  /** Main-thread calls in order; a call that started a sub-agent holds that sub-agent's calls in `children`. */
+  toolSequence?: ToolCall[];
   pluginCapture?: {
     entries: number;
     lastEventAt: string;
