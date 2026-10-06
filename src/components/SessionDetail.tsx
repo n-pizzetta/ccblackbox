@@ -925,7 +925,6 @@ function ToolsTab({
   focus: { promptIdx: number; start: number; end: number } | null;
   onClearFocus: () => void;
 }) {
-  const [view, setView] = useState<"sequence" | "summary">("sequence");
   const sortedTools = (Object.entries(session.toolCounts) as Array<[ToolName, number]>)
     .filter(([, v]) => v > 0)
     .sort(([, a], [, b]) => b - a);
@@ -937,88 +936,75 @@ function ToolsTab({
     : allSequence;
   const sequence = [...filtered].reverse();
 
+  // the calls in order on the left; their count per tool in a card on the right (above it on narrow screens)
   return (
-    <div className="tools-tab">
-      <div className="section-title">
-        <span>
-          Tool calls <InfoDot title="Every tool Claude invoked during the session (Read, Edit, Bash, Grep, Glob, Write, Agent, etc.). Sequence view shows chronological calls with their result size; Summary view shows aggregate counts per tool. Click a row to expand the result preview." />
-        </span>
-        <div className="tool-view-toggle">
-          <span className="seg">
-            <button
-              className={`tool-view-btn ${view === "sequence" ? "active" : ""}`}
-              onClick={() => setView("sequence")}
-            >
-              Sequence
-            </button>
-            <button
-              className={`tool-view-btn ${view === "summary" ? "active" : ""}`}
-              onClick={() => setView("summary")}
-            >
-              Summary
-            </button>
-          </span>
-          <span className="dim mono tabular" style={{ marginLeft: 10 }}>
-            {focus ? `${sequence.length} of ${total}` : `${total} total`}
-          </span>
-        </div>
-      </div>
-      {focus && (
-        <div className="tools-focus-chip mono">
-          <span>
-            Showing tools after prompt <strong>#{focus.promptIdx + 1}</strong>
-            <span className="dim">
-              {" "}· {formatClockAt(session.startedAt, focus.start)}
-              {focus.end !== Infinity && ` → ${formatClockAt(session.startedAt, focus.end)}`}
+    <div className="overview-grid tools-grid">
+      <div className="overview-main">
+        <div className="d-panel tools-tab">
+          <div className="section-title">
+            <span>
+              Tool calls <InfoDot title="Every tool Claude invoked during the session (Read, Edit, Bash, Grep, Glob, Write, Agent, etc.), in order, with their result size. Click a row to expand the result preview. The By tool card counts the calls per tool." />
             </span>
-          </span>
-          <button className="tools-focus-clear" onClick={onClearFocus} aria-label="Show all tools">
-            show all ✕
-          </button>
-        </div>
-      )}
-      {view === "summary" && (
-        <div className="tool-list">
-          {sortedTools.map(([name, count]) => (
-            <div key={name} className="tool-row">
-              <span className="tool-name mono" title={name}>{name}</span>
-              <div className="tool-meter">
-                <div className="tool-meter-fill" style={{ width: `${(count / maxTool) * 100}%` }} />
-              </div>
-              <span className="tool-count tabular mono">{count}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {view === "sequence" && (
-        sequence.length === 0 ? (
-          <div className="placeholder">
-            No tool sequence available. Summary view shows aggregated counts.
+            <span className="dim mono tabular">
+              {focus ? `${sequence.length} of ${total}` : `${total} total`}
+            </span>
           </div>
-        ) : (
-          <div className="tool-sequence">
-            {sequence.map((s, i) => {
-              const isLastPending =
-                session.live &&
-                i === 0 &&
-                !s.result;
-              return (
+          {focus && (
+            <div className="tools-focus-chip mono">
+              <span>
+                Showing tools after prompt <strong>#{focus.promptIdx + 1}</strong>
+                <span className="dim">
+                  {" "}· {formatClockAt(session.startedAt, focus.start)}
+                  {focus.end !== Infinity && ` → ${formatClockAt(session.startedAt, focus.end)}`}
+                </span>
+              </span>
+              <button className="tools-focus-clear" onClick={onClearFocus} aria-label="Show all tools">
+                show all ✕
+              </button>
+            </div>
+          )}
+          {sequence.length === 0 ? (
+            <div className="placeholder">No tool sequence available. The By tool card has the counts.</div>
+          ) : (
+            <div className="tool-sequence">
+              {sequence.map((s, i) => (
                 <ToolSeqRow
                   key={i}
                   entry={s}
                   startedAt={session.startedAt}
-                  pending={isLastPending}
+                  pending={session.live && i === 0 && !s.result}
                 />
-              );
-            })}
-            {sequence.length >= 300 && (
-              <div className="mono dim" style={{ padding: "8px 10px", fontSize: "var(--fs-sm)" }}>
-                (older tool calls truncated — showing first 300 captured)
-              </div>
-            )}
+              ))}
+              {sequence.length >= 300 && (
+                <div className="mono dim" style={{ padding: "8px 10px", fontSize: "var(--fs-sm)" }}>
+                  (older tool calls truncated — showing first 300 captured)
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="overview-rail">
+        <div className="d-panel preview">
+          <div className="preview-head">
+            <span className="preview-title">By tool</span>
+            <span className="preview-meta mono tabular">{total} calls</span>
           </div>
-        )
-      )}
+          {sortedTools.length === 0 ? (
+            <div className="preview-note mono dim">No tool calls.</div>
+          ) : (
+            <div className="preview-bars">
+              {sortedTools.map(([name, count]) => (
+                <div key={name} className="preview-bar-row">
+                  <span className="mono preview-bar-name" title={name}>{name}</span>
+                  <span className="preview-bar-track"><span style={{ width: `${(count / maxTool) * 100}%` }} /></span>
+                  <span className="mono tabular preview-bar-n">{count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

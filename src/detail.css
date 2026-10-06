@@ -150,8 +150,7 @@
 .detail-body .tool-view-btn:last-child { border-radius: 13px; margin-left: 0; }
 .detail-body .tool-view-btn.active { font-weight: 600; color: var(--c-text); background: var(--c-lens); box-shadow: var(--shadow-lens); }
 .detail-body .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--c-fill); border-radius: 16px; }
-.detail-body .prompt-view-toggle > .mono,
-.detail-body .tool-view-toggle > .mono { font-family: var(--f-ui); font-size: var(--fs-base); font-weight: 400; letter-spacing: 0; color: var(--c-text-dim); }
+.detail-body .prompt-view-toggle > .mono { font-family: var(--f-ui); font-size: var(--fs-base); font-weight: 400; letter-spacing: 0; color: var(--c-text-dim); }
 .detail .section-title > .dim:not(.seg) { font-family: var(--f-ui); font-size: var(--fs-base); font-weight: 400; letter-spacing: 0; color: var(--c-text-dim); }
 
 /* the context banners read as a quiet capsule under the title */
@@ -232,6 +231,13 @@
 .overview-main, .overview-rail { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 @media (max-width: 1100px) {
   .overview-grid { grid-template-columns: minmax(0, 1fr); }
+}
+/* Tools tab: the same two columns; the per-tool card stays in view while the calls scroll, and goes
+   above them once the columns stack */
+.tools-grid { align-items: start; }
+.tools-grid > .overview-rail { position: sticky; top: 0; }
+@media (max-width: 1100px) {
+  .tools-grid > .overview-rail { position: static; order: -1; }
 }
 /* real frictions first, the "nothing to report" line last */
 .overview-rail > .friction-panel { order: -1; }
