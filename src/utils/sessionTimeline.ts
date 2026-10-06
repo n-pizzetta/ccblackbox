@@ -1,5 +1,6 @@
 import type { Session } from "../types";
 import { costOf } from "../../scripts/models.mjs";
+import { frictionTimes, type TimelineFriction } from "./frictionTimes";
 import { flattenCalls } from "./toolCalls";
 import { freshTokens } from "./units";
 
@@ -46,6 +47,8 @@ export interface SessionTimelineData {
   points: TimelinePoint[];
   tools: TimelineTool[];
   prompts: Array<{ t: number; preview: string; idx: number }>;
+  /** Approximate: see frictionTimes. */
+  frictions: TimelineFriction[];
   compactions: number[];
   gaps: TimelineGap[];
   window: number;
@@ -131,6 +134,7 @@ export function buildSessionTimeline(session: Session, nowOffsetMs?: number): Se
     points,
     tools,
     prompts,
+    frictions: frictionTimes(session.frictions ?? [], start, end, axis),
     compactions,
     gaps,
     window,

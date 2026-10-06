@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "../types";
-import { buildSessionTimeline, type TimelinePoint } from "../utils/sessionTimeline";
+import { classifyPrompt, PROMPT_KIND_COLOR, PROMPT_KIND_LABEL } from "../utils/classifyPrompt";
+import { callsPerPrompt } from "../utils/toolCalls";
+import { buildSessionTimeline, TIMELINE_GAP_MS, type TimelinePoint } from "../utils/sessionTimeline";
 import { formatClockAt, formatCost, formatDuration, formatTokens } from "../utils/format";
 import { KpiRow } from "./Kpi";
 import "../timeline.css";
@@ -86,6 +88,7 @@ export function TimelineTab({
 
   const ticks = axisTicks(Date.parse(session.startedAt), data.start, data.end, data.gaps, innerW);
   const lastMain = main[main.length - 1];
+  const idleMs = data.gaps.reduce((a, g) => a + (g.to - g.from), 0);
 
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -106,9 +109,14 @@ export function TimelineTab({
       <KpiRow
         items={[
           { label: "Peak context", value: `${Math.round(data.peakPct)}%`, sub: `of ${formatTokens(data.window)}`, tone: data.peakPct >= 85 ? "red" : data.peakPct >= WATCH_PCT ? "amber" : undefined },
-          { label: "Context now", value: lastMain ? `${Math.round(lastMain.ctxPct!)}%` : "—", sub: lastMain ? `${formatTokens(lastMain.ctx!)} · ${data.points.length} turns` : `${data.points.length} turns` },
+          { label: session.live ? "Context now" : "Context at end", value: lastMain ? `${Math.round(lastMain.ctxPct!)}%` : "—", sub: lastMain ? `${formatTokens(lastMain.ctx!)} · ${data.points.length} turns` : `${data.points.length} turns` },
           { label: "Compactions", value: data.compactions.length, sub: data.compactions.length ? "context dropped by half" : "none detected", tone: data.compactions.length ? "amber" : undefined },
-          { label: "Failed tool calls", value: data.failedTools, sub: `of ${data.tools.length}`, tone: data.failedTools ? "red" : undefined },
+          {
+            label: "Idle",
+            value: data.gaps.length ? formatDuration(idleMs) : "—",
+            sub: data.gaps.length ? `${data.gaps.length} gap${data.gaps.length === 1 ? "" : "s"} over ${TIMELINE_GAP_MS / 60_000} min, shortened` : `no gap over ${TIMELINE_GAP_MS / 60_000} min`,
+            title: "Pauses between events longer than 5 minutes: drawn as a short break on the chart",
+          },
         ]}
       />
 
@@ -123,6 +131,7 @@ export function TimelineTab({
             <span><i className="sw agent" />sub-agent</span>
             <span><i className="sw err" />failed call</span>
             <span><i className="sw compact" />compaction</span>
+            {data.frictions.length > 0 && <span><i className="sw friction" />friction (approx.)</span>}
           </span>
         </div>
         <div className="tl-wrap" ref={wrapRef}>
@@ -165,6 +174,15 @@ export function TimelineTab({
                 </g>
               ))}
               {lastMain && <text className="tl-end ctx" x={PAD_L + innerW + 6} y={yCtx(lastMain.ctxPct!)} dy={3}>{Math.round(lastMain.ctxPct!)}%</text>}
+
+              {/* frictions from /insights: approximate moments, across every lane */}
+              {data.frictions.map((f, i) => (
+                <g key={`f${i}`} className="tl-friction">
+                  <line x1={X(f.t)} x2={X(f.t)} y1={top.ctx} y2={top.activity + LANES.activity} />
+                  <circle cx={X(f.t)} cy={top.ctx} r={3.5} />
+                  <title>{`Friction (approximate time, from /insights) · ${f.kind.replace(/_/g, " ")}: ${f.detail}`}</title>
+                </g>
+              ))}
 
               {/* cost lane */}
               <line className="tl-grid" x1={PAD_L} x2={PAD_L + innerW} y1={yCost(0)} y2={yCost(0)} />
@@ -216,9 +234,90 @@ export function TimelineTab({
         </div>
         <p className="tl-note">
           Context is the prompt size of each main-thread turn (input + cache), against a {formatTokens(data.window)} window. Idle gaps over 5 minutes are shortened. Click a prompt marker to see its tool calls.
+          {data.frictions.length > 0 && " Frictions come from /insights, which gives no time: their place is approximate."}
         </p>
       </div>
+
+      <TimelinePrompts session={session} onFocusTools={onFocusTools} />
     </>
+  );
+}
+
+/** What was asked when: every prompt in order, its kind, the calls it led to (→ Tools), its text. */
+function TimelinePrompts({
+  session,
+  onFocusTools,
+}: {
+  session: Session;
+  onFocusTools: (promptIdx: number, start: number, end: number) => void;
+}) {
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const prompts = session.prompts ?? [];
+  const calls = callsPerPrompt(session.toolSequence ?? [], prompts);
+  if (prompts.length === 0) return null;
+  const toggle = (i: number) => setOpenIdx((o) => (o === i ? null : i));
+  return (
+    <div className="d-panel tl-prompts">
+      <div className="section-title">
+        <span>Prompts</span>
+        <span className="dim tabular">{prompts.length} prompt{prompts.length === 1 ? "" : "s"}</span>
+      </div>
+      <div className="prompt-list">
+        <div className="prompt-row prompt-row-head mono dim caps">
+          <span>#</span>
+          <span>Time</span>
+          <span>Kind</span>
+          <span className="right">Tool calls</span>
+          <span>Prompt</span>
+        </div>
+        {prompts.map((p, i) => {
+          const kind = classifyPrompt(p.text);
+          const end = prompts[i + 1]?.t ?? Infinity;
+          const open = openIdx === i;
+          return (
+            <Fragment key={i}>
+              <div
+                className={`prompt-row ${open ? "selected" : ""}`}
+                role="button"
+                tabIndex={0}
+                aria-expanded={open}
+                onClick={() => toggle(i)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggle(i);
+                  }
+                }}
+              >
+                <span className="mono dim tabular">{String(i + 1).padStart(2, "0")}</span>
+                <span className="mono dim tabular">{formatClockAt(session.startedAt, p.t)}</span>
+                <span className="tl-prompt-kind">
+                  <span className="prompt-row-cat" style={{ background: PROMPT_KIND_COLOR[kind] }} aria-hidden="true" />
+                  {PROMPT_KIND_LABEL[kind]}
+                </span>
+                {calls[i] > 0 ? (
+                  <button
+                    type="button"
+                    className="mono tabular right prompt-row-tools-link"
+                    title={`Show the ${calls[i]} tool call${calls[i] === 1 ? "" : "s"} this prompt led to`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFocusTools(i, p.t, end);
+                    }}
+                  >
+                    {calls[i]} →
+                  </button>
+                ) : (
+                  <span className="mono tabular right dim">—</span>
+                )}
+                <span className="prompt-row-preview mono">{p.preview}</span>
+              </div>
+              {open && <pre className="prompt-panel-body">{p.text}</pre>}
+            </Fragment>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

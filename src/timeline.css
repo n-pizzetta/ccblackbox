@@ -13,6 +13,7 @@
 .sw.agent { background: var(--c-violet-dim); height: 8px !important; width: 4px !important; }
 .sw.err { background: var(--c-red); height: 9px !important; width: 2px !important; }
 .sw.compact { background: none; border-left: 2px dashed var(--c-amber); height: 10px !important; width: 0 !important; }
+.sw.friction { background: none; border-left: 2px dotted var(--c-coral); height: 10px !important; width: 0 !important; }
 
 .tl-wrap { position: relative; }
 .tl-svg { display: block; overflow: visible; font-family: var(--f-mono); }
@@ -28,6 +29,8 @@
 .tl-ctx { fill: none; stroke: var(--c-violet); stroke-width: 1.75; stroke-linejoin: round; }
 .tl-ctx-area { fill: var(--c-violet); opacity: .12; }
 .tl-compact line { stroke: var(--c-amber); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.tl-friction line { stroke: var(--c-coral); stroke-width: 1.25; stroke-dasharray: 2 4; opacity: .7; }
+.tl-friction circle { fill: var(--c-coral); }
 .tl-cost { fill: none; stroke: var(--c-green); stroke-width: 1.75; stroke-linejoin: round; }
 .tl-end { font-size: var(--fs-xs); fill: var(--c-text-dim); font-variant-numeric: tabular-nums; }
 .tl-end.ctx { fill: var(--c-violet); }
@@ -52,3 +55,12 @@
 .tl-note { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--c-text-faint); }
 
 @media (prefers-reduced-motion: reduce) { .tl-live i { animation: none; } }
+
+/* ---- Prompts: what was asked when ---- */
+.tl-prompts .prompt-row { grid-template-columns: 32px 64px 120px 84px minmax(0, 1fr); }
+.tl-prompt-kind { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-ui); color: var(--c-text-dim); }
+.tl-prompts .prompt-panel-body { border-bottom: 1px solid var(--c-hairline); }
+@media (max-width: 640px) {
+  .tl-prompts .prompt-row { grid-template-columns: 24px 56px 64px minmax(0, 1fr); }
+  .tl-prompts .prompt-row > :nth-child(3) { display: none; }
+}
