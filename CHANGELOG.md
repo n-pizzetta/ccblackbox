@@ -13,12 +13,16 @@ versioning follows [SemVer](https://semver.org/).
 - The session view uses the same width and side gutter as the other pages instead of a narrower centred column, so its edges line up with the app header.
 - **Tools tab.** The calls in order fill the main column, and a *By tool* card beside them counts the calls per tool, like the Overview's sidebar, instead of a Sequence / Summary toggle whose summary stretched across the whole width.
 - The scope bar ends with the session count and the search field; the range and the filters stay on the left.
+- **Session view structure.** Each tab answers one question, and each block has one home. *Overview* (how it went): four headline tiles that open their tab (active time and peak context, fresh tokens or API value, tool calls with failures and sub-agents), the Prompts chart without its Timeline / List toggle, frictions, and a summary of each other tab whose link lands on the right section. *Timeline* (what happened when): the chart, now with sub-agent calls and approximate friction markers, then the prompt list, which moved from the Overview. *Tools* (what Claude did): sub-agent calls nested under the Agent call that ran them, and a Failed view. *Tokens* (where the tokens and their API value went): By kind, and a new By prompt section that holds the per-prompt detail the Overview had. *Files* (what changed): the file versions, then the commits. "API value" is the only name for $, fresh or all tokens is always said, and "cacheR" / "cacheW" read "cache read" / "cache write".
+- The demo data (`pnpm seed:demo`) runs a sub-agent from each Agent call and keeps a file history of the files it edits.
 
 ### Fixed
 
 - `/marey:replay` opens the dashboard at once: the server takes the port before reading the sessions (a cold start could take 20 s, longer than the command waited), and the dashboard shows its loading screen until the first read is done. Each launch writes its own log, so a server being replaced can't garble it.
 - On phones, the session view's close button is no longer pushed off screen by the usage limits: they move to a row of their own under the toolbar.
 - The page navigation, the session tabs and the segmented toggles no longer show a focus ring after a mouse click followed by a key press; keyboard focus (Tab) still shows it.
+- **Tool-call counts agree.** Sub-agent calls were counted in the tab, the headline tile and the By tool card, but missing from the list, the Timeline and the prompt badges (39 counted, 26 listed). The parser now nests each sub-agent's calls under the Agent call that ran it, matched by the agent id Claude Code writes in the call's result, else by its prompt, else by time, so every count is the same.
+- **One unit per figure.** A prompt shown in fresh tokens got its share of the session's API value (24.8k shown as 9.5% when it was 7.8% of the tokens); the share now follows the shown unit. The Overview's "Tokens" card, which drew API value shares under a token total, is now "API value by kind".
 
 ### Planned
 
