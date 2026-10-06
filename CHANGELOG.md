@@ -9,11 +9,13 @@ versioning follows [SemVer](https://semver.org/).
 ### Changed
 
 - The glass page navigation and session tabs are lit by a soft glint in the middle of their top edge instead of a white rim, and the selected tab by an even ring.
-- **Session view header.** The tabs are built like the page navigation (a line icon before each label, the friction count as a plain amber number), and the live status and context cards above them are merged into one compact strip: live state and time since the last event, prompt and turns, context fill, cache state and the verdict, whose reasons open from the pill. The content starts about 150 px higher on a live session.
+- **Session view header.** The tabs are built like the page navigation (a line icon before each label, the friction count as a plain amber number), and the live status and context cards above them are merged into one strip that reads at a glance: *Idle · 3m ago · prompt 1 · 5 turns* on the left, *Context 7% · 67.5k / 1M · cache 57m* and the verdict on the right, whose reasons open from its pill. The content starts about 140 px higher on a live session.
+- The session view uses the same width and side gutter as the other pages instead of a narrower centred column, so its edges line up with the app header.
 
 ### Fixed
 
 - `/marey:replay` opens the dashboard at once: the server takes the port before reading the sessions (a cold start could take 20 s, longer than the command waited), and the dashboard shows its loading screen until the first read is done. Each launch writes its own log, so a server being replaced can't garble it.
+- On phones, the session view's close button is no longer pushed off screen by the usage limits: they move to a row of their own under the toolbar.
 
 ### Planned
 
