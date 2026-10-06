@@ -2,13 +2,15 @@ import { LimitsPill } from "./LimitsGauge";
 import { SessionContext, StatusSep } from "./ContextCard";
 import { GoalSummary } from "./GoalSummary";
 import { TimelineTab } from "./SessionTimeline";
-import { SessionKpis, TabPreviews } from "./SessionOverview";
+import { FrictionsCard, SessionKpis, TabPreviews, type OverviewLink } from "./SessionOverview";
 import { KpiRow } from "./Kpi";
-import { freshTokens, useUnit } from "../utils/units";
+import { freshTokens, useUnit, type Unit } from "../utils/units";
+import { promptWeights } from "../utils/promptShare";
 import { projectColor } from "../utils/fleetStats";
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPatch } from "diff";
-import type { Session, SessionQuality, ToolName } from "../types";
+import type { Session, SessionQuality, ToolCall, ToolName } from "../types";
+import { callsBetween, callsPerPrompt, countCalls, countFailed, countSubCalls, flattenCalls, onlyFailed } from "../utils/toolCalls";
 import { estimateHint, formatBytes, formatClockAt, formatCost, formatDuration, formatTokens, outcomeColor, outcomeLabel } from "../utils/format";
 import { SESSION_IDLE_GAP_MS } from "../utils/fleetStats";
 import { downloadSessionHtml } from "../utils/exportSession";
@@ -244,6 +246,9 @@ export function SessionDetail({
 }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const [toolFocus, setToolFocus] = useState<{ promptIdx: number; start: number; end: number } | null>(null);
+  // a link from the Overview into the Tokens tab, consumed once it has scrolled there
+  const [tokensFocus, setTokensFocus] = useState<TokensFocus | null>(null);
+  const clearTokensFocus = useCallback(() => setTokensFocus(null), []);
   const [resumeCopied, setResumeCopied] = useState(false);
   const c = outcomeColor(session.outcome);
   const toolCallCount = Object.values(session.toolCounts ?? {}).reduce((a, n) => a + n, 0);
@@ -272,6 +277,16 @@ export function SessionDetail({
   const focusToolsForPrompt = (promptIdx: number, start: number, end: number) => {
     setToolFocus({ promptIdx, start, end });
     setTab("tools");
+  };
+  // the Overview's summaries open their tab; the API value one lands on Tokens › By kind
+  const openFromOverview = (to: OverviewLink) => {
+    if (to === "tokens") setTokensFocus({ section: "kind" });
+    if (to === "tools") setToolFocus(null);
+    setTab(to);
+  };
+  const openPromptCost = (idx: number) => {
+    setTokensFocus({ section: "prompt", idx });
+    setTab("tokens");
   };
 
   return (
@@ -409,7 +424,7 @@ export function SessionDetail({
                 </span>
               )}
               {t.id === "tools" && <span className="tab-count mono tabular">{toolCallCount}</span>}
-              {t.id === "files" && <span className="tab-count mono tabular">{session.filesChanged}</span>}
+              {t.id === "files" && session.filesChanged > 0 && <span className="tab-count mono tabular">{session.filesChanged}</span>}
             </button>
           ))}
         </div>
@@ -417,13 +432,13 @@ export function SessionDetail({
 
       <div className="detail-body scrollbar">
         {tab === "overview" && (
-          <OverviewTab session={session} onFocusTools={focusToolsForPrompt} onOpenTab={setTab} />
+          <OverviewTab session={session} onFocusTools={focusToolsForPrompt} onOpen={openFromOverview} onOpenPromptCost={openPromptCost} />
         )}
         {tab === "timeline" && <TimelineTab session={session} onFocusTools={focusToolsForPrompt} />}
         {tab === "tools" && (
           <ToolsTab session={session} focus={toolFocus} onClearFocus={() => setToolFocus(null)} />
         )}
-        {tab === "tokens" && <TokensTab session={session} />}
+        {tab === "tokens" && <TokensTab session={session} focus={tokensFocus} onFocusDone={clearTokensFocus} />}
         {tab === "files" && <FilesTab session={session} />}
       </div>
 
@@ -589,41 +604,39 @@ function GhostBanner({ session }: { session: Session }) {
   );
 }
 
+/**
+ * How this session went, in one screen: the headline figures (each opening its tab), the prompts
+ * chart, frictions, and a summary of each other tab.
+ */
 function OverviewTab({
   session,
   onFocusTools,
-  onOpenTab,
+  onOpen,
+  onOpenPromptCost,
 }: {
   session: Session;
   onFocusTools: (promptIdx: number, start: number, end: number) => void;
-  onOpenTab: (t: Tab) => void;
+  onOpen: (to: OverviewLink) => void;
+  onOpenPromptCost: (promptIdx: number) => void;
 }) {
   const unit = useUnit();
   const liveEmpty = session.live && (session.timeline?.length ?? 0) === 0;
   const [selectedPrompt, setSelectedPrompt] = useState<number | null>(null);
-  const [promptView, setPromptView] = useState<"timeline" | "list">("timeline");
   const prompts = session.prompts ?? [];
   const toolSeq = session.toolSequence ?? [];
   const stats: PromptStats[] = session.turns && prompts.length > 0
     ? aggregateByPrompt(session.turns, session.model, prompts)
     : [];
-  const totalCost = stats.reduce((a, s) => a + s.cost, 0);
-  /** Per-prompt figure in the chosen unit: fresh tokens, or API value. */
-  const val = (s: PromptStats) => (unit === "tokens" ? freshTokens(s.tokens) : s.cost);
-  const fv = (s: PromptStats) => (unit === "tokens" ? formatTokens(freshTokens(s.tokens)) : formatCost(s.cost));
-  const fmtAxis = (n: number) => (unit === "tokens" ? formatTokens(n) : formatCost(n));
-  const totalVal = stats.reduce((a, s) => a + val(s), 0);
-  const rewriteFlagged = stats.filter((s) => s.cacheRewriteFlag);
-  const rewriteCost = rewriteFlagged.reduce((a, s) => a + (s.cacheRewriteFlag?.cacheWriteCost ?? 0), 0);
+  // each prompt's weight and share, both in the usage unit
+  const weights = promptWeights(stats.map((s) => ({ fresh: freshTokens(s.tokens), cost: s.cost })), unit);
+  const fmt = (v: number) => (unit === "tokens" ? formatTokens(v) : formatCost(v));
+  const unitLabel = unit === "tokens" ? "fresh tokens" : "API value";
+  const totalVal = weights.reduce((a, w) => a + w.value, 0);
   const maxPromptT = prompts.reduce((a, p) => Math.max(a, p.t), 0);
   const effDurationMs = Math.max(session.durationMs, maxPromptT, 1);
   const durationMin = effDurationMs / 60_000;
-
-  const promptKinds = prompts.map((p) => classifyPrompt(p.text));
-  const promptTools = prompts.map((p, i) => {
-    const nextT = prompts[i + 1]?.t ?? Infinity;
-    return toolSeq.filter((t) => t.t >= p.t && t.t < nextT).length;
-  });
+  // calls made while each prompt ran, sub-agent calls included
+  const promptTools = callsPerPrompt(toolSeq, prompts);
 
   if (liveEmpty) {
     return (
@@ -637,59 +650,37 @@ function OverviewTab({
     );
   }
 
+  const sel = selectedPrompt !== null && prompts[selectedPrompt] ? selectedPrompt : null;
+
   return (
-    <>
-      <div className="overview-grid">
-        <div className="overview-main">
-          <SessionKpis session={session} />
-      <div className="d-panel">
-        <div className="section-title">
-          <span>User prompts</span>
-          <div className="prompt-view-toggle">
-            <span className="seg">
-              <button
-                className={`tool-view-btn ${promptView === "timeline" ? "active" : ""}`}
-                onMouseDown={keepFocus}
-                onClick={() => setPromptView("timeline")}
-              >
-                Timeline
-              </button>
-              <button
-                className={`tool-view-btn ${promptView === "list" ? "active" : ""}`}
-                onMouseDown={keepFocus}
-                onClick={() => setPromptView("list")}
-              >
-                List
-              </button>
+    <div className="overview-grid">
+      <div className="overview-main">
+        <SessionKpis session={session} onOpen={onOpen} />
+        <div className="d-panel">
+          <div className="section-title">
+            <span>
+              Prompts <InfoDot title={`One bar per prompt: its ${unitLabel}, sub-agents included, and the tool calls it led to. The colour is its costliest kind (by API value). Click a bar for the prompt.`} />
             </span>
-            <span className="dim mono tabular" style={{ marginLeft: 10 }}>
-              {prompts.length} prompts
-              {totalVal > 0 && ` · ${fmtAxis(totalVal)} total`}
-              {rewriteFlagged.length > 0 && (
-                <span style={{ color: "var(--c-amber)" }}>
-                  {" · "}
-                  {rewriteFlagged.length} idle-rewrite{rewriteFlagged.length > 1 ? "s" : ""} = {formatCost(rewriteCost)}
-                </span>
-              )}
+            <span className="dim tabular">
+              {prompts.length} prompt{prompts.length === 1 ? "" : "s"}
+              {totalVal > 0 && ` · ${fmt(totalVal)} ${unitLabel}`}
             </span>
           </div>
-        </div>
-        {promptView === "timeline" && (
-          stats.length === 0 ? (
-            <div className="placeholder">No cost data captured.</div>
+          {stats.length === 0 ? (
+            <div className="placeholder">No usage captured for its prompts.</div>
           ) : (() => {
-            const maxCost = Math.max(0.0001, ...stats.map(val));
+            const maxVal = Math.max(1e-9, ...weights.map((w) => w.value));
             return (
               <>
                 <div className="prompt-chart-wrap">
                   <div className="prompt-chart-axis">
-                    <span className="mono dim tabular">{fmtAxis(maxCost)}</span>
+                    <span className="mono dim tabular">{fmt(maxVal)}</span>
                     <span className="mono dim tabular">0</span>
                   </div>
                   <div className="prompt-chart">
                     {stats.map((s, i) => {
-                      const heightPct = (val(s) / maxCost) * 100;
-                      const isSelected = selectedPrompt === i;
+                      const heightPct = (weights[i].value / maxVal) * 100;
+                      const isSelected = sel === i;
                       const showGap = i > 0 && s.gapBeforeMs >= SESSION_IDLE_GAP_MS;
                       const tc = promptTools[i];
                       return (
@@ -697,7 +688,7 @@ function OverviewTab({
                           {showGap && (
                             <span
                               className={`prompt-gap-marker ${s.cacheRewriteFlag ? "warn" : ""}`}
-                              title={`${formatDuration(s.gapBeforeMs)} idle gap before #${i + 1}`}
+                              title={`${formatDuration(s.gapBeforeMs)} idle before #${i + 1}${s.cacheRewriteFlag ? ", then the cache was rewritten" : ""}`}
                               aria-hidden="true"
                             />
                           )}
@@ -707,11 +698,9 @@ function OverviewTab({
                             onClick={() => setSelectedPrompt((p) => (p === i ? null : i))}
                             aria-label={`Prompt ${i + 1}`}
                             aria-pressed={isSelected}
-                            title={`#${i + 1} · ${fv(s)}${showGap ? ` · ${formatDuration(s.gapBeforeMs)} idle before` : ""} · ${tc} tool${tc === 1 ? "" : "s"}`}
+                            title={`#${i + 1} · ${fmt(weights[i].value)} ${unitLabel}${showGap ? ` · ${formatDuration(s.gapBeforeMs)} idle before` : ""} · ${tc} tool call${tc === 1 ? "" : "s"}`}
                           >
-                            {tc > 0 && (
-                              <span className="prompt-bar-turn-badge tabular">{tc}</span>
-                            )}
+                            {tc > 0 && <span className="prompt-bar-turn-badge tabular">{tc}</span>}
                           </button>
                         </div>
                       );
@@ -724,7 +713,7 @@ function OverviewTab({
                   </div>
                 </div>
                 <div className="prompt-legend mono dim" style={{ marginTop: 10 }}>
-                  <span className="dim">dominant cost kind:</span>
+                  <span className="dim">costliest kind:</span>
                   <span className="prompt-legend-item"><span className="prompt-legend-swatch tokens-seg output" /> output</span>
                   <span className="prompt-legend-item"><span className="prompt-legend-swatch tokens-seg cache-read" /> cache read</span>
                   <span className="prompt-legend-item"><span className="prompt-legend-swatch tokens-seg cache-write" /> cache write</span>
@@ -732,179 +721,49 @@ function OverviewTab({
                 </div>
               </>
             );
-          })()
-        )}
-        {promptView === "timeline" && selectedPrompt !== null && prompts[selectedPrompt] && (() => {
-          const i = selectedPrompt;
-          const p = prompts[i];
-          const kind = promptKinds[i];
-          const tc = promptTools[i];
-          return (
-            <div className="prompt-panel" style={{ marginTop: 12, border: "1px solid var(--c-hairline)", borderRadius: "var(--radius)" }}>
-              <div className="prompt-panel-head">
-                <span className="mono dim">
-                  prompt #{i + 1} @ {formatClockAt(session.startedAt, p.t)}
-                  {" · "}
-                  <span style={{ color: PROMPT_KIND_COLOR[kind] }}>
-                    {PROMPT_KIND_LABEL[kind]}
+          })()}
+          {sel !== null && (() => {
+            const p = prompts[sel];
+            const kind = classifyPrompt(p.text);
+            const tc = promptTools[sel];
+            const w = weights[sel];
+            return (
+              <div className="prompt-card">
+                <div className="prompt-card-head">
+                  <span className="mono dim">
+                    #{sel + 1} · {formatClockAt(session.startedAt, p.t)} ·{" "}
+                    <span style={{ color: PROMPT_KIND_COLOR[kind] }}>{PROMPT_KIND_LABEL[kind]}</span>
                   </span>
-                  {tc > 0 && ` · ${tc} tools after`}
-                  {stats[i] && (
-                    <>
-                      {" · "}
-                      <span style={{ color: "var(--c-amber)" }}>{fv(stats[i])}</span>
-                      {totalCost > 0 && ` · ${((stats[i].cost / totalCost) * 100).toFixed(1)}% of session`}
-                    </>
-                  )}
-                </span>
-                <button className="prompt-panel-close" onClick={() => setSelectedPrompt(null)}>✕</button>
-              </div>
-              {stats[i] && (
-                <PromptCostBreakdown s={stats[i]} model={session.model} />
-              )}
-              <pre className="prompt-panel-body">{p.text}</pre>
-            </div>
-          );
-        })()}
-        {promptView === "list" && (
-          prompts.length === 0 ? (
-            <div className="placeholder">No prompts captured.</div>
-          ) : (
-            <div className="prompt-list">
-              <div className="prompt-row prompt-row-head mono dim caps">
-                <span>#</span>
-                <span>Time</span>
-                <span>Kind</span>
-                <span className="right">Tools</span>
-                <span className="right">{unit === "tokens" ? "tok" : "$"}</span>
-                <span />
-                <span>Prompt</span>
-                <span className="right">Length</span>
-              </div>
-              {prompts.map((_, revIdx) => {
-                const i = prompts.length - 1 - revIdx;
-                const p = prompts[i];
-                const kind = promptKinds[i];
-                const tc = promptTools[i];
-                const nextT = prompts[i + 1]?.t ?? Infinity;
-                const selected = selectedPrompt === i;
-                return (
-                  <Fragment key={i}>
-                  <div
-                    className={`prompt-row ${selected ? "selected" : ""}`}
-                    role="button"
-                    tabIndex={0}
-                    title={PROMPT_KIND_LABEL[kind]}
-                    onClick={() => setSelectedPrompt(selected ? null : i)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedPrompt(selected ? null : i);
-                      }
-                    }}
-                  >
-                    <span className="mono dim tabular">{String(i + 1).padStart(2, "0")}</span>
-                    <span className="mono dim tabular">{formatClockAt(session.startedAt, p.t)}</span>
-                    <span
-                      className="prompt-row-cat"
-                      style={{ background: PROMPT_KIND_COLOR[kind] }}
-                      title={PROMPT_KIND_LABEL[kind]}
-                    />
-                    {tc > 0 ? (
-                      <button
-                        type="button"
-                        className="mono tabular right prompt-row-tools-link"
-                        title={`Jump to ${tc} tool call${tc === 1 ? "" : "s"} after this prompt`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onFocusTools(i, p.t, nextT);
-                        }}
-                      >
-                        {tc} →
-                      </button>
-                    ) : (
-                      <span className="mono tabular right dim">—</span>
-                    )}
-                    <span
-                      className="mono tabular right"
-                      style={{
-                        color: stats[i] && stats[i].cost >= 0.5 ? "var(--c-amber)" : "var(--c-text-faint)",
-                      }}
-                    >
-                      {stats[i] ? fv(stats[i]) : "—"}
-                    </span>
-                    <span
-                      className="prompt-row-warn"
-                      title={
-                        stats[i]?.cacheRewriteFlag
-                          ? `${formatDuration(stats[i].cacheRewriteFlag!.gapMs)} idle — cacheW ${formatCost(stats[i].cacheRewriteFlag!.cacheWriteCost)}`
-                          : ""
-                      }
-                    >
-                      {stats[i]?.cacheRewriteFlag ? "⚠" : ""}
-                    </span>
-                    <span className="prompt-row-preview mono">{p.preview}</span>
-                    <span className="mono dim tabular right">{p.text.length}</span>
-                  </div>
-                  {selected && (
-                    <div className="prompt-panel">
-                      <div className="prompt-panel-head">
-                        <span className="mono dim">
-                          prompt #{i + 1} @ {formatClockAt(session.startedAt, p.t)}
-                          {" · "}
-                          <span style={{ color: PROMPT_KIND_COLOR[kind] }}>
-                            {PROMPT_KIND_LABEL[kind]}
-                          </span>
-                          {tc > 0 && ` · ${tc} tools after`}
-                          {stats[i] && (
-                            <>
-                              {" · "}
-                              <span style={{ color: "var(--c-amber)" }}>{fv(stats[i])}</span>
-                              {totalCost > 0 && ` · ${((stats[i].cost / totalCost) * 100).toFixed(1)}% of session`}
-                            </>
-                          )}
-                        </span>
-                        <button className="prompt-panel-close" onClick={() => setSelectedPrompt(null)}>✕</button>
-                      </div>
-                      {stats[i] && (
-                        <PromptCostBreakdown s={stats[i]} model={session.model} />
-                      )}
-                      <pre className="prompt-panel-body">{p.text}</pre>
-                    </div>
-                  )}
-                  </Fragment>
-                );
-              })}
-            </div>
-          )
-        )}
-      </div>
-        </div>
-        <div className="overview-rail">
-          <TabPreviews session={session} onOpenTab={onOpenTab} />
-      {session.frictions.length > 0 ? (
-        <div className="d-panel friction-panel">
-          <div className="section-title">
-            <span>Frictions</span>
-            <span className="dim mono" title="LLM-flagged friction points. Count is real; on-timeline positions are approximate.">
-              {session.frictions.length} · ⓘ LLM
-            </span>
-          </div>
-          <div className="friction-list">
-            {session.frictions.map((f, i) => (
-              <div key={i} className="friction-item">
-                <span className="dot" />
-                <div>
-                  <div className="kind">{f.kind.replace(/_/g, " ")}</div>
-                  <div className="detail-text">{f.detail}</div>
+                  <button className="prompt-panel-close" onClick={() => setSelectedPrompt(null)} aria-label="Close the prompt">✕</button>
                 </div>
-                <span className="at tabular">{(f.at * 100).toFixed(0)}%</span>
+                {w && (
+                  <div className="prompt-card-weight tabular">
+                    <b>{fmt(w.value)}</b> {unitLabel}
+                    <span className="dim"> · {(w.share * 100).toFixed(1)}% of the session's {unitLabel}</span>
+                  </div>
+                )}
+                <div className="prompt-card-links">
+                  {tc > 0 && (
+                    <button className="preview-more" onClick={() => onFocusTools(sel, p.t, prompts[sel + 1]?.t ?? Infinity)}>
+                      {tc} tool call{tc === 1 ? "" : "s"} →
+                    </button>
+                  )}
+                  {stats[sel] && (
+                    <button className="preview-more" onClick={() => onOpenPromptCost(sel)}>
+                      Tokens and API value per kind →
+                    </button>
+                  )}
+                </div>
+                <pre className="prompt-panel-body">{p.text}</pre>
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
-      ) : (
-        session.outcome === "unknown" || session.outcome === "in_progress" ? (
+      </div>
+      <div className="overview-rail">
+        {session.frictions.length > 0 ? (
+          <FrictionsCard session={session} onOpen={onOpen} />
+        ) : session.outcome === "unknown" || session.outcome === "in_progress" ? (
           <div className="clean-row dim">
             {session.agent === "codex" ? "Frictions not analyzed · /insights only covers Claude Code" : "Frictions not analyzed yet · run /insights in Claude Code"}
           </div>
@@ -912,11 +771,10 @@ function OverviewTab({
           <div className="clean-row">
             <span style={{ color: "var(--c-green)" }}>✓</span> Clean session · no friction detected
           </div>
-        )
-      )}
-        </div>
+        )}
+        <TabPreviews session={session} onOpen={onOpen} />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -929,16 +787,20 @@ function ToolsTab({
   focus: { promptIdx: number; start: number; end: number } | null;
   onClearFocus: () => void;
 }) {
+  const [failedOnly, setFailedOnly] = useState(false);
   const sortedTools = (Object.entries(session.toolCounts) as Array<[ToolName, number]>)
     .filter(([, v]) => v > 0)
     .sort(([, a], [, b]) => b - a);
   const maxTool = Math.max(...sortedTools.map(([, v]) => v), 1);
-  const total = sortedTools.reduce((a, [, v]) => a + v, 0);
-  const allSequence = session.toolSequence ?? [];
-  const filtered = focus
-    ? allSequence.filter((s) => s.t >= focus.start && s.t < focus.end)
-    : allSequence;
-  const sequence = [...filtered].reverse();
+  const all = session.toolSequence ?? [];
+  const total = countCalls(all);
+  const inFocus = focus ? callsBetween(all, focus.start, focus.end) : all;
+  const failed = countFailed(inFocus);
+  const subCalls = countSubCalls(inFocus);
+  const shown = failedOnly && failed > 0 ? onlyFailed(inFocus) : inFocus;
+  // newest first; the newest call of a live session may still be running
+  const sequence = [...shown].reverse();
+  const truncated = all.length >= 300;
 
   // the calls in order on the left; their count per tool in a card on the right (above it on narrow screens)
   return (
@@ -947,10 +809,23 @@ function ToolsTab({
         <div className="d-panel tools-tab">
           <div className="section-title">
             <span>
-              Tool calls <InfoDot title="Every tool Claude invoked during the session (Read, Edit, Bash, Grep, Glob, Write, Agent, etc.), in order, with their result size. Click a row to expand the result preview. The By tool card counts the calls per tool." />
+              Tool calls <InfoDot title="Every tool call of the session, newest first, with its result size: a call that started a sub-agent holds the sub-agent's calls. Click a row to expand its input and result. The By tool card counts the calls per tool." />
             </span>
-            <span className="dim mono tabular">
-              {focus ? `${sequence.length} of ${total}` : `${total} total`}
+            <span className="tools-head-meta">
+              <span className="dim tabular">
+                {focus ? `${countCalls(inFocus)} of ${total} calls` : `${total} calls`}
+                {subCalls > 0 && ` · ${subCalls} in sub-agents`}
+              </span>
+              {failed > 0 && (
+                <span className="seg" role="group" aria-label="Show">
+                  <button className={`tool-view-btn ${failedOnly ? "" : "active"}`} onMouseDown={keepFocus} onClick={() => setFailedOnly(false)} aria-pressed={!failedOnly}>
+                    All
+                  </button>
+                  <button className={`tool-view-btn ${failedOnly ? "active" : ""}`} onMouseDown={keepFocus} onClick={() => setFailedOnly(true)} aria-pressed={failedOnly}>
+                    Failed <span className="tools-failed-n tabular">{failed}</span>
+                  </button>
+                </span>
+              )}
             </span>
           </div>
           {focus && (
@@ -973,15 +848,16 @@ function ToolsTab({
             <div className="tool-sequence">
               {sequence.map((s, i) => (
                 <ToolSeqRow
-                  key={i}
+                  key={`${s.t}-${i}`}
                   entry={s}
                   startedAt={session.startedAt}
-                  pending={session.live && i === 0 && !s.result}
+                  pending={!!session.live && i === 0 && !s.result && !s.orphan && !failedOnly}
+                  openSub={failedOnly}
                 />
               ))}
-              {sequence.length >= 300 && (
+              {truncated && (
                 <div className="mono dim" style={{ padding: "8px 10px", fontSize: "var(--fs-sm)" }}>
-                  (older tool calls truncated — showing first 300 captured)
+                  (later tool calls truncated — showing the first 300 of each transcript)
                 </div>
               )}
             </div>
@@ -1013,35 +889,45 @@ function ToolsTab({
   );
 }
 
+/** One call. A call that started a sub-agent opens onto the sub-agent's calls, nested under it. */
 function ToolSeqRow({
   entry,
   startedAt,
   pending,
+  openSub = false,
 }: {
-  entry: NonNullable<Session["toolSequence"]>[number];
+  entry: ToolCall;
   startedAt: string;
   pending?: boolean;
+  /** Start with the sub-agent's calls shown (the failed-only view). */
+  openSub?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(openSub);
   const hasResult = !!entry.result;
   const hasFull = !!entry.full;
   const expandable = hasResult || hasFull;
   const isError = !!entry.result?.isError;
   const resultOneLine = entry.result?.text.replace(/\s+/g, " ").trim() ?? "";
-  const status = pending ? "running" : isError ? "error" : hasResult ? "ok" : "no result";
+  const status = entry.orphan ? "sub-agent" : pending ? "running" : isError ? "error" : hasResult ? "ok" : "no result";
+  const kids = entry.children ?? [];
+  const kidsFailed = kids.filter((c) => c.result?.isError).length;
+  // newest first, like the calls around them; the newest one runs while its sub-agent does
+  const kidsShown = [...kids].reverse();
   return (
-    <div className={`tool-seq-row ${expandable ? "has-result" : ""} ${open ? "open" : ""} ${pending ? "pending" : ""}`}>
+    <div className={`tool-seq-row ${expandable ? "has-result" : ""} ${open ? "open" : ""} ${pending ? "pending" : ""} ${entry.orphan ? "orphan" : ""}`}>
       <button
         className="tool-seq-main"
         onClick={() => expandable && setOpen((v) => !v)}
         disabled={!expandable}
         aria-label={expandable ? (open ? "Collapse tool details" : "Expand tool details") : undefined}
+        title={entry.orphan ? "A sub-agent whose starting call isn't in the transcript" : undefined}
       >
         <span className="tool-seq-time mono dim tabular">{formatClockAt(startedAt, entry.t)}</span>
         <span className={`tool-seq-status ${pending ? "run" : isError ? "err" : hasResult ? "ok" : ""}`} title={status} aria-label={status}>
           {pending ? "▶" : isError ? "✗" : hasResult ? "✓" : "·"}
         </span>
-        <span className="tool-seq-name mono" title={entry.tool}>{entry.tool}</span>
+        <span className="tool-seq-name mono" title={entry.tool}>{entry.orphan ? "Sub-agent" : entry.tool}</span>
         <span className="tool-seq-preview mono dim">{entry.preview}</span>
         <span className="tool-seq-size">
           {entry.result?.bytes != null && entry.result.bytes > 0 && (
@@ -1069,6 +955,23 @@ function ToolSeqRow({
         <div className="tool-seq-result-hint mono">
           {resultOneLine.slice(0, 140)}{resultOneLine.length > 140 ? "…" : ""}
         </div>
+      )}
+      {kids.length > 0 && (
+        <>
+          <button className="tool-seq-sub-toggle mono" onClick={() => setSubOpen((v) => !v)} aria-expanded={subOpen}>
+            <span aria-hidden="true">{subOpen ? "▾" : "▸"}</span>
+            {" "}{kids.length} call{kids.length === 1 ? "" : "s"} in the sub-agent
+            {entry.agentLabel && <span className="dim"> · {entry.agentLabel}</span>}
+            {kidsFailed > 0 && <span className="tool-seq-sub-failed"> · {kidsFailed} failed</span>}
+          </button>
+          {subOpen && (
+            <div className="tool-seq-children">
+              {kidsShown.map((c, i) => (
+                <ToolSeqRow key={`${c.t}-${i}`} entry={c} startedAt={startedAt} pending={pending && i === 0 && !c.result} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -1175,8 +1078,13 @@ function InfoDot({ title }: { title: string }) {
   );
 }
 
-function TokensTab({ session }: { session: Session }) {
-  const totalTokens =
+/** Where a link from the Overview lands in the Tokens tab: the By kind section, or one prompt's detail. */
+type TokensFocus = { section: "kind" } | { section: "prompt"; idx: number };
+
+/** Where the tokens and their API value went: by kind (with the cache), then by prompt. */
+function TokensTab({ session, focus, onFocusDone }: { session: Session; focus: TokensFocus | null; onFocusDone: () => void }) {
+  const unit = useUnit();
+  const allTokens =
     session.tokens.input +
     session.tokens.output +
     session.tokens.cacheRead +
@@ -1206,6 +1114,14 @@ function TokensTab({ session }: { session: Session }) {
   const hitTone = cacheHit >= 0.9 ? "green" : cacheHit >= 0.4 ? undefined : "red";
   const estimated = session.unpricedModels?.length ? "~" : "";
 
+  // a link from the Overview to By kind: scroll there, once (a link to a prompt is By prompt's to handle)
+  const kindRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focus?.section !== "kind") return;
+    kindRef.current?.scrollIntoView({ block: "start" });
+    onFocusDone();
+  }, [focus, onFocusDone]);
+
   return (
     <>
       <KpiRow
@@ -1219,35 +1135,35 @@ function TokensTab({ session }: { session: Session }) {
           {
             label: "Cache hit",
             value: `${(cacheHit * 100).toFixed(1)}%`,
-            sub: `${formatTokens(session.tokens.cacheRead)} of ${formatTokens(session.tokens.input + session.tokens.cacheRead)} input`,
+            sub: `${formatTokens(session.tokens.cacheRead)} of ${formatTokens(session.tokens.input + session.tokens.cacheRead)} input tokens`,
             tone: hitTone,
             title: "cacheRead / (cacheRead + input): input served from the prompt cache instead of billed fresh. Aim for 90% or more.",
           },
           {
             label: "Cache savings",
             value: formatCost(savings),
-            sub: `${savingsPct.toFixed(0)}% off the no-cache cost`,
+            sub: `${savingsPct.toFixed(0)}% off the API value without cache`,
             tone: savings > 0 ? "green" : undefined,
-            title: "Actual cost vs every cached token billed as fresh input: what the prompt cache is worth here.",
+            title: "API value vs every cached token billed as fresh input: what the prompt cache is worth here.",
           },
           {
             label: "Per prompt",
             value: promptCount > 0 ? formatCost(costPerPrompt) : "—",
-            sub: promptCount > 0 ? `${promptCount} user prompts` : "no prompts captured",
+            sub: promptCount > 0 ? `API value ÷ ${promptCount} user prompts` : "no prompts captured",
             title: "API value ÷ user prompts: a rough weight of each turn, inflated by tool-heavy turns and long replies.",
           },
         ]}
       />
 
-      <div className="d-panel">
+      <div className="d-panel" ref={kindRef}>
         <div className="section-title">
           <span>
-            Breakdown <InfoDot title="Token volume and cost per kind. Volume ≠ cost: cache reads are cheap, output costs several times input, so cost is often dominated by output and cache writes even when cache reads dominate volume." />
+            By kind <InfoDot title="Tokens and API value per kind. They differ: cache reads are cheap, output costs several times input, so the API value is often dominated by output and cache writes even when cache reads dominate the tokens." />
           </span>
-          <span className="dim mono tabular">{formatTokens(totalTokens)} tokens · {estimated}{formatCost(totalCost)}</span>
+          <span className="dim tabular">{formatTokens(allTokens)} tokens in all · {estimated}{formatCost(totalCost)} API value</span>
         </div>
         <div className="tokens-bars">
-          {([["Volume", "tokens"], ["Cost", "cost"]] as const).map(([label, field]) => (
+          {([["Tokens", "tokens"], ["API value", "cost"]] as const).map(([label, field]) => (
             <div key={field} className="tokens-bars-row">
               <span className="tokens-bars-label">{label}</span>
               <div className="tokens-bar" aria-label={`${label} by token kind`}>
@@ -1256,7 +1172,7 @@ function TokensTab({ session }: { session: Session }) {
                     key={r.key}
                     className={`tokens-seg ${r.cls}`}
                     style={{ flex: r[field] || 0.0001 }}
-                    title={`${r.label}: ${field === "tokens" ? formatTokens(r.tokens) : formatCost(r.cost)} (${pct(r[field], field === "tokens" ? totalTokens : totalCost).toFixed(1)}%)`}
+                    title={`${r.label}: ${field === "tokens" ? `${formatTokens(r.tokens)} tokens` : `${formatCost(r.cost)} API value`} (${pct(r[field], field === "tokens" ? allTokens : totalCost).toFixed(1)}%)`}
                   />
                 ))}
               </div>
@@ -1268,9 +1184,9 @@ function TokensTab({ session }: { session: Session }) {
             <span />
             <span>Kind</span>
             <span className="tabular right">Tokens</span>
-            <span className="tabular right">Volume</span>
-            <span className="tabular right">Cost</span>
-            <span className="tabular right">Cost share</span>
+            <span className="tabular right">Share</span>
+            <span className="tabular right">API value</span>
+            <span className="tabular right">Share</span>
           </div>
           {rows.map((r) => (
             <div key={r.key} className="tokens-table-row">
@@ -1279,14 +1195,125 @@ function TokensTab({ session }: { session: Session }) {
                 {r.label} <InfoDot title={tokenInfo(session.model)[r.key]} />
               </span>
               <span className="tabular mono right">{formatTokens(r.tokens)}</span>
-              <span className="tabular mono dim right">{pct(r.tokens, totalTokens).toFixed(1)}%</span>
+              <span className="tabular mono dim right">{pct(r.tokens, allTokens).toFixed(1)}%</span>
               <span className="tabular mono right">{formatCost(r.cost)}</span>
               <span className="tabular mono dim right">{pct(r.cost, totalCost).toFixed(1)}%</span>
             </div>
           ))}
         </div>
       </div>
+
+      <TokensByPrompt
+        session={session}
+        unit={unit}
+        openIdx={focus?.section === "prompt" ? focus.idx : null}
+        onOpened={onFocusDone}
+      />
     </>
+  );
+}
+
+/** Each prompt's fresh tokens and API value, its share, its costliest kind and idle cache rewrite; a row opens its detail. */
+function TokensByPrompt({ session, unit, openIdx, onOpened }: { session: Session; unit: Unit; openIdx: number | null; onOpened: () => void }) {
+  const prompts = session.prompts ?? [];
+  const stats = session.turns && prompts.length > 0 ? aggregateByPrompt(session.turns, session.model, prompts) : [];
+  const weights = promptWeights(stats.map((s) => ({ fresh: freshTokens(s.tokens), cost: s.cost })), unit);
+  // a link from the Overview opens the tab on that prompt: it starts open, and is brought into view
+  const [open, setOpen] = useState<number | null>(openIdx);
+  const [heaviest, setHeaviest] = useState(false);
+  const rowRefs = useRef(new Map<number, HTMLDivElement>());
+  useEffect(() => {
+    if (openIdx === null) return;
+    rowRefs.current.get(openIdx)?.scrollIntoView({ block: "center" });
+    onOpened();
+  }, [openIdx, onOpened]);
+
+  if (stats.length === 0) return null;
+  const rewrites = stats.filter((s) => s.cacheRewriteFlag);
+  const rewriteCost = rewrites.reduce((a, s) => a + (s.cacheRewriteFlag?.cacheWriteCost ?? 0), 0);
+  const order = stats.map((_, i) => i);
+  if (heaviest) order.sort((a, b) => weights[b].value - weights[a].value);
+  const unitLabel = unit === "tokens" ? "fresh tokens" : "API value";
+
+  return (
+    <div className="d-panel tok-prompts">
+      <div className="section-title">
+        <span>
+          By prompt <InfoDot title="What each prompt's turns used, sub-agents included. Share is of the session's fresh tokens or API value, following the usage unit. Open a prompt for its tokens and API value per kind, cache rewrites and turns." />
+        </span>
+        <span className="tools-head-meta">
+          <span className="dim tabular">
+            {stats.length} prompts
+            {rewrites.length > 0 && (
+              <span className="tok-rewrite-meta"> · {rewrites.length} idle cache rewrite{rewrites.length > 1 ? "s" : ""}, {formatCost(rewriteCost)} API value</span>
+            )}
+          </span>
+          <span className="seg" role="group" aria-label="Order">
+            <button className={`tool-view-btn ${heaviest ? "" : "active"}`} onMouseDown={keepFocus} onClick={() => setHeaviest(false)} aria-pressed={!heaviest}>In order</button>
+            <button className={`tool-view-btn ${heaviest ? "active" : ""}`} onMouseDown={keepFocus} onClick={() => setHeaviest(true)} aria-pressed={heaviest}>Heaviest first</button>
+          </span>
+        </span>
+      </div>
+      <div className="prompt-list">
+        <div className="prompt-row prompt-row-head mono dim caps">
+          <span>#</span>
+          <span>Time</span>
+          <span className="right">Fresh tokens</span>
+          <span className="right">API value</span>
+          <span className="right" title={`Share of the session's ${unitLabel}`}>Share</span>
+          <span>Costliest</span>
+          <span />
+          <span>Prompt</span>
+        </div>
+        {order.map((i) => {
+          const s = stats[i];
+          const p = prompts[i];
+          const isOpen = open === i;
+          const toggle = () => setOpen(isOpen ? null : i);
+          return (
+            <Fragment key={i}>
+              <div
+                ref={(el) => { if (el) rowRefs.current.set(i, el); else rowRefs.current.delete(i); }}
+                className={`prompt-row ${isOpen ? "selected" : ""}`}
+                role="button"
+                tabIndex={0}
+                aria-expanded={isOpen}
+                onClick={toggle}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggle();
+                  }
+                }}
+              >
+                <span className="mono dim tabular">{String(i + 1).padStart(2, "0")}</span>
+                <span className="mono dim tabular">{formatClockAt(session.startedAt, s.t)}</span>
+                <span className="mono tabular right">{formatTokens(freshTokens(s.tokens))}</span>
+                <span className="mono tabular right">{formatCost(s.cost)}</span>
+                <span className="mono tabular right dim">{(weights[i].share * 100).toFixed(1)}%</span>
+                <span className="tok-kind">
+                  <span className={`swatch ${KIND_CLS[s.dominantKind]}`} aria-hidden="true" />
+                  {KIND_LABEL[s.dominantKind]}
+                </span>
+                <span
+                  className="prompt-row-warn"
+                  title={s.cacheRewriteFlag ? `${formatDuration(s.cacheRewriteFlag.gapMs)} idle, then the cache was rewritten: ${formatCost(s.cacheRewriteFlag.cacheWriteCost)} API value in cache writes` : ""}
+                >
+                  {s.cacheRewriteFlag ? "⚠" : ""}
+                </span>
+                <span className="prompt-row-preview mono">{p?.preview}</span>
+              </div>
+              {isOpen && (
+                <div className="prompt-panel">
+                  <PromptCostBreakdown s={s} model={session.model} />
+                  {p && <pre className="prompt-panel-body">{p.text}</pre>}
+                </div>
+              )}
+            </Fragment>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -1426,14 +1453,20 @@ const KIND_CLS: Record<PromptStats["dominantKind"], string> = {
   cacheRead: "cache-read",
   cacheWrite: "cache-write",
 };
+const KIND_LABEL: Record<PromptStats["dominantKind"], string> = {
+  input: "input",
+  output: "output",
+  cacheRead: "cache read",
+  cacheWrite: "cache write",
+};
 
 function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
   const pr = priceFor(model);
   const rows: Array<{ key: "input" | "output" | "cacheRead" | "cacheWrite"; label: string; cls: string; val: number; cost: number }> = [
     { key: "input",      label: "input",  cls: "input",       val: s.tokens.input,      cost: (s.tokens.input / 1e6) * pr.in },
     { key: "output",     label: "output", cls: "output",      val: s.tokens.output,     cost: (s.tokens.output / 1e6) * pr.out },
-    { key: "cacheRead",  label: "cacheR", cls: "cache-read",  val: s.tokens.cacheRead,  cost: (s.tokens.cacheRead / 1e6) * pr.cacheRead },
-    { key: "cacheWrite", label: "cacheW", cls: "cache-write", val: s.tokens.cacheWrite, cost: cacheWriteCost(pr, s.tokens) },
+    { key: "cacheRead",  label: "cache read", cls: "cache-read",  val: s.tokens.cacheRead,  cost: (s.tokens.cacheRead / 1e6) * pr.cacheRead },
+    { key: "cacheWrite", label: "cache write", cls: "cache-write", val: s.tokens.cacheWrite, cost: cacheWriteCost(pr, s.tokens) },
   ];
   return (
     <div className="prompt-cost-panel-body">
@@ -1445,7 +1478,7 @@ function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
               <span className={`swatch ${r.cls}`} />
               <span className="dim">{r.label}</span>
               <span className="tabular mono">{formatTokens(r.val)}</span>
-              <span className="tabular mono prompt-cost-panel-cell-usd" title={`$${r.cost.toFixed(4)}`}>
+              <span className="tabular mono prompt-cost-panel-cell-usd" title={`$${r.cost.toFixed(4)} API value`}>
                 {formatCost(r.cost)}
               </span>
             </div>
@@ -1453,7 +1486,7 @@ function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
         })}
       </div>
       <div className="prompt-cost-panel-note mono dim">
-        dominant = highest $ cost, not highest token count (on {modelLabel(model)}, a cache write costs{" "}
+        costliest kind = the highest API value, not the most tokens (on {modelLabel(model)}, a cache write costs{" "}
         {ratio(pr.cacheWrite / pr.cacheRead)} a cache read).
       </div>
       {s.cacheRewriteFlag && (
@@ -1461,10 +1494,9 @@ function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
           <span className="prompt-cost-warn-icon">{s.cacheRewriteFlag.severity === "warn" ? "⚠" : "ℹ"}</span>
           <div>
             <div className="prompt-cost-warn-title">
-              Cache rewritten after {formatDuration(s.cacheRewriteFlag.gapMs)} idle
-              {" — cacheW cost "}
-              <strong className="tabular">{formatCost(s.cacheRewriteFlag.cacheWriteCost)}</strong>
-              {" ("}{(s.cacheRewriteFlag.cacheWriteShare * 100).toFixed(0)}% of this prompt).
+              Cache rewritten after {formatDuration(s.cacheRewriteFlag.gapMs)} idle:{" "}
+              <strong className="tabular">{formatCost(s.cacheRewriteFlag.cacheWriteCost)}</strong> API value in cache writes
+              {" ("}{(s.cacheRewriteFlag.cacheWriteShare * 100).toFixed(0)}% of this prompt's API value).
             </div>
             <div className="prompt-cost-warn-detail">
               The prompt cache expires (5 min, or 1 h for the extended cache). Resuming after that re-uploads the context as a fresh
@@ -1478,11 +1510,11 @@ function PromptCostBreakdown({ s, model }: { s: PromptStats; model: string }) {
       )}
       {s.tokens.cacheWrite > 0 && (
         <div className="prompt-cost-cw-split mono dim">
-          cacheW split:
+          cache writes:
           {" "}
-          <span className="tabular">{formatTokens(s.tokens.cacheWrite1h)}</span> in 1h block
+          <span className="tabular">{formatTokens(s.tokens.cacheWrite1h)}</span> in the 1h block
           {" · "}
-          <span className="tabular">{formatTokens(s.tokens.cacheWrite5m)}</span> in 5m block
+          <span className="tabular">{formatTokens(s.tokens.cacheWrite5m)}</span> in the 5m block
           {" "}
           <InfoDot title="Anthropic prompt cache has two TTL tiers. 1h block = system prompt, tools, memory (the long-lived prefix). 5m block = recent conversation. Writes to the 1h block usually mean the system block changed (new tool, hook, env var) or the 1h TTL expired. Writes to the 5m block are normal when conversation extends past the previous breakpoint or 5m idle elapsed." />
         </div>
@@ -1508,7 +1540,7 @@ function TurnBreakdown({ details }: { details: PromptStats["turnDetails"] }) {
         onClick={() => setOpen((p) => !p)}
       >
         {open ? "▾" : "▸"} per-turn breakdown · {details.length} turns
-        {cacheWTurns > 0 && `, ${cacheWTurns} with cacheW`}
+        {cacheWTurns > 0 && `, ${cacheWTurns} with cache writes`}
         {totalIn + totalOut > 0 && ` · added ${formatBytes(totalIn)} in / ${formatBytes(totalOut)} out`}
       </button>
       {open && (
@@ -1518,8 +1550,8 @@ function TurnBreakdown({ details }: { details: PromptStats["turnDetails"] }) {
             <span className="right">Gap</span>
             <span className="right">In</span>
             <span className="right">Out</span>
-            <span className="right">Cache R</span>
-            <span className="right">Cache W</span>
+            <span className="right">Cache read</span>
+            <span className="right">Cache write</span>
             <span className="right">1h</span>
             <span className="right">5m</span>
             <span>Tools</span>
@@ -1574,18 +1606,34 @@ function TurnBreakdown({ details }: { details: PromptStats["turnDetails"] }) {
   );
 }
 
+const GIT_COMMIT_RE = /\bgit\s+commit\b/;
 
+/** The message of a `git commit -m "…"` command, else the command. */
+function commitMessage(command: string): string {
+  const m = /\s-m\s+(?:"((?:[^"\\]|\\.)*)"|'([^']*)'|(\S+))/.exec(command);
+  return (m?.[1] ?? m?.[2] ?? m?.[3] ?? command).trim();
+}
+
+/** What changed: the files Claude edited, their versions and diffs, and the commits it made. */
 function FilesTab({ session }: { session: Session }) {
   const history = session.fileHistory ?? [];
   const [openHash, setOpenHash] = useState<string | null>(null);
+  // the commits the session counts (main thread), from its Bash calls
+  const commits = flattenCalls(session.toolSequence ?? []).filter((c) => !c.sub && c.tool === "Bash" && GIT_COMMIT_RE.test(c.full ?? c.preview));
+  const totalVersions = history.reduce((a, f) => a + f.versions.length, 0);
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const meta = [
+    history.length > 0 ? `${plural(history.length, "file")} · ${plural(totalVersions, "version")}` : `${session.filesChanged} changed`,
+    plural(session.commits, "commit"),
+  ].join(" · ");
 
-  if (history.length === 0) {
-    return (
-      <div>
-        <div className="section-title">
-          <span>Files</span>
-          <span className="dim mono tabular">{session.filesChanged} tracked · {session.commits} commits</span>
-        </div>
+  return (
+    <div>
+      <div className="section-title">
+        <span>Files</span>
+        <span className="dim tabular">{meta}</span>
+      </div>
+      {history.length === 0 ? (
         <div className="placeholder">
           No file history recorded for this session.
           <div className="mono dim" style={{ marginTop: 6 }}>
@@ -1596,31 +1644,45 @@ function FilesTab({ session }: { session: Session }) {
             )}
           </div>
         </div>
-      </div>
-    );
-  }
-
-  const totalVersions = history.reduce((a, f) => a + f.versions.length, 0);
-
-  return (
-    <div>
-      <div className="section-title">
-        <span>Files</span>
-        <span className="dim mono tabular">{history.length} files · {totalVersions} versions</span>
-      </div>
-      <div className="file-list">
-        {history.map((f) => (
-          <FileEntry
-            key={f.hash}
-            sessionId={session.id}
-            hash={f.hash}
-            versions={f.versions}
-            path={f.path}
-            open={openHash === f.hash}
-            onToggle={() => setOpenHash(openHash === f.hash ? null : f.hash)}
-          />
-        ))}
-      </div>
+      ) : (
+        <div className="file-list">
+          {history.map((f) => (
+            <FileEntry
+              key={f.hash}
+              sessionId={session.id}
+              hash={f.hash}
+              versions={f.versions}
+              path={f.path}
+              open={openHash === f.hash}
+              onToggle={() => setOpenHash(openHash === f.hash ? null : f.hash)}
+            />
+          ))}
+        </div>
+      )}
+      {commits.length > 0 && (
+        <div className="files-commits">
+          <div className="section-title">
+            <span>Commits</span>
+            <span className="dim tabular">{plural(commits.length, "commit")}</span>
+          </div>
+          <div className="tool-sequence">
+            {commits.map((c, i) => {
+              const failed = !!c.result?.isError;
+              return (
+                <div key={i} className="tool-seq-row">
+                  <div className="tool-seq-main files-commit-row" title={c.full ?? c.preview}>
+                    <span className="tool-seq-time mono dim tabular">{formatClockAt(session.startedAt, c.t)}</span>
+                    <span className={`tool-seq-status ${failed ? "err" : c.result ? "ok" : ""}`} title={failed ? "the commit command failed" : "committed"}>
+                      {failed ? "✗" : c.result ? "✓" : "·"}
+                    </span>
+                    <span className="files-commit-msg mono">{commitMessage(c.full ?? c.preview)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

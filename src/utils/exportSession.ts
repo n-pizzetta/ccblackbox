@@ -1,5 +1,6 @@
 import type { Session } from "../types";
 import { formatDuration, formatTokens, formatCost, outcomeLabel } from "./format";
+import { flattenCalls } from "./toolCalls";
 
 function esc(s: string): string {
   return s
@@ -28,12 +29,13 @@ export function exportSessionHtml(session: Session): string {
     )
     .join("\n");
 
-  const toolRows = toolSeq
+  // every call the count counts: a sub-agent's calls follow the call that started it, marked ↳
+  const toolRows = flattenCalls(toolSeq)
     .map((t) => {
       const resultBlock = t.result
         ? `<pre class="result${t.result.isError ? " err" : ""}">${esc(t.result.text)}${t.result.truncated ? " …" : ""}</pre>`
         : "";
-      return `<div class="tool"><span class="t">${formatRelTime(t.t)}</span><span class="name">${esc(t.tool)}</span><span class="prev">${esc(t.preview)}</span>${resultBlock}</div>`;
+      return `<div class="tool"><span class="t">${formatRelTime(t.t)}</span><span class="name">${t.sub ? "↳ " : ""}${esc(t.tool)}</span><span class="prev">${esc(t.preview)}</span>${resultBlock}</div>`;
     })
     .join("\n");
 

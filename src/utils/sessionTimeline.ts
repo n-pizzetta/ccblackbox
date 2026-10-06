@@ -1,5 +1,7 @@
 import type { Session } from "../types";
 import { costOf } from "../../scripts/models.mjs";
+import { frictionTimes, type TimelineFriction } from "./frictionTimes";
+import { flattenCalls } from "./toolCalls";
 import { freshTokens } from "./units";
 
 /** Same rule as scripts/quality.mjs: the window isn't in the transcript, a context over 200k proves a 1M window. */
@@ -31,6 +33,8 @@ export interface TimelineTool {
   tool: string;
   preview: string;
   isError: boolean;
+  /** Made by a sub-agent. */
+  sub: boolean;
 }
 
 export interface TimelineGap {
@@ -43,6 +47,8 @@ export interface SessionTimelineData {
   points: TimelinePoint[];
   tools: TimelineTool[];
   prompts: Array<{ t: number; preview: string; idx: number }>;
+  /** Approximate: see frictionTimes. */
+  frictions: TimelineFriction[];
   compactions: number[];
   gaps: TimelineGap[];
   window: number;
@@ -93,11 +99,13 @@ export function buildSessionTimeline(session: Session, nowOffsetMs?: number): Se
     };
   });
 
-  const tools: TimelineTool[] = (session.toolSequence ?? []).map((e) => ({
+  // every call, sub-agent calls included (drawn tinted), as the Tools tab counts them
+  const tools: TimelineTool[] = flattenCalls(session.toolSequence ?? []).map((e) => ({
     t: e.t,
     tool: e.tool,
     preview: e.preview,
     isError: !!e.result?.isError,
+    sub: e.sub,
   }));
   const prompts = (session.prompts ?? []).map((p, idx) => ({ t: p.t, preview: p.preview, idx }));
 
@@ -126,6 +134,7 @@ export function buildSessionTimeline(session: Session, nowOffsetMs?: number): Se
     points,
     tools,
     prompts,
+    frictions: frictionTimes(session.frictions ?? [], start, end, axis),
     compactions,
     gaps,
     window,

@@ -1,36 +1,34 @@
+import { useMemo } from "react";
 import type { Session } from "../types";
 import { costOf } from "../../scripts/models.mjs";
-import { formatCost, formatDuration, formatTokens } from "../utils/format";
+import { formatClockAt, formatCost, formatDuration, formatTokens } from "../utils/format";
+import { buildSessionTimeline } from "../utils/sessionTimeline";
+import { countCalls, countFailed } from "../utils/toolCalls";
 import { API_VALUE_HINT, freshTokens, useUnit } from "../utils/units";
 import { KpiRow, type KpiItem } from "./Kpi";
 
-export type DetailTab = "overview" | "tools" | "tokens" | "files";
+/** Where an Overview summary leads: the tab (and section) that details it. */
+export type OverviewLink = "timeline" | "tools" | "tokens" | "files";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-/** Headline figures of a session, above the prompts: always four tiles, smaller counts as context. */
-export function SessionKpis({ session }: { session: Session }) {
+/**
+ * Headline figures of a session, one per question the other tabs answer; each tile opens its tab.
+ * Time and context → Timeline, weight → Tokens, calls → Tools.
+ */
+export function SessionKpis({ session, onOpen }: { session: Session; onOpen: (to: OverviewLink) => void }) {
   const unit = useUnit();
-  const toolCalls = Object.values(session.toolCounts ?? {}).reduce((a, n) => a + n, 0);
+  const timeline = useMemo(() => buildSessionTimeline(session), [session]);
+  const seq = session.toolSequence ?? [];
+  // the parser nests sub-agent calls, so the list and the counts add up; without a list, the counts
+  const toolCalls = seq.length ? countCalls(seq) : Object.values(session.toolCounts ?? {}).reduce((a, n) => a + n, 0);
+  const failed = countFailed(seq);
   const fresh = freshTokens(session.tokens);
-  const tokensTile: KpiItem = {
-    label: "Fresh tokens",
-    value: formatTokens(fresh),
-    sub: `+ ${formatTokens(session.tokens.cacheRead)} cached reads`,
-    title: "Input + output + cache writes. Cached reads weigh far less.",
-  };
-  const costTile: KpiItem = {
-    label: "API value",
-    value: formatCost(session.costUsd),
-    sub: session.prompts?.length ? `${formatCost(session.costUsd / session.prompts.length)} / prompt` : undefined,
-    title: API_VALUE_HINT,
-  };
-  const activity = [
-    plural(session.messages, "message"),
-    session.filesChanged > 0 && plural(session.filesChanged, "file"),
-    session.commits > 0 && plural(session.commits, "commit"),
-    session.subAgents > 0 && plural(session.subAgents, "sub-agent"),
-  ].filter(Boolean).join(" · ");
+  const weight: KpiItem =
+    unit === "tokens"
+      ? { label: "Fresh tokens", value: formatTokens(fresh), sub: `${formatCost(session.costUsd)} API value`, title: "Input + output + cache writes; cached reads weigh far less. Open the Tokens tab for each kind and each prompt." }
+      : { label: "API value", value: formatCost(session.costUsd), sub: `${formatTokens(fresh)} fresh tokens`, title: `${API_VALUE_HINT} Open the Tokens tab for each kind and each prompt.` };
+  const callsSub = [failed > 0 && `${failed} failed`, session.subAgents > 0 && plural(session.subAgents, "sub-agent")].filter(Boolean).join(" · ");
 
   return (
     <KpiRow
@@ -39,22 +37,38 @@ export function SessionKpis({ session }: { session: Session }) {
           label: "Active time",
           value: formatDuration(session.durationMs),
           sub: session.wallMs && session.wallMs > session.durationMs * 1.2 ? `${formatDuration(session.wallMs)} wall-clock` : "idle gaps excluded",
-          title: "Idle gaps over 5 minutes are excluded",
+          title: "Idle gaps over 5 minutes are excluded. Open the Timeline.",
+          onClick: () => onOpen("timeline"),
         },
-        // the chosen unit comes first
-        ...(unit === "tokens" ? [tokensTile, costTile] : [costTile, tokensTile]),
-        { label: "Tool calls", value: toolCalls, sub: activity },
+        { ...weight, onClick: () => onOpen("tokens") },
+        {
+          label: "Tool calls",
+          value: toolCalls,
+          sub: callsSub || "none failed",
+          title: "Every tool call, sub-agents included. Open the Tools tab.",
+          onClick: () => onOpen("tools"),
+        },
+        {
+          label: "Peak context",
+          value: timeline ? `${Math.round(timeline.peakPct)}%` : "—",
+          sub: timeline
+            ? `of ${formatTokens(timeline.window)}${timeline.compactions.length ? ` · ${plural(timeline.compactions.length, "compaction")}` : ""}`
+            : "no turn data",
+          tone: timeline && timeline.peakPct >= 85 ? "red" : timeline && timeline.peakPct >= 70 ? "amber" : undefined,
+          title: "The fullest the main thread's context got. Open the Timeline.",
+          onClick: () => onOpen("timeline"),
+        },
       ]}
     />
   );
 }
 
-function PreviewHead({ title, meta, tab, onOpenTab }: { title: string; meta: string; tab: DetailTab; onOpenTab: (t: DetailTab) => void }) {
+function PreviewHead({ title, meta, to, onOpen }: { title: string; meta?: string; to: OverviewLink; onOpen: (to: OverviewLink) => void }) {
   return (
     <div className="preview-head">
       <span className="preview-title">{title}</span>
-      <span className="preview-meta mono tabular">{meta}</span>
-      <button className="preview-more" onClick={() => onOpenTab(tab)}>See all →</button>
+      {meta ? <span className="preview-meta mono tabular">{meta}</span> : <span className="preview-meta" />}
+      <button className="preview-more" onClick={() => onOpen(to)}>See all →</button>
     </div>
   );
 }
@@ -80,10 +94,12 @@ function kindShares(session: Session): Array<{ cls: string; label: string; pct: 
   return KINDS.map((k) => ({ cls: k.cls, label: k.label, pct: (cost[k.key] / total) * 100 }));
 }
 
-/** Small previews of the Tools, Tokens and Files tabs, so what lives there is visible from the overview. */
-export function TabPreviews({ session, onOpenTab }: { session: Session; onOpenTab: (t: DetailTab) => void }) {
+/**
+ * Small summaries of the Tools, Tokens and Files tabs, each opening its tab (Tokens on By kind). Their
+ * totals are in the headline tiles already, so they show only the breakdown.
+ */
+export function TabPreviews({ session, onOpen }: { session: Session; onOpen: (to: OverviewLink) => void }) {
   const tools = Object.entries(session.toolCounts ?? {}).sort((a, b) => b[1] - a[1]);
-  const toolTotal = tools.reduce((a, [, n]) => a + n, 0);
   const topTools = tools.slice(0, 5);
   const maxTool = topTools[0]?.[1] ?? 1;
   const shares = kindShares(session);
@@ -91,9 +107,9 @@ export function TabPreviews({ session, onOpenTab }: { session: Session; onOpenTa
 
   return (
     <>
-      {toolTotal > 0 && (
+      {topTools.length > 0 && (
         <div className="d-panel preview">
-          <PreviewHead title="Tools" meta={`${toolTotal} calls`} tab="tools" onOpenTab={onOpenTab} />
+          <PreviewHead title="Top tools" to="tools" onOpen={onOpen} />
           <div className="preview-bars">
             {topTools.map(([name, n]) => (
               <div key={name} className="preview-bar-row">
@@ -108,8 +124,8 @@ export function TabPreviews({ session, onOpenTab }: { session: Session; onOpenTa
 
       {shares.length > 0 && (
         <div className="d-panel preview">
-          <PreviewHead title="Tokens" meta={`${formatTokens(freshTokens(session.tokens))} fresh`} tab="tokens" onOpenTab={onOpenTab} />
-          <div className="preview-stack" role="img" aria-label="Share of API value by token kind">
+          <PreviewHead title="API value by kind" to="tokens" onOpen={onOpen} />
+          <div className="preview-stack" role="img" aria-label="Share of the API value by token kind">
             {shares.map((s) => (
               <span key={s.cls} className={`tokens-seg ${s.cls}`} style={{ width: `${s.pct}%` }} title={`${s.label} ${s.pct.toFixed(0)}%`} />
             ))}
@@ -119,24 +135,26 @@ export function TabPreviews({ session, onOpenTab }: { session: Session; onOpenTa
               <span key={s.cls}><i className={`tokens-seg ${s.cls}`} />{s.label} {s.pct.toFixed(0)}%</span>
             ))}
           </div>
-          <div className="preview-note mono dim">share of API value ({formatCost(session.costUsd)}) by token kind</div>
         </div>
       )}
 
-      {(session.filesChanged > 0 || session.commits > 0 || files.length > 0) && (
+      {(session.filesChanged > 0 || session.commits > 0) && (
         <div className="d-panel preview">
           <PreviewHead
             title="Files"
-            meta={`${session.filesChanged} changed · ${session.commits} commit${session.commits === 1 ? "" : "s"}`}
-            tab="files"
-            onOpenTab={onOpenTab}
+            meta={[
+              session.filesChanged > 0 && `${session.filesChanged} changed`,
+              session.commits > 0 && plural(session.commits, "commit"),
+            ].filter(Boolean).join(" · ")}
+            to="files"
+            onOpen={onOpen}
           />
           {files.length > 0 && (
             <ul className="preview-files mono">
               {files.slice(0, 3).map((f) => (
                 <li key={f.hash} title={f.path}>
                   <span className="preview-file-name">{f.path ? f.path.split("/").slice(-2).join("/") : f.hash.slice(0, 8)}</span>
-                  <span className="dim tabular">{f.versions.length} version{f.versions.length === 1 ? "" : "s"}</span>
+                  <span className="dim tabular">{plural(f.versions.length, "version")}</span>
                 </li>
               ))}
             </ul>
@@ -144,5 +162,38 @@ export function TabPreviews({ session, onOpenTab }: { session: Session; onOpenTa
         </div>
       )}
     </>
+  );
+}
+
+/** Frictions flagged by /insights, at the same approximate time as on the Timeline. */
+export function FrictionsCard({ session, onOpen }: { session: Session; onOpen: (to: OverviewLink) => void }) {
+  const timeline = useMemo(() => buildSessionTimeline(session), [session]);
+  const times = timeline?.frictions ?? [];
+  return (
+    <div className="d-panel friction-panel">
+      <div className="section-title">
+        <span>Frictions</span>
+        <span className="dim mono" title="Flagged by /insights (an LLM): the count is real, the times are approximate.">
+          {session.frictions.length} · ⓘ LLM
+        </span>
+        {timeline && (
+          <button className="preview-more friction-go" onClick={() => onOpen("timeline")}>On the timeline →</button>
+        )}
+      </div>
+      <div className="friction-list">
+        {session.frictions.map((f, i) => (
+          <div key={i} className="friction-item">
+            <span className="dot" />
+            <div>
+              <div className="kind">{f.kind.replace(/_/g, " ")}</div>
+              <div className="detail-text">{f.detail}</div>
+            </div>
+            <span className="at tabular" title="Approximate time, from /insights">
+              {times[i] ? `≈ ${formatClockAt(session.startedAt, times[i].t, { seconds: false })}` : `${(f.at * 100).toFixed(0)}%`}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
