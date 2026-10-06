@@ -2,7 +2,6 @@
 
 /* ---- Frame: the session view is a true full-screen page, content centered on very wide screens ---- */
 .session-overlay-host {
-  --detail-pad: max(24px, calc((100vw - 1640px) / 2));
   /* the same ambient backdrop as the app, so the tabs' glass reads */
   background:
     radial-gradient(52% 70% at 8% -8%, rgba(94, 125, 166, 0.22), transparent 72%),

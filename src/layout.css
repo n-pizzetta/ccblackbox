@@ -664,8 +664,8 @@
 .tool-seq-command { margin-left: 114px; }
 
 /* ---- Session view: frame, header chips, tabs ---- */
-/* content centered at a readable width on wide screens */
-.session-overlay-host { --detail-pad: max(24px, calc((100vw - 1360px) / 2)); }
+/* the pages' width and side gutter (--content-max, --pad-x), so the edges line up with the rest of the app */
+.session-overlay-host { --detail-pad: var(--pad-x); }
 .session-overlay-host .detail-toolbar { padding-inline: var(--detail-pad); }
 .toolbar-btn { width: 32px; height: 32px; border-radius: 16px; }
 .toolbar-btn.wide { width: auto; padding: 0 14px; font-size: var(--fs-base); }
