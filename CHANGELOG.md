@@ -9,6 +9,7 @@ versioning follows [SemVer](https://semver.org/).
 ### Changed
 
 - The glass page navigation and session tabs are lit by a soft glint in the middle of their top edge instead of a white rim, and the selected tab by an even ring.
+- **Session view header.** The tabs are built like the page navigation (a line icon before each label, the friction count as a plain amber number), and the live status and context cards above them are merged into one compact strip: live state and time since the last event, prompt and turns, context fill, cache state and the verdict, whose reasons open from the pill. The content starts about 150 px higher on a live session.
 
 ### Fixed
 
