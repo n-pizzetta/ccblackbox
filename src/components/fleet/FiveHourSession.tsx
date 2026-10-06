@@ -84,7 +84,7 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
     return (
       <div className="fleet-block five-hour-session five-hour-idle">
         <div className="section-title">
-          <span>Current 5h window</span>
+          <span>Claude Code · Current 5h window</span>
           <span className="dim">{fromMs === null ? "Idle · waiting for the first message" : "Idle · no Claude Code activity in the last 5h"}</span>
         </div>
         {today && <WindowConsumers key="today" data={today} scope="today" limitPct={null} onSelectSession={onSelectSession} />}
@@ -125,7 +125,7 @@ export function FiveHourSession({ sessions, limits, onSelectSession }: Props) {
   return (
     <div className="fleet-block five-hour-session">
       <div className="section-title">
-        <span>Current 5h window</span>
+        <span>Claude Code · Current 5h window</span>
         <span className="dim tabular">{formatClock(fromMs)} – {formatClock(endMs)}</span>
       </div>
       <KpiRow items={tiles} />

@@ -8,6 +8,9 @@ import { BrandMark } from "./BrandMark";
 import { ParseErrors } from "./ParseErrors";
 import { ProfileMenu } from "./ProfileMenu";
 import { UpdateNotice } from "./UpdateNotice";
+import type { Agent } from "../types";
+import type { Provider } from "../utils/providers";
+import { ProviderSwitcher } from "./ProviderSwitcher";
 
 export interface ReportStatus {
   exists: boolean;
@@ -17,6 +20,10 @@ export interface ReportStatus {
 interface Props {
   page: Page;
   onPageChange: (p: Page) => void;
+  providers: Agent[];
+  provider: Provider;
+  onProviderChange: (provider: Provider) => void;
+  showClaude: boolean;
   /** Sessions in the scope, shown on the Sessions tab. */
   sessionCount: number;
   /** Failing or warning health checks in the scope, shown on the Health tab. */
@@ -64,6 +71,10 @@ const NAV_ICONS: Record<Page, ReactNode> = {
 export function AppHeader({
   page,
   onPageChange,
+  providers,
+  provider,
+  onProviderChange,
+  showClaude,
   sessionCount,
   healthIssues,
   unseenUnlocks,
@@ -80,6 +91,7 @@ export function AppHeader({
       <div className="app-brand">
         <BrandMark size={28} />
         <span className="app-brand-name">{PRODUCT_NAME}</span>
+        <ProviderSwitcher providers={providers} value={provider} onChange={onProviderChange} />
       </div>
 
       <nav className="app-nav" aria-label="Pages">
@@ -113,7 +125,7 @@ export function AppHeader({
 
       <div className="app-header-right">
         <UpdateNotice />
-        <LimitsPill />
+        {showClaude && <LimitsPill />}
         {parseErrors && parseErrors.length > 0 && <ParseErrors errors={parseErrors} />}
         <ProfileMenu
           level={level}
@@ -121,6 +133,7 @@ export function AppHeader({
           source={source}
           parsedAgo={formatAge(generatedAt)}
           reportStatus={reportStatus}
+          showClaude={showClaude}
           onHelp={onHelp}
           onOpenPage={onPageChange}
         />

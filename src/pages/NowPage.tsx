@@ -6,9 +6,17 @@ import { LiveTicker } from "../components/fleet/LiveTicker";
 import { FiveHourSession } from "../components/fleet/FiveHourSession";
 import { SessionList } from "../components/SessionList";
 import { PageSection } from "./PageSection";
+import { PROVIDER_LABELS, type Provider } from "../utils/providers";
+import { useNow } from "../utils/useNow";
+import { tokensInWindow } from "../utils/fleetStats";
+import { freshTokens } from "../utils/units";
+import { formatCost, formatTokens } from "../utils/format";
+import { KpiRow } from "../components/Kpi";
 
 interface Props {
   allSessions: Session[];
+  provider: Provider;
+  showClaude: boolean;
   /** Sessions that count against the usage limits (the 5h window). */
   limitSessions: Session[];
   limits: RateLimits | null;
@@ -20,8 +28,8 @@ interface Props {
 
 const LATEST = 6;
 
-/** What is running and how much of the limits is left. Ignores the range and filters on purpose. */
-export function NowPage({ allSessions, limitSessions, limits, badges, onSelectSession, onShowAllSessions, onOpenProgress }: Props) {
+/** Follows the provider, but deliberately ignores time range and session filters. */
+export function NowPage({ allSessions, provider, showClaude, limitSessions, limits, badges, onSelectSession, onShowAllSessions, onOpenProgress }: Props) {
   const live = allSessions.filter((s) => s.live);
   const rows = live.length > 0 ? live : allSessions.slice(0, LATEST);
 
@@ -29,10 +37,12 @@ export function NowPage({ allSessions, limitSessions, limits, badges, onSelectSe
     <div className="page">
       <PageSection
         title="Right now"
-        note="All sessions · not affected by the range or filters"
+        note={`${PROVIDER_LABELS[provider]} · not affected by the range or filters`}
         aside={<LiveTicker sessions={allSessions} />}
       >
-        <FiveHourSession sessions={limitSessions} limits={limits} onSelectSession={onSelectSession} />
+        {showClaude
+          ? <FiveHourSession sessions={limitSessions} limits={limits} onSelectSession={onSelectSession} />
+          : <TodayActivity sessions={allSessions} provider={provider} />}
       </PageSection>
 
       {badges && <ProgressStrip badges={badges} onOpen={onOpenProgress} />}
@@ -48,11 +58,31 @@ export function NowPage({ allSessions, limitSessions, limits, badges, onSelectSe
   );
 }
 
+/** Codex activity is available even though Marey does not read its quota limits. */
+function TodayActivity({ sessions, provider }: { sessions: Session[]; provider: Provider }) {
+  const now = useNow(5000);
+  const usage = tokensInWindow(sessions, new Date(now).setHours(0, 0, 0, 0), now);
+  return (
+    <div className="fleet-block">
+      <div className="section-title">
+        <span>{PROVIDER_LABELS[provider]} · Today</span>
+        <span className="dim">Since midnight</span>
+      </div>
+      <KpiRow items={[
+        { label: "Live sessions", value: sessions.filter((s) => s.live).length, sub: "running now" },
+        { label: "Fresh tokens", value: formatTokens(freshTokens(usage.tokens)), sub: "today" },
+        { label: "API value", value: formatCost(usage.cost), sub: "today", title: "Equivalent API value, not a bill" },
+      ]} />
+      {provider === "codex" && <p className="dim provider-note">Codex usage limits are not available in Marey. Activity is calculated from your sessions.</p>}
+    </div>
+  );
+}
+
 /** Level, today's XP, the streak and the three closest good-practice badges: a goal on the landing page. */
 function ProgressStrip({ badges, onOpen }: { badges: BadgesPayload; onOpen: () => void }) {
   const { level, streak } = badges;
   if (nextUp(badges.families, 1).length === 0) return null;
-  const note = level ? `Lv ${level.level} ${level.title} · +${level.today} XP today` : undefined;
+  const note = level ? `Claude Code · Lv ${level.level} ${level.title} · +${level.today} XP today` : "Claude Code";
   return (
     <PageSection
       title="Next up"

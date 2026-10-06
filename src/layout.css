@@ -40,6 +40,12 @@
   letter-spacing: -0.02em;
   color: var(--c-text);
 }
+.scope-select.provider-switcher { margin-left: 6px; background: var(--c-fill); }
+.provider-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--c-text-dim); }
+.provider-dot.claude { background: var(--c-amber); }
+.provider-dot.codex { background: var(--c-green); }
+.provider-single { margin-left: 6px; font-size: var(--fs-md); color: var(--c-text-dim); }
+.provider-note { font-size: var(--fs-md); line-height: 1.5; }
 .app-nav {
   display: flex;
   gap: 2px;
@@ -512,11 +518,14 @@
 
 /* ---- Small screens: navigation on its own scrollable row ---- */
 /* below this the brand, nav and limits no longer fit on one line: the nav gets its own row */
-@media (max-width: 1080px) {
+@media (max-width: 1380px) {
   .app-header { display: flex; flex-wrap: wrap; height: auto; gap: 10px 16px; padding-block: 12px 4px; }
   .app-header-right { margin-left: auto; }
   .app-nav { order: 3; width: 100%; overflow-x: auto; }
   .app-nav-item { padding: 0 12px; }
+}
+@media (max-width: 720px) {
+  .app-header-right { order: 2; width: 100%; margin-left: 0; justify-content: space-between; }
 }
 @media (max-width: 900px) {
   .scope-search, .scope-summary + .scope-search { width: 100%; order: 5; margin-left: 0; }

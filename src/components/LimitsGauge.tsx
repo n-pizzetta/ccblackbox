@@ -44,13 +44,14 @@ export function LimitsPill() {
   if (rows.length === 0) {
     return (
       <div className="limits-pill off" title="Run /marey:limits in Claude Code to connect your real 5h and 7-day limits">
-        <span className="limits-pill-label">usage limits · not connected</span>
+        <span className="limits-pill-label">Claude limits · not connected</span>
       </div>
     );
   }
 
   return (
-    <div className="limits-pill" aria-label="Usage limits">
+    <div className="limits-pill" aria-label="Claude Code usage limits">
+      <span className="limits-pill-label">Claude</span>
       {rows.map(({ key, window: w, spanMs }) => {
         const frac = Math.min(1, w.usedPct / 100);
         const color = limitColor(frac);

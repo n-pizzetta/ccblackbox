@@ -15,7 +15,8 @@ import { UsagePage } from "./pages/UsagePage";
 import { HealthPage } from "./pages/HealthPage";
 import { BadgesPage } from "./pages/BadgesPage";
 import { loadSessions, loadSessionDetail } from "./data/loadSessions";
-import type { Session } from "./types";
+import type { Agent, Session } from "./types";
+import { detectedProviders, isProvider, resolveProvider, sessionProvider, type Provider } from "./utils/providers";
 import type { Range } from "./utils/range";
 import { filterByRange, scopeToRange } from "./utils/range";
 import { registerProjects } from "./utils/fleetStats";
@@ -38,7 +39,7 @@ import { toastError } from "./utils/toast";
 const POLL_MS = 5000;
 const STORAGE_KEY = "marey:state";
 
-const FILTER_IDS: FilterId[] = ["all", "live", "ghost", "friction", "failed", "lowquality", "claude", "codex"];
+const FILTER_IDS: FilterId[] = ["all", "live", "ghost", "friction", "failed", "lowquality"];
 const RANGE_IDS: Range[] = ["today", "7d", "30d", "all"];
 /** Sessions that can be compared side by side. Not applied to the ghost bulk-delete selection. */
 const MAX_COMPARE = 3;
@@ -49,6 +50,7 @@ interface PersistedState {
   id: string | null;
   range: Range;
   filter: FilterId;
+  provider: Provider;
   project: string | null;
   search: string;
 }
@@ -69,6 +71,13 @@ function parseHash(): Partial<PersistedState> {
     if (r && (RANGE_IDS as string[]).includes(r)) out.range = r as Range;
     const f = params.get("filter");
     if (f && (FILTER_IDS as string[]).includes(f)) out.filter = f as FilterId;
+    // Preserve links made before providers moved out of the session filters.
+    if (f === "claude" || f === "codex") {
+      out.provider = f;
+      out.filter = "all";
+    }
+    const provider = params.get("provider");
+    if (isProvider(provider)) out.provider = provider;
     const p = params.get("project");
     if (p) out.project = p;
     const q = params.get("q");
@@ -80,7 +89,13 @@ function parseHash(): Partial<PersistedState> {
 function loadPersisted(): Partial<PersistedState> {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored) as Partial<PersistedState>;
+    if (stored) {
+      const state = JSON.parse(stored) as Omit<Partial<PersistedState>, "filter"> & { filter?: FilterId | Agent };
+      if (state.filter === "claude" || state.filter === "codex") {
+        return { ...state, provider: state.provider ?? state.filter, filter: "all" };
+      }
+      return state as Partial<PersistedState>;
+    }
   } catch {
     /* ignore */
   }
@@ -91,6 +106,7 @@ function writeHash(state: PersistedState) {
   const params = new URLSearchParams();
   if (state.range !== "7d") params.set("range", state.range);
   if (state.filter !== "all") params.set("filter", state.filter);
+  if (state.provider !== "all") params.set("provider", state.provider);
   if (state.project) params.set("project", state.project);
   if (state.search) params.set("q", state.search);
   const qs = params.toString();
@@ -111,6 +127,7 @@ function App() {
   const [page, setPage] = useState<Page>(initial.page && PAGE_IDS.includes(initial.page) ? initial.page : "now");
   const [selectedId, setSelectedIdInternal] = useState<string | null>(initial.id ?? null);
   const [filter, setFilter] = useState<FilterId>(initial.filter ?? "all");
+  const [preferredProvider, setPreferredProvider] = useState<Provider>(isProvider(initial.provider) ? initial.provider : "all");
   const [projectFilter, setProjectFilter] = useState<string | null>(initial.project ?? null);
   const [range, setRange] = useState<Range>(initial.range ?? "7d");
   const [search, setSearch] = useState(initial.search ?? "");
@@ -122,11 +139,19 @@ function App() {
   const [analysisSpike, setAnalysisSpike] = useState<Spike | null>(null);
   const unit = useUnit();
   const limits = useRateLimits();
+  const providers = useMemo(() => detectedProviders(allSessions), [allSessions]);
+  const provider = resolveProvider(preferredProvider, providers);
+  const providerSessions = useMemo(
+    () => provider === "all" ? allSessions : allSessions.filter((s) => sessionProvider(s) === provider),
+    [allSessions, provider],
+  );
+  const showClaude = provider !== "codex" && providers.includes("claude");
   /** Sessions that count against the Claude usage limits: 5h window, burn rate, spikes. Codex has its own. */
   const limitSessions = useMemo(() => allSessions.filter((s) => s.agent !== "codex"), [allSessions]);
   const burn = useBurnTracker(limitSessions, limits);
   // Refetched after each parse; announces unlocks and level-ups wherever the user is.
-  const badges = useBadges(allSessions);
+  const claudeBadges = useBadges(allSessions);
+  const badges = showClaude ? claudeBadges : null;
   const openProgress = () => {
     setSelectedIdInternal(null);
     setPage("badges");
@@ -135,10 +160,11 @@ function App() {
   const progress = useProgressEvents(source === "loading" ? null : badges, openProgress);
 
   useEffect(() => {
-    const state: PersistedState = { page, id: selectedId, range, filter, project: projectFilter, search };
+    // The choice, not the resolved provider: a Claude-only history must not pin "claude" once Codex shows up.
+    const state: PersistedState = { page, id: selectedId, range, filter, provider: preferredProvider, project: projectFilter, search };
     writeHash(state);
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
-  }, [page, selectedId, range, filter, projectFilter, search]);
+  }, [page, selectedId, range, filter, preferredProvider, projectFilter, search]);
 
   /** Leaving the ghost filter with a bigger selection than a comparison can hold trims it. */
   const changeFilter = (f: FilterId) => {
@@ -152,6 +178,15 @@ function App() {
     setSearch("");
   };
 
+  const changeProvider = (next: Provider) => {
+    setPreferredProvider(next);
+    resetFilters();
+    setCompareIds(new Set());
+    setCompareMode(false);
+    setSelectedIdInternal(null);
+    setAnalysisSpike(null);
+  };
+
   const setSelectedId = (id: string | null) => {
     setSelectedIdInternal(id);
   };
@@ -162,6 +197,7 @@ function App() {
       const next = parsed.id ?? null;
       if (next !== selectedId) setSelectedIdInternal(next);
       if (parsed.page) setPage(parsed.page);
+      setPreferredProvider(parsed.provider ?? "all");
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -202,7 +238,7 @@ function App() {
     };
   }, []);
 
-  const inRange = useMemo(() => filterByRange(allSessions, range), [range, allSessions]);
+  const inRange = useMemo(() => filterByRange(providerSessions, range), [range, providerSessions]);
 
   const q = search.trim().toLowerCase();
   const unsorted = useMemo(() => inRange.filter((s) => {
@@ -216,8 +252,6 @@ function App() {
     if (filter === "friction") return s.frictions.length > 0;
     if (filter === "failed") return !s.ghost && (s.outcome === "not_achieved" || s.outcome === "partially_achieved");
     if (filter === "lowquality") return !!s.quality && s.quality.score < 70;
-    if (filter === "codex") return s.agent === "codex";
-    if (filter === "claude") return s.agent !== "codex";
     return true;
   }), [inRange, projectFilter, q, filter]);
   // The table order is also the ↑ / ↓ order inside a session.
@@ -225,8 +259,8 @@ function App() {
   // Aggregates only count what was spent inside the range (per turn).
   const scopedFiltered = useMemo(() => scopeToRange(filtered, range), [filtered, range]);
   const healthIssues = useMemo(
-    () => healthReport(scopedFiltered, allSessions).rules.filter((r) => r.status === "fail" || r.status === "warn").length,
-    [scopedFiltered, allSessions],
+    () => healthReport(scopedFiltered, providerSessions).rules.filter((r) => r.status === "fail" || r.status === "warn").length,
+    [scopedFiltered, providerSessions],
   );
   const activeFilterCount = (filter !== "all" ? 1 : 0) + (projectFilter ? 1 : 0) + (search ? 1 : 0);
 
@@ -307,7 +341,7 @@ function App() {
       <div className="app">
         <div className="loading-screen">
           <BrandMark size={44} />
-          <div className="mono dim" style={{ marginTop: 14 }}>reading ~/.claude/projects/…</div>
+          <div className="mono dim" style={{ marginTop: 14 }}>Reading Claude Code and Codex sessions…</div>
         </div>
       </div>
     );
@@ -320,6 +354,10 @@ function App() {
       <AppHeader
         page={page}
         onPageChange={setPage}
+        providers={providers}
+        provider={provider}
+        onProviderChange={changeProvider}
+        showClaude={showClaude}
         sessionCount={filtered.length}
         healthIssues={healthIssues}
         unseenUnlocks={page === "badges" ? 0 : progress.unseen.size}
@@ -347,7 +385,7 @@ function App() {
         />
       )}
       <main className={`app-content scrollbar ${page === "sessions" ? "fill" : ""}`}>
-        {burn.activeSpike && (
+        {showClaude && burn.activeSpike && (
           <BurnSpikeBanner
             spike={burn.activeSpike}
             onInvestigate={() => setAnalysisSpike(burn.activeSpike)}
@@ -364,7 +402,9 @@ function App() {
         )}
         {page === "now" && (
           <NowPage
-            allSessions={allSessions}
+            allSessions={providerSessions}
+            provider={provider}
+            showClaude={showClaude}
             limitSessions={limitSessions}
             limits={limits}
             badges={badges}
@@ -376,7 +416,7 @@ function App() {
         {page === "sessions" && (
           <SessionsPage
             sessions={filtered}
-            allSessions={allSessions}
+            allSessions={providerSessions}
             selectedId={selected?.id ?? null}
             onSelect={setSelectedId}
             sort={sort}
@@ -426,14 +466,15 @@ function App() {
           />
         )}
         {page === "usage" && (
-          <UsagePage sessions={scopedFiltered} allSessions={allSessions} range={range} onSelectSession={setSelectedId} />
+          <UsagePage sessions={scopedFiltered} allSessions={providerSessions} range={range} onSelectSession={setSelectedId} />
         )}
         {page === "health" && (
-          <HealthPage sessions={scopedFiltered} allSessions={allSessions} onSelectSession={setSelectedId} />
+          <HealthPage sessions={scopedFiltered} allSessions={providerSessions} onSelectSession={setSelectedId} />
         )}
         {page === "badges" && (
           <BadgesPage
-            allSessions={allSessions}
+            allSessions={providerSessions}
+            provider={provider}
             badges={badges}
             unseen={progress.unseen}
             onViewed={progress.markViewed}
@@ -441,7 +482,7 @@ function App() {
           />
         )}
       </main>
-      {analysisSpike && (
+      {showClaude && analysisSpike && (
         <SpikeAnalysisOverlay
           spike={analysisSpike}
           sessions={scopedFiltered.filter((s) => s.agent !== "codex")}
