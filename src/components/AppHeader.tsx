@@ -6,6 +6,7 @@ import { LimitsPill } from "./LimitsGauge";
 import { BrandMark } from "./BrandMark";
 import { ParseErrors } from "./ParseErrors";
 import { ProfileMenu } from "./ProfileMenu";
+import { UpdateNotice } from "./UpdateNotice";
 
 export interface ReportStatus {
   exists: boolean;
@@ -109,6 +110,7 @@ export function AppHeader({
       </nav>
 
       <div className="app-header-right">
+        <UpdateNotice />
         <LimitsPill />
         {parseErrors && parseErrors.length > 0 && <ParseErrors errors={parseErrors} />}
         <ProfileMenu

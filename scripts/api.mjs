@@ -16,6 +16,7 @@ import { readdir } from "node:fs/promises";
 import { mergeLimits, parseAllSessions, readLimits, readLiveContext, summarizeSession } from "./parse-sessions.mjs";
 import { badgeStatePath, computeBadges, loadBadgeState, saveBadgeState } from "./badges.mjs";
 import { dataDir } from "./data-dir.mjs";
+import { availableUpdate, latestVersion } from "./update-check.mjs";
 import { focusSession } from "./focus-terminal.mjs";
 
 // Honors CLAUDE_CONFIG_DIR, like Claude Code.
@@ -312,6 +313,12 @@ async function handleApi(req, res) {
   if (url === "/api/badges") {
     res.setHeader("cache-control", "no-store");
     return sendJson(res, 200, cache.badges ?? { startedAt: null, total: 0, families: [] });
+  }
+
+  // The daily update check (scripts/update-check.mjs), for the dashboard's update notice.
+  if (url === "/api/update") {
+    res.setHeader("cache-control", "no-store");
+    return sendJson(res, 200, { current: VERSION, update: availableUpdate(VERSION, await latestVersion(DATA)) });
   }
 
   // Lets a newer /marey:replay recognize this server and replace it.
