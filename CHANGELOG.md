@@ -6,6 +6,10 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `/marey:replay` no longer prints `no matches found: …/marey-*.log` under zsh: old logs are cleared with `find` instead of a shell glob.
+
 ### Planned
 
 - Front-end: split `SessionDetail.tsx` (66 KB → 4 sub-components per tab).

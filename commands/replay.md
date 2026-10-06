@@ -8,7 +8,7 @@ Start the Marey dashboard server in the background and open it in the user's bro
 Run this command (it returns immediately; the server keeps running):
 
 ```sh
-LOG="${TMPDIR:-/tmp}/marey-$$.log"; rm -f "${TMPDIR:-/tmp}"/marey-*.log "${TMPDIR:-/tmp}/marey.log"
+LOG="${TMPDIR:-/tmp}/marey-$$.log"; find "${TMPDIR:-/tmp}" -maxdepth 1 -name "marey*.log" -delete 2>/dev/null
 nohup node "${CLAUDE_PLUGIN_ROOT}/scripts/serve.mjs" $ARGUMENTS > "$LOG" 2>&1 &
 for i in 1 2 3 4 5 6 7 8 9 10; do grep -qE "listening on|already running|already in use" "$LOG" && break; sleep 1; done; cat "$LOG"
 ```
