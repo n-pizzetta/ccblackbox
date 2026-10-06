@@ -1250,12 +1250,6 @@ a:focus-visible,
 }
 .tools-focus-clear:hover { color: var(--c-text); border-color: var(--c-text-dim); }
 
-.prompt-view-toggle {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-}
-
 .prompt-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1338,15 +1332,6 @@ a:focus-visible,
   overflow: hidden;
 }
 .prompt-panel:last-child { border-bottom: none; }
-.prompt-panel-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: var(--c-bg-panel);
-  border-bottom: 1px solid var(--c-hairline);
-  font-size: var(--fs-sm);
-}
 .prompt-panel-close {
   background: transparent;
   border: none;

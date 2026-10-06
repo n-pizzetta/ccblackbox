@@ -2,7 +2,7 @@ import { LimitsPill } from "./LimitsGauge";
 import { SessionContext, StatusSep } from "./ContextCard";
 import { GoalSummary } from "./GoalSummary";
 import { TimelineTab } from "./SessionTimeline";
-import { SessionKpis, TabPreviews } from "./SessionOverview";
+import { FrictionsCard, SessionKpis, TabPreviews, type OverviewLink } from "./SessionOverview";
 import { KpiRow } from "./Kpi";
 import { freshTokens, useUnit, type Unit } from "../utils/units";
 import { promptWeights } from "../utils/promptShare";
@@ -278,6 +278,16 @@ export function SessionDetail({
     setToolFocus({ promptIdx, start, end });
     setTab("tools");
   };
+  // the Overview's summaries open their tab; the API value one lands on Tokens › By kind
+  const openFromOverview = (to: OverviewLink) => {
+    if (to === "tokens") setTokensFocus({ section: "kind" });
+    if (to === "tools") setToolFocus(null);
+    setTab(to);
+  };
+  const openPromptCost = (idx: number) => {
+    setTokensFocus({ section: "prompt", idx });
+    setTab("tokens");
+  };
 
   return (
     <div className={`detail ${fullscreen ? "fullscreen" : ""}`} key={session.id}>
@@ -422,7 +432,7 @@ export function SessionDetail({
 
       <div className="detail-body scrollbar">
         {tab === "overview" && (
-          <OverviewTab session={session} onFocusTools={focusToolsForPrompt} onOpenTab={setTab} />
+          <OverviewTab session={session} onFocusTools={focusToolsForPrompt} onOpen={openFromOverview} onOpenPromptCost={openPromptCost} />
         )}
         {tab === "timeline" && <TimelineTab session={session} onFocusTools={focusToolsForPrompt} />}
         {tab === "tools" && (
@@ -594,37 +604,37 @@ function GhostBanner({ session }: { session: Session }) {
   );
 }
 
+/**
+ * How this session went, in one screen: the headline figures (each opening its tab), the prompts
+ * chart, frictions, and a summary of each other tab.
+ */
 function OverviewTab({
   session,
   onFocusTools,
-  onOpenTab,
+  onOpen,
+  onOpenPromptCost,
 }: {
   session: Session;
   onFocusTools: (promptIdx: number, start: number, end: number) => void;
-  onOpenTab: (t: Tab) => void;
+  onOpen: (to: OverviewLink) => void;
+  onOpenPromptCost: (promptIdx: number) => void;
 }) {
   const unit = useUnit();
   const liveEmpty = session.live && (session.timeline?.length ?? 0) === 0;
   const [selectedPrompt, setSelectedPrompt] = useState<number | null>(null);
-  const [promptView, setPromptView] = useState<"timeline" | "list">("timeline");
   const prompts = session.prompts ?? [];
   const toolSeq = session.toolSequence ?? [];
   const stats: PromptStats[] = session.turns && prompts.length > 0
     ? aggregateByPrompt(session.turns, session.model, prompts)
     : [];
-  const totalCost = stats.reduce((a, s) => a + s.cost, 0);
-  /** Per-prompt figure in the chosen unit: fresh tokens, or API value. */
-  const val = (s: PromptStats) => (unit === "tokens" ? freshTokens(s.tokens) : s.cost);
-  const fv = (s: PromptStats) => (unit === "tokens" ? formatTokens(freshTokens(s.tokens)) : formatCost(s.cost));
-  const fmtAxis = (n: number) => (unit === "tokens" ? formatTokens(n) : formatCost(n));
-  const totalVal = stats.reduce((a, s) => a + val(s), 0);
-  const rewriteFlagged = stats.filter((s) => s.cacheRewriteFlag);
-  const rewriteCost = rewriteFlagged.reduce((a, s) => a + (s.cacheRewriteFlag?.cacheWriteCost ?? 0), 0);
+  // each prompt's weight and share, both in the usage unit
+  const weights = promptWeights(stats.map((s) => ({ fresh: freshTokens(s.tokens), cost: s.cost })), unit);
+  const fmt = (v: number) => (unit === "tokens" ? formatTokens(v) : formatCost(v));
+  const unitLabel = unit === "tokens" ? "fresh tokens" : "API value";
+  const totalVal = weights.reduce((a, w) => a + w.value, 0);
   const maxPromptT = prompts.reduce((a, p) => Math.max(a, p.t), 0);
   const effDurationMs = Math.max(session.durationMs, maxPromptT, 1);
   const durationMin = effDurationMs / 60_000;
-
-  const promptKinds = prompts.map((p) => classifyPrompt(p.text));
   // calls made while each prompt ran, sub-agent calls included
   const promptTools = callsPerPrompt(toolSeq, prompts);
 
@@ -640,59 +650,37 @@ function OverviewTab({
     );
   }
 
+  const sel = selectedPrompt !== null && prompts[selectedPrompt] ? selectedPrompt : null;
+
   return (
-    <>
-      <div className="overview-grid">
-        <div className="overview-main">
-          <SessionKpis session={session} />
-      <div className="d-panel">
-        <div className="section-title">
-          <span>User prompts</span>
-          <div className="prompt-view-toggle">
-            <span className="seg">
-              <button
-                className={`tool-view-btn ${promptView === "timeline" ? "active" : ""}`}
-                onMouseDown={keepFocus}
-                onClick={() => setPromptView("timeline")}
-              >
-                Timeline
-              </button>
-              <button
-                className={`tool-view-btn ${promptView === "list" ? "active" : ""}`}
-                onMouseDown={keepFocus}
-                onClick={() => setPromptView("list")}
-              >
-                List
-              </button>
+    <div className="overview-grid">
+      <div className="overview-main">
+        <SessionKpis session={session} onOpen={onOpen} />
+        <div className="d-panel">
+          <div className="section-title">
+            <span>
+              Prompts <InfoDot title={`One bar per prompt: its ${unitLabel}, sub-agents included, and the tool calls it led to. The colour is its costliest kind (by API value). Click a bar for the prompt.`} />
             </span>
-            <span className="dim mono tabular" style={{ marginLeft: 10 }}>
-              {prompts.length} prompts
-              {totalVal > 0 && ` · ${fmtAxis(totalVal)} total`}
-              {rewriteFlagged.length > 0 && (
-                <span style={{ color: "var(--c-amber)" }}>
-                  {" · "}
-                  {rewriteFlagged.length} idle-rewrite{rewriteFlagged.length > 1 ? "s" : ""} = {formatCost(rewriteCost)}
-                </span>
-              )}
+            <span className="dim tabular">
+              {prompts.length} prompt{prompts.length === 1 ? "" : "s"}
+              {totalVal > 0 && ` · ${fmt(totalVal)} ${unitLabel}`}
             </span>
           </div>
-        </div>
-        {promptView === "timeline" && (
-          stats.length === 0 ? (
-            <div className="placeholder">No cost data captured.</div>
+          {stats.length === 0 ? (
+            <div className="placeholder">No usage captured for its prompts.</div>
           ) : (() => {
-            const maxCost = Math.max(0.0001, ...stats.map(val));
+            const maxVal = Math.max(1e-9, ...weights.map((w) => w.value));
             return (
               <>
                 <div className="prompt-chart-wrap">
                   <div className="prompt-chart-axis">
-                    <span className="mono dim tabular">{fmtAxis(maxCost)}</span>
+                    <span className="mono dim tabular">{fmt(maxVal)}</span>
                     <span className="mono dim tabular">0</span>
                   </div>
                   <div className="prompt-chart">
                     {stats.map((s, i) => {
-                      const heightPct = (val(s) / maxCost) * 100;
-                      const isSelected = selectedPrompt === i;
+                      const heightPct = (weights[i].value / maxVal) * 100;
+                      const isSelected = sel === i;
                       const showGap = i > 0 && s.gapBeforeMs >= SESSION_IDLE_GAP_MS;
                       const tc = promptTools[i];
                       return (
@@ -700,7 +688,7 @@ function OverviewTab({
                           {showGap && (
                             <span
                               className={`prompt-gap-marker ${s.cacheRewriteFlag ? "warn" : ""}`}
-                              title={`${formatDuration(s.gapBeforeMs)} idle gap before #${i + 1}`}
+                              title={`${formatDuration(s.gapBeforeMs)} idle before #${i + 1}${s.cacheRewriteFlag ? ", then the cache was rewritten" : ""}`}
                               aria-hidden="true"
                             />
                           )}
@@ -710,11 +698,9 @@ function OverviewTab({
                             onClick={() => setSelectedPrompt((p) => (p === i ? null : i))}
                             aria-label={`Prompt ${i + 1}`}
                             aria-pressed={isSelected}
-                            title={`#${i + 1} · ${fv(s)}${showGap ? ` · ${formatDuration(s.gapBeforeMs)} idle before` : ""} · ${tc} tool${tc === 1 ? "" : "s"}`}
+                            title={`#${i + 1} · ${fmt(weights[i].value)} ${unitLabel}${showGap ? ` · ${formatDuration(s.gapBeforeMs)} idle before` : ""} · ${tc} tool call${tc === 1 ? "" : "s"}`}
                           >
-                            {tc > 0 && (
-                              <span className="prompt-bar-turn-badge tabular">{tc}</span>
-                            )}
+                            {tc > 0 && <span className="prompt-bar-turn-badge tabular">{tc}</span>}
                           </button>
                         </div>
                       );
@@ -727,7 +713,7 @@ function OverviewTab({
                   </div>
                 </div>
                 <div className="prompt-legend mono dim" style={{ marginTop: 10 }}>
-                  <span className="dim">dominant cost kind:</span>
+                  <span className="dim">costliest kind:</span>
                   <span className="prompt-legend-item"><span className="prompt-legend-swatch tokens-seg output" /> output</span>
                   <span className="prompt-legend-item"><span className="prompt-legend-swatch tokens-seg cache-read" /> cache read</span>
                   <span className="prompt-legend-item"><span className="prompt-legend-swatch tokens-seg cache-write" /> cache write</span>
@@ -735,179 +721,49 @@ function OverviewTab({
                 </div>
               </>
             );
-          })()
-        )}
-        {promptView === "timeline" && selectedPrompt !== null && prompts[selectedPrompt] && (() => {
-          const i = selectedPrompt;
-          const p = prompts[i];
-          const kind = promptKinds[i];
-          const tc = promptTools[i];
-          return (
-            <div className="prompt-panel" style={{ marginTop: 12, border: "1px solid var(--c-hairline)", borderRadius: "var(--radius)" }}>
-              <div className="prompt-panel-head">
-                <span className="mono dim">
-                  prompt #{i + 1} @ {formatClockAt(session.startedAt, p.t)}
-                  {" · "}
-                  <span style={{ color: PROMPT_KIND_COLOR[kind] }}>
-                    {PROMPT_KIND_LABEL[kind]}
+          })()}
+          {sel !== null && (() => {
+            const p = prompts[sel];
+            const kind = classifyPrompt(p.text);
+            const tc = promptTools[sel];
+            const w = weights[sel];
+            return (
+              <div className="prompt-card">
+                <div className="prompt-card-head">
+                  <span className="mono dim">
+                    #{sel + 1} · {formatClockAt(session.startedAt, p.t)} ·{" "}
+                    <span style={{ color: PROMPT_KIND_COLOR[kind] }}>{PROMPT_KIND_LABEL[kind]}</span>
                   </span>
-                  {tc > 0 && ` · ${tc} tools after`}
-                  {stats[i] && (
-                    <>
-                      {" · "}
-                      <span style={{ color: "var(--c-amber)" }}>{fv(stats[i])}</span>
-                      {totalCost > 0 && ` · ${((stats[i].cost / totalCost) * 100).toFixed(1)}% of session`}
-                    </>
-                  )}
-                </span>
-                <button className="prompt-panel-close" onClick={() => setSelectedPrompt(null)}>✕</button>
-              </div>
-              {stats[i] && (
-                <PromptCostBreakdown s={stats[i]} model={session.model} />
-              )}
-              <pre className="prompt-panel-body">{p.text}</pre>
-            </div>
-          );
-        })()}
-        {promptView === "list" && (
-          prompts.length === 0 ? (
-            <div className="placeholder">No prompts captured.</div>
-          ) : (
-            <div className="prompt-list">
-              <div className="prompt-row prompt-row-head mono dim caps">
-                <span>#</span>
-                <span>Time</span>
-                <span>Kind</span>
-                <span className="right">Tools</span>
-                <span className="right">{unit === "tokens" ? "tok" : "$"}</span>
-                <span />
-                <span>Prompt</span>
-                <span className="right">Length</span>
-              </div>
-              {prompts.map((_, revIdx) => {
-                const i = prompts.length - 1 - revIdx;
-                const p = prompts[i];
-                const kind = promptKinds[i];
-                const tc = promptTools[i];
-                const nextT = prompts[i + 1]?.t ?? Infinity;
-                const selected = selectedPrompt === i;
-                return (
-                  <Fragment key={i}>
-                  <div
-                    className={`prompt-row ${selected ? "selected" : ""}`}
-                    role="button"
-                    tabIndex={0}
-                    title={PROMPT_KIND_LABEL[kind]}
-                    onClick={() => setSelectedPrompt(selected ? null : i)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedPrompt(selected ? null : i);
-                      }
-                    }}
-                  >
-                    <span className="mono dim tabular">{String(i + 1).padStart(2, "0")}</span>
-                    <span className="mono dim tabular">{formatClockAt(session.startedAt, p.t)}</span>
-                    <span
-                      className="prompt-row-cat"
-                      style={{ background: PROMPT_KIND_COLOR[kind] }}
-                      title={PROMPT_KIND_LABEL[kind]}
-                    />
-                    {tc > 0 ? (
-                      <button
-                        type="button"
-                        className="mono tabular right prompt-row-tools-link"
-                        title={`Jump to ${tc} tool call${tc === 1 ? "" : "s"} after this prompt`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onFocusTools(i, p.t, nextT);
-                        }}
-                      >
-                        {tc} →
-                      </button>
-                    ) : (
-                      <span className="mono tabular right dim">—</span>
-                    )}
-                    <span
-                      className="mono tabular right"
-                      style={{
-                        color: stats[i] && stats[i].cost >= 0.5 ? "var(--c-amber)" : "var(--c-text-faint)",
-                      }}
-                    >
-                      {stats[i] ? fv(stats[i]) : "—"}
-                    </span>
-                    <span
-                      className="prompt-row-warn"
-                      title={
-                        stats[i]?.cacheRewriteFlag
-                          ? `${formatDuration(stats[i].cacheRewriteFlag!.gapMs)} idle — cacheW ${formatCost(stats[i].cacheRewriteFlag!.cacheWriteCost)}`
-                          : ""
-                      }
-                    >
-                      {stats[i]?.cacheRewriteFlag ? "⚠" : ""}
-                    </span>
-                    <span className="prompt-row-preview mono">{p.preview}</span>
-                    <span className="mono dim tabular right">{p.text.length}</span>
-                  </div>
-                  {selected && (
-                    <div className="prompt-panel">
-                      <div className="prompt-panel-head">
-                        <span className="mono dim">
-                          prompt #{i + 1} @ {formatClockAt(session.startedAt, p.t)}
-                          {" · "}
-                          <span style={{ color: PROMPT_KIND_COLOR[kind] }}>
-                            {PROMPT_KIND_LABEL[kind]}
-                          </span>
-                          {tc > 0 && ` · ${tc} tools after`}
-                          {stats[i] && (
-                            <>
-                              {" · "}
-                              <span style={{ color: "var(--c-amber)" }}>{fv(stats[i])}</span>
-                              {totalCost > 0 && ` · ${((stats[i].cost / totalCost) * 100).toFixed(1)}% of session`}
-                            </>
-                          )}
-                        </span>
-                        <button className="prompt-panel-close" onClick={() => setSelectedPrompt(null)}>✕</button>
-                      </div>
-                      {stats[i] && (
-                        <PromptCostBreakdown s={stats[i]} model={session.model} />
-                      )}
-                      <pre className="prompt-panel-body">{p.text}</pre>
-                    </div>
-                  )}
-                  </Fragment>
-                );
-              })}
-            </div>
-          )
-        )}
-      </div>
-        </div>
-        <div className="overview-rail">
-          <TabPreviews session={session} onOpenTab={onOpenTab} />
-      {session.frictions.length > 0 ? (
-        <div className="d-panel friction-panel">
-          <div className="section-title">
-            <span>Frictions</span>
-            <span className="dim mono" title="LLM-flagged friction points. Count is real; on-timeline positions are approximate.">
-              {session.frictions.length} · ⓘ LLM
-            </span>
-          </div>
-          <div className="friction-list">
-            {session.frictions.map((f, i) => (
-              <div key={i} className="friction-item">
-                <span className="dot" />
-                <div>
-                  <div className="kind">{f.kind.replace(/_/g, " ")}</div>
-                  <div className="detail-text">{f.detail}</div>
+                  <button className="prompt-panel-close" onClick={() => setSelectedPrompt(null)} aria-label="Close the prompt">✕</button>
                 </div>
-                <span className="at tabular">{(f.at * 100).toFixed(0)}%</span>
+                {w && (
+                  <div className="prompt-card-weight tabular">
+                    <b>{fmt(w.value)}</b> {unitLabel}
+                    <span className="dim"> · {(w.share * 100).toFixed(1)}% of the session's {unitLabel}</span>
+                  </div>
+                )}
+                <div className="prompt-card-links">
+                  {tc > 0 && (
+                    <button className="preview-more" onClick={() => onFocusTools(sel, p.t, prompts[sel + 1]?.t ?? Infinity)}>
+                      {tc} tool call{tc === 1 ? "" : "s"} →
+                    </button>
+                  )}
+                  {stats[sel] && (
+                    <button className="preview-more" onClick={() => onOpenPromptCost(sel)}>
+                      Tokens and API value per kind →
+                    </button>
+                  )}
+                </div>
+                <pre className="prompt-panel-body">{p.text}</pre>
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
-      ) : (
-        session.outcome === "unknown" || session.outcome === "in_progress" ? (
+      </div>
+      <div className="overview-rail">
+        {session.frictions.length > 0 ? (
+          <FrictionsCard session={session} onOpen={onOpen} />
+        ) : session.outcome === "unknown" || session.outcome === "in_progress" ? (
           <div className="clean-row dim">
             {session.agent === "codex" ? "Frictions not analyzed · /insights only covers Claude Code" : "Frictions not analyzed yet · run /insights in Claude Code"}
           </div>
@@ -915,11 +771,10 @@ function OverviewTab({
           <div className="clean-row">
             <span style={{ color: "var(--c-green)" }}>✓</span> Clean session · no friction detected
           </div>
-        )
-      )}
-        </div>
+        )}
+        <TabPreviews session={session} onOpen={onOpen} />
       </div>
-    </>
+    </div>
   );
 }
 

@@ -302,6 +302,11 @@
   text-overflow: ellipsis;
   color: var(--c-text);
 }
+/* a tile that opens where its figure is detailed */
+.kpi.kpi-link { width: 100%; text-align: left; border-radius: var(--radius); transition: background var(--t-fast); }
+.kpi.kpi-link:hover { background: rgba(255, 255, 255, 0.03); }
+.kpi.kpi-link .kpi-go { color: var(--c-text-faint); opacity: 0; transition: opacity var(--t-fast); }
+.kpi.kpi-link:hover .kpi-go, .kpi.kpi-link:focus-visible .kpi-go { opacity: 1; }
 .kpi .kpi-value.amber { color: var(--c-amber); }
 .kpi .kpi-value.red { color: var(--c-red); }
 .kpi .kpi-value.green { color: var(--c-green); }
