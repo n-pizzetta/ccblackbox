@@ -2,7 +2,7 @@
 
 Marey is a local dashboard for Claude Code and Codex sessions, shipped both as an npm package (`npx marey`) and as a Claude Code plugin (`/marey:replay`). A Node server parses the files Claude Code already writes under `~/.claude/` (and Codex under `~/.codex/`, §3), keeps the result in memory and serves it to a React single-page app over a small local API.
 
-There is no database, no network access beyond loopback, and no runtime dependency besides Node's standard library on the server side.
+There is no database, no network access beyond loopback except the daily update check (`scripts/update-check.mjs`), and no runtime dependency besides Node's standard library on the server side.
 
 ---
 
@@ -318,7 +318,7 @@ React 19 + TypeScript, bundled by Vite. No router or state library.
 ## 9. Plugin packaging
 
 - [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json) and [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json): plugin `marey`, source `./` (the repo root is the plugin).
-- [`hooks/hooks.json`](hooks/hooks.json): runs [`hooks/capture.mjs`](hooks/capture.mjs) on `PostToolUse` (tool name + truncated input/output previews) and on `Stop` (`--stop` marker). The hook validates the session id, reads stdin with a timeout, never writes to stdout and swallows every error so it cannot break Claude Code.
+- [`hooks/hooks.json`](hooks/hooks.json): runs [`hooks/capture.mjs`](hooks/capture.mjs) on `PostToolUse` (tool name + truncated input/output previews) and on `Stop` (`--stop` marker). The hook validates the session id, reads stdin with a timeout, never writes to stdout and swallows every error so it cannot break Claude Code. On `SessionStart`, [`hooks/session-start.mjs`](hooks/session-start.mjs) runs the update check: at most once a day it reads the `version` of the repo's `.claude-plugin/plugin.json` on GitHub (2 s timeout; offline keeps the last answer), caches it in `~/.claude/marey/update-check.json` with the version running, and prints a `systemMessage` when a newer one is out. The status line wrapper appends `↑ Marey <latest> · /marey:update` from that file, and `GET /api/update` feeds the dashboard header's notice. Off with `{"updateCheck": false}` in `~/.claude/marey/config.json` or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`. [`commands/update.md`](commands/update.md) → `/marey:update` runs `claude plugin marketplace update marey && claude plugin update marey@marey`.
 - [`commands/replay.md`](commands/replay.md) → `/marey:replay`: starts `scripts/serve.mjs` (flags forwarded: `--port <n>`, `--no-open`).
 - [`commands/limits.md`](commands/limits.md) → `/marey:limits`: runs `install-statusline.mjs` (`--uninstall` forwarded).
 - The server needs the prebuilt `dist/`, which is why it is committed (plugins install from the repo, with no build step).

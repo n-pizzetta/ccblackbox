@@ -8,6 +8,7 @@ versioning follows [SemVer](https://semver.org/).
 
 ### Added
 
+- **Update notice.** When a newer Marey is published, a message says so as a session starts (*Marey 0.6.0 is available (you have 0.5.2) · run /marey:update*), the status line segment shows `↑ Marey 0.6.0 · /marey:update`, and the dashboard header shows `↑ 0.6.0`. `/marey:update` refreshes the marketplace and updates the plugin. The check reads the version in the repo's `plugin.json` on GitHub at most once a day, sends nothing else, and is off with `{"updateCheck": false}` in `~/.claude/marey/config.json` or `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`. It is Marey's only network request.
 - **Open a running session's terminal** (macOS). *Open terminal* in the session view, and a `›_` chip on live rows in the table and on the Now page, bring the terminal running that session to the front. In Ghostty 1.3+ it focuses the exact window, tab and split, matched on the session title Claude Code shows in the terminal title, with a short-lived title marker on the session's tty when titles don't tell terminals apart. Other terminal apps are brought to the front as a whole. New route: `POST /api/sessions/:id/focus` (#65).
 
 ### Planned

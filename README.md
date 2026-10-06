@@ -140,7 +140,9 @@ The plugin also registers a `PostToolUse` hook that records fine-grained tool se
 
 ### Updating
 
-Turn on auto-update once: `/plugin` → **Marketplaces** → `marey` → **Enable auto-update** (it's off by default for marketplaces outside Anthropic's). Claude Code then fetches new versions shortly after you start a session and tells you to run `/reload-plugins`. Without auto-update: `/plugin` → **Installed** → `marey` → **Update now** (or `claude plugin update marey@marey`), then `/reload-plugins`.
+When a new version is out, Marey tells you as a session starts (*Marey 0.6.0 is available (you have 0.5.2) · run /marey:update*), in its status line segment and in the dashboard header. `/marey:update` refreshes the marketplace and updates the plugin; then run `/reload-plugins` and `/marey:replay`.
+
+You can also let Claude Code do it: turn on auto-update once in `/plugin` → **Marketplaces** → `marey` → **Enable auto-update** (it's off by default for marketplaces outside Anthropic's). Claude Code then fetches new versions shortly after you start a session and tells you to run `/reload-plugins`. Without auto-update: `/plugin` → **Installed** → `marey` → **Update now** (or `claude plugin update marey@marey`), then `/reload-plugins`.
 
 Then run `/marey:replay`. If the dashboard from the previous version is still running, it is stopped and the new one takes its place, and the status line wrapper installed by `/marey:limits` is refreshed on the way: nothing to restart or re-install by hand.
 
@@ -174,7 +176,9 @@ node scripts/install-statusline.mjs   # optional: real usage limits (see above)
 
 ## Privacy
 
-**Everything runs locally: no network calls, no telemetry.** Marey reads (from `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set):
+**Everything runs locally, with no telemetry.** The one network request: once a day, Marey reads the version number in its own `plugin.json` on GitHub (`raw.githubusercontent.com`) to tell you when an update is out. Nothing about you or your sessions is sent. Turn it off with `{"updateCheck": false}` in `~/.claude/marey/config.json`; it is also off when `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` is set.
+
+Marey reads (from `~/.claude`, or `$CLAUDE_CONFIG_DIR` when set):
 
 | Data | Source |
 | --- | --- |
