@@ -1930,59 +1930,6 @@ a:focus-visible,
   justify-content: center;
 }
 
-.live-status {
-  margin: 0 0 12px;
-  padding: 12px 14px;
-  border-radius: var(--radius);
-  border: 1px solid color-mix(in srgb, var(--c-green) 30%, transparent);
-  background: color-mix(in srgb, var(--c-green) 6%, transparent);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.live-status-tool { border-color: color-mix(in srgb, var(--c-cyan) 40%, transparent); background: color-mix(in srgb, var(--c-cyan) 6%, transparent); }
-.live-status-thinking { border-color: color-mix(in srgb, var(--c-green) 40%, transparent); background: color-mix(in srgb, var(--c-green) 6%, transparent); }
-.live-status-idle { border-color: color-mix(in srgb, var(--c-amber) 40%, transparent); background: color-mix(in srgb, var(--c-amber) 6%, transparent); }
-.live-status-done { border-color: var(--c-hairline); background: var(--c-bg-elevated); }
-.live-status-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.live-status-head .live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--c-green);
-  box-shadow: 0 0 10px var(--c-green);
-  animation: live-pulse 1.4s ease-in-out infinite;
-}
-.live-status-tool .live-status-head .live-dot { background: var(--c-cyan); box-shadow: 0 0 10px var(--c-cyan); }
-.live-status-idle .live-status-head .live-dot { background: var(--c-amber); box-shadow: 0 0 10px var(--c-amber); animation: none; opacity: 0.8; }
-.live-status-done .live-status-head .live-dot { background: var(--c-text-faint); box-shadow: none; animation: none; }
-.live-status-label { font-size: var(--fs-base); }
-.live-status-elapsed { font-size: var(--fs-sm); }
-.live-status-body {
-  font-size: var(--fs-md);
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  padding: 6px 10px;
-  background: var(--c-bg);
-  border-radius: var(--radius-sm);
-  border-left: 2px solid var(--c-cyan);
-}
-.live-status-preview {
-  color: var(--c-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-}
-.live-status-prompt { font-size: var(--fs-md); }
-.live-status-prompt-preview { color: var(--c-text); }
-
 .tool-seq-row.pending {
   background: color-mix(in srgb, var(--c-cyan) 6%, transparent);
   border-left: 2px solid var(--c-cyan);

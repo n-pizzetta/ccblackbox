@@ -1,5 +1,5 @@
 import { LimitsPill } from "./LimitsGauge";
-import { SessionContext } from "./ContextCard";
+import { SessionStatus } from "./SessionStatus";
 import { TimelineTab } from "./SessionTimeline";
 import { SessionKpis, TabPreviews } from "./SessionOverview";
 import { KpiRow } from "./Kpi";
@@ -383,8 +383,7 @@ export function SessionDetail({
           </div>
         </div>
 
-        {session.live && <LiveStatus session={session} />}
-        <SessionContext sessionId={session.id} />
+        <SessionStatus session={session} />
         {(session.clearedFrom || session.clearedInto) && (
           <ClearedBanner session={session} />
         )}
@@ -437,81 +436,6 @@ export function SessionDetail({
           </button>
         </span>
       </div>
-    </div>
-  );
-}
-
-function useNow(intervalMs: number) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-  return now;
-}
-
-function formatElapsed(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const s = Math.floor(ms / 1000);
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-  if (m < 60) return `${m}m${String(rem).padStart(2, "0")}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h${String(m % 60).padStart(2, "0")}m`;
-}
-
-function LiveStatus({ session }: { session: Session }) {
-  const now = useNow(1000);
-  const lastTs = session.lastEventAt ? Date.parse(session.lastEventAt) : now;
-  const elapsed = Math.max(0, now - lastTs);
-  const running = session.runningTool;
-  const prompts = session.prompts ?? [];
-  const turns = session.turns ?? [];
-  const lastPromptIdx = prompts.length > 0 ? prompts.length - 1 : -1;
-  const lastPrompt = lastPromptIdx >= 0 ? prompts[lastPromptIdx] : null;
-  const turnsOnLast = lastPromptIdx >= 0
-    ? turns.filter((t) => t.promptIdx === lastPromptIdx).length
-    : 0;
-
-  // state classification
-  let kind: "tool" | "thinking" | "idle" | "done";
-  let label: string;
-  if (running) {
-    kind = "tool";
-    label = `Running ${running.tool}`;
-  } else if (elapsed < 5_000) {
-    kind = "thinking";
-    label = "Claude is thinking";
-  } else if (elapsed < 30_000) {
-    kind = "done";
-    label = "Turn complete";
-  } else {
-    kind = "idle";
-    label = "Idle — waiting for input";
-  }
-
-  return (
-    <div className={`live-status live-status-${kind}`}>
-      <div className="live-status-head">
-        <span className="live-dot" aria-hidden />
-        <strong className="live-status-label">{label}</strong>
-        <span className="mono dim tabular live-status-elapsed">· {formatElapsed(elapsed)} since last event</span>
-      </div>
-      {running && (
-        <div className="live-status-body mono">
-          <span className="dim">input:</span>
-          <span className="live-status-preview">{running.preview.slice(0, 140)}</span>
-        </div>
-      )}
-      {lastPrompt && (
-        <div className="live-status-prompt mono">
-          <span className="dim">on prompt </span>
-          <strong>#{lastPromptIdx + 1}</strong>
-          <span className="dim"> · {turnsOnLast} turn{turnsOnLast === 1 ? "" : "s"} so far · </span>
-          <span className="dim live-status-prompt-preview">{lastPrompt.preview.slice(0, 100)}</span>
-        </div>
-      )}
     </div>
   );
 }
