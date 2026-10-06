@@ -15,6 +15,7 @@ interface Props {
   /** "20s ago", or empty before the first parse. */
   parsedAgo: string;
   reportStatus: { exists: boolean };
+  showClaude: boolean;
   onHelp: () => void;
   onOpenPage: (page: Page) => void;
 }
@@ -24,7 +25,7 @@ interface Props {
  * progress, Health, display settings, data status and help. A "+N" floats
  * under the chip whenever XP comes in while the dashboard is open.
  */
-export function ProfileMenu({ level, streak, source, parsedAgo, reportStatus, onHelp, onOpenPage }: Props) {
+export function ProfileMenu({ level, streak, source, parsedAgo, reportStatus, showClaude, onHelp, onOpenPage }: Props) {
   const [open, setOpen] = useState(false);
   const popRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -118,15 +119,15 @@ export function ProfileMenu({ level, streak, source, parsedAgo, reportStatus, on
             <button className="profile-link" onClick={() => openPage("health")}>
               <span>Health check</span><span aria-hidden="true">→</span>
             </button>
-            {reportStatus.exists ? (
+            {showClaude && (reportStatus.exists ? (
               <a className="profile-link" href="/usage-report.html" target="_blank" rel="noreferrer">
-                <span>Insights report</span><span aria-hidden="true">↗</span>
+                <span>Claude Code insights</span><span aria-hidden="true">↗</span>
               </a>
             ) : (
               <span className="profile-link disabled" title="Run /insights in Claude Code to generate it">
-                <span>Insights report</span><span className="mono dim">/insights</span>
+                <span>Claude Code insights</span><span className="mono dim">/insights</span>
               </span>
-            )}
+            ))}
           </div>
 
           <div className="profile-section">
@@ -138,7 +139,7 @@ export function ProfileMenu({ level, streak, source, parsedAgo, reportStatus, on
                 {source === "real" ? (parsedAgo ? `live · ${parsedAgo}` : "live") : "mock"}
               </span>
             </div>
-            <LimitsSection />
+            {showClaude && <LimitsSection />}
           </div>
 
           <div className="profile-foot">

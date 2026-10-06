@@ -6,6 +6,10 @@ versioning follows [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- A global provider switcher lists detected Claude Code and Codex sessions, remembers the selection, and scopes every page. Claude limits and badges are labelled explicitly and hidden in Codex views, which show today's Codex activity instead.
+
 ### Fixed
 
 - Codex installations now expose native `replay` and `update` skills through an explicit plugin manifest. The dashboard launcher resolves bundled scripts from the installed package, and updates use Codex's plugin manager.

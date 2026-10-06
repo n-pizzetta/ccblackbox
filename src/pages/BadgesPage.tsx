@@ -5,9 +5,11 @@ import { KpiRow } from "../components/Kpi";
 import { TopSessions } from "../components/fleet/TopSessions";
 import { Badges, NextUp } from "../components/fleet/Badges";
 import { PageSection } from "./PageSection";
+import type { Provider } from "../utils/providers";
 
 interface Props {
   allSessions: Session[];
+  provider: Provider;
   /** Null without the local API: only the records show. */
   badges: BadgesPayload | null;
   /** Unlocks not seen here yet; marked as seen on arrival, still flagged "new" during the visit. */
@@ -17,7 +19,7 @@ interface Props {
 }
 
 /** "Progress": level, next goals, badges and records. All time: the range and filters don't apply. */
-export function BadgesPage({ allSessions, badges, unseen, onViewed, onSelectSession }: Props) {
+export function BadgesPage({ allSessions, provider, badges, unseen, onViewed, onSelectSession }: Props) {
   const [fresh, setFresh] = useState<Set<string>>(() => new Set(unseen));
   if ([...unseen].some((k) => !fresh.has(k))) setFresh(new Set([...fresh, ...unseen]));
   useEffect(() => {
@@ -29,8 +31,13 @@ export function BadgesPage({ allSessions, badges, unseen, onViewed, onSelectSess
 
   return (
     <div className="page">
+      {provider === "codex" && (
+        <PageSection title="Codex records" note="All time">
+          <p className="dim provider-note">Badges and XP are currently available for Claude Code. Your Codex records are shown below.</p>
+        </PageSection>
+      )}
       {level && streak && (
-        <PageSection title="Progress" note="All time · not affected by the range or filters">
+        <PageSection title="Progress" note="Claude Code · All time · not affected by the range or filters">
           <KpiRow
             items={[
               { label: "Level", value: level.level, sub: level.title },
@@ -61,7 +68,7 @@ export function BadgesPage({ allSessions, badges, unseen, onViewed, onSelectSess
         </PageSection>
       )}
       {badges && (
-        <PageSection title="Next up" note="Closest badges that reward good practice">
+        <PageSection title="Next up" note="Claude Code · Closest badges that reward good practice">
           <NextUp families={badges.families} limit={6} />
         </PageSection>
       )}

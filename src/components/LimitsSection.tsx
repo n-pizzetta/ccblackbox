@@ -9,7 +9,7 @@ export function LimitsSection() {
   return (
     <>
       <div className="profile-row">
-        <span className="profile-row-label">Usage limits</span>
+        <span className="profile-row-label">Claude Code limits</span>
         {connected ? (
           <span className="profile-row-value mono">
             <span className="profile-dot ok" aria-hidden="true" />

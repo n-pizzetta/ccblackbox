@@ -313,7 +313,7 @@ export function SessionDetail({
             ) : null}
           </div>
           <div className="detail-toolbar-right">
-            <LimitsPill />
+            {session.agent !== "codex" && <LimitsPill />}
             <button
               className="toolbar-btn wide"
               onClick={() => downloadSessionHtml(session)}
