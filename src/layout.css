@@ -112,7 +112,7 @@
 /* the Sessions page: the table scrolls, not the page */
 .app-content.fill { overflow: hidden; padding-bottom: var(--page-gap); }
 
-/* ---- Scope bar: range, filters, search, and what they add up to ---- */
+/* ---- Scope bar: range and filters on the left, what they add up to and the search on the right ---- */
 /* flat: one fill track for the range, ghost selects, one fill search; no glass, no panel */
 .scope-bar {
   flex: none;
@@ -215,6 +215,8 @@
 .scope-summary .mono { font-family: var(--f-ui); font-weight: 600; color: var(--c-text); }
 .scope-reset { font-size: var(--fs-md); color: var(--c-cyan); }
 .scope-reset:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* the search ends the row, a little apart from the count */
+.scope-summary + .scope-search { margin-left: 10px; }
 
 /* ---- Pages ---- */
 .page { display: flex; flex-direction: column; gap: var(--page-gap); min-width: 0; }
@@ -512,7 +514,7 @@
   .app-nav-item { padding: 0 12px; }
 }
 @media (max-width: 900px) {
-  .scope-search { width: 100%; order: 5; }
+  .scope-search, .scope-summary + .scope-search { width: 100%; order: 5; margin-left: 0; }
   .scope-summary { margin-left: 0; }
 }
 

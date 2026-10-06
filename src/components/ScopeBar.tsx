@@ -60,14 +60,7 @@ export function ScopeBar({
         onProjectFilterChange={onProjectFilterChange}
         sessions={inRange}
       />
-      <input
-        className={`scope-search ${search ? "set" : ""}`}
-        type="search"
-        placeholder="Search goals and summaries…"
-        aria-label="Search sessions"
-        value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
-      />
+      {/* filters on the left; what they add up to, then the search, on the right */}
       <div className="scope-summary">
         <span className="mono tabular">
           {filtered ? `${count} of ${inRange.length}` : count} session{count === 1 ? "" : "s"}
@@ -77,6 +70,14 @@ export function ScopeBar({
           <button className="scope-reset" onClick={onReset}>Reset filters</button>
         )}
       </div>
+      <input
+        className={`scope-search ${search ? "set" : ""}`}
+        type="search"
+        placeholder="Search goals and summaries…"
+        aria-label="Search sessions"
+        value={search}
+        onChange={(e) => onSearchChange(e.target.value)}
+      />
     </div>
   );
 }
