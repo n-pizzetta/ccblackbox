@@ -34,7 +34,14 @@
 }
 .toolbar-btn:hover:not(:disabled) { background: var(--c-fill); border-color: transparent; }
 .toolbar-btn.wide { width: auto; padding: 0 14px; font-size: var(--fs-base); font-weight: 500; }
-.toolbar-pos { font-family: var(--f-ui); font-size: var(--fs-base); color: var(--c-text-dim); }
+.toolbar-pos { font-family: var(--f-ui); font-size: var(--fs-base); color: var(--c-text-dim); white-space: nowrap; }
+/* phones: the limits take a row of their own under the toolbar, so Export and close stay on screen */
+@media (max-width: 640px) {
+  .session-overlay-host .detail-toolbar { flex-wrap: wrap; gap: 4px 6px; }
+  .session-overlay-host .detail-toolbar-right { display: contents; }
+  .session-overlay-host .detail-toolbar .limits-pill { order: 1; flex-basis: 100%; }
+  .session-overlay-host .detail-toolbar .toolbar-btn.wide { margin-left: auto; }
+}
 
 /* the tabs: the one glass element of the session view, built like the page navigation (.app-nav):
    same capsule, item height, padding and gap, a line icon before the label, plain counts after it */
