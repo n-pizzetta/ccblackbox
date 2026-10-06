@@ -1,7 +1,7 @@
 import type { Session } from "../types";
 import { useSnapshotMap } from "../utils/liveContext";
 import { useNow } from "../utils/useNow";
-import { ContextSummary } from "./ContextCard";
+import { ContextSummary, StatusSep } from "./ContextCard";
 
 function formatElapsed(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -12,6 +12,17 @@ function formatElapsed(ms: number): string {
   if (m < 60) return `${m}m${String(rem).padStart(2, "0")}s`;
   const h = Math.floor(m / 60);
   return `${h}h${String(m % 60).padStart(2, "0")}m`;
+}
+
+/** Glanceable age: seconds, then minutes, then hours, then days. The exact one goes in the tooltip. */
+function formatAgo(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h${String(m % 60).padStart(2, "0")}`;
+  return `${Math.floor(h / 24)}d`;
 }
 
 /** What a live session is doing: the running tool or its idle state, time since the last event, the prompt it is on. */
@@ -28,32 +39,34 @@ function LiveState({ session }: { session: Session }) {
 
   let kind: "tool" | "thinking" | "done" | "idle";
   let label: string;
-  let hint: string | null = null;
+  let title: string;
   if (running) {
     kind = "tool";
     label = `Running ${running.tool}`;
+    title = `Running ${running.tool}`;
   } else if (elapsed < 5_000) {
     kind = "thinking";
-    label = "Claude is thinking";
+    label = "Thinking";
+    title = "Claude is thinking";
   } else if (elapsed < 30_000) {
     kind = "done";
     label = "Turn complete";
+    title = "Turn complete";
   } else {
     kind = "idle";
     label = "Idle";
-    hint = "waiting for input";
+    title = "Idle, waiting for input";
   }
 
   return (
     <div className={`status-live ${kind}`}>
-      <span className="live-dot" aria-hidden="true" />
-      <strong className="status-label">
+      <span className="status-label" title={title}>
+        <span className="live-dot" aria-hidden="true" />
         {label}
-        {hint && <span className="status-hint"> — {hint}</span>}
-      </strong>
-      <span className="status-elapsed tabular" title="Time since the last event in the transcript">
-        {formatElapsed(elapsed)}
-        <span className="status-elapsed-words"> since last event</span>
+      </span>
+      <StatusSep />
+      <span className="status-elapsed tabular" title={`${formatElapsed(elapsed)} since the last event in the transcript`}>
+        {formatAgo(elapsed)} ago
       </span>
       {running && (
         <code className="status-input mono" title={running.preview}>
@@ -61,16 +74,16 @@ function LiveState({ session }: { session: Session }) {
         </code>
       )}
       {lastPrompt && (
-        <span className="status-prompt tabular" title={lastPrompt.preview}>
-          Prompt <b>#{lastPromptIdx + 1}</b>
-          <span className="status-sep"> · </span>
-          <b>{turnsOnLast}</b> turn{turnsOnLast === 1 ? "" : "s"} so far
-        </span>
-      )}
-      {lastPrompt && !running && (
-        <span className="status-prompt-text" title={lastPrompt.preview}>
-          {lastPrompt.preview.slice(0, 100)}
-        </span>
+        <>
+          <StatusSep />
+          <span className="status-fig tabular" title={lastPrompt.preview}>
+            prompt <b>{lastPromptIdx + 1}</b>
+          </span>
+          <StatusSep />
+          <span className="status-fig tabular" title={`${turnsOnLast} turn${turnsOnLast === 1 ? "" : "s"} on this prompt so far`}>
+            <b>{turnsOnLast}</b> turn{turnsOnLast === 1 ? "" : "s"}
+          </span>
+        </>
       )}
     </div>
   );

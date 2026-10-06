@@ -18,15 +18,14 @@
 .ctx-cache.cold { color: var(--c-red); }
 .ctx-cache.cold i { background: var(--c-red); }
 
-
 /* ---- Session view: context part of the status strip ---- */
-/* fill, cache and verdict on one line; colour only where the state calls for it */
-.status-context { display: flex; flex: none; align-items: center; gap: 14px; min-width: 0; white-space: nowrap; }
+/* figures split by dots, then the pill; colour only where the state calls for it (fill level, an
+   expiring or cold cache, the verdict) */
+.status-context { display: flex; flex: none; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; }
 /* alone in the strip (an ended session): the pill still ends the row */
 .status-context:first-child { flex: 1 1 auto; }
-.status-fill { display: inline-flex; flex: none; align-items: center; gap: 6px; color: var(--c-text-dim); }
+.status-fill { display: inline-flex; align-items: center; gap: 6px; }
 .ctx-ring { flex: none; }
-.status-fill b { font-weight: 600; color: var(--c-text); }
 .status-context .ctx-cache.warm { color: var(--c-text-dim); }
 /* the pill reads as a chip until the verdict asks for something; it discloses the reasons */
 .status-verdict {
@@ -37,7 +36,7 @@
   min-width: 0;
   max-width: 100%;
   height: 32px;
-  margin-left: auto;
+  margin-left: 8px;
   padding: 0 10px 0 12px;
   font-size: var(--fs-md);
   font-weight: 600;
@@ -46,6 +45,7 @@
   border-radius: 16px;
   transition: filter var(--t-fast);
 }
+.status-context:first-child .status-verdict { margin-left: auto; }
 .status-verdict:hover { filter: brightness(1.2); }
 .status-verdict.level-watch { color: var(--c-amber); background: color-mix(in srgb, var(--c-amber) 14%, transparent); }
 .status-verdict.level-act { color: var(--c-red); background: color-mix(in srgb, var(--c-red) 14%, transparent); }

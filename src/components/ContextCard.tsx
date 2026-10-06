@@ -44,6 +44,16 @@ export function ContextLine({ snap, now }: { snap: ContextSnapshot; now: number 
   );
 }
 
+/** Window sizes read as round figures: 1M, 200k. */
+function formatWindow(n: number): string {
+  return n >= 1e6 ? `${Number((n / 1e6).toFixed(2))}M` : `${Math.round(n / 1e3)}k`;
+}
+
+/** The dot between the figures of the session view's status strip. */
+export function StatusSep({ className = "" }: { className?: string }) {
+  return <span className={`status-sep ${className}`} aria-hidden="true">·</span>;
+}
+
 function Ring({ pct }: { pct: number | null }) {
   const r = 7;
   const c = 2 * Math.PI * r;
@@ -74,27 +84,31 @@ export function ContextSummary({ snap }: { snap: ContextSnapshot }) {
   const text = cacheText(a);
   const recache = a.cache.recacheTokens !== null && a.cache.state !== "unknown" ? formatTokens(a.cache.recacheTokens) : null;
   // once the cache is cold or about to expire, a reason already says what the next message re-caches
-  const coldStart = recache && cacheTone(a) === "warm" ?`Cold start ≈ ${recache} tokens: what the next message re-caches once the cache is cold.` : null;
+  const coldStart = recache && cacheTone(a) === "warm" ? `Cold start ≈ ${recache} tokens: what the next message re-caches once the cache is cold.` : null;
   const updated = idleMs > 60_000 ? `Updated ${fmtLeft(idleMs / 1000)} ago.` : null;
   const details = [...a.reasons, coldStart, updated].filter((s): s is string => !!s);
-  const fill = `${formatTokens(a.context.tokens)}${a.context.size ? ` / ${formatTokens(a.context.size)}` : ""}`;
+  const fill = `${formatTokens(a.context.tokens)}${a.context.size ? ` / ${formatWindow(a.context.size)}` : ""}`;
+  const fillTitle = `Context window used by the last turn: ${formatTokens(a.context.tokens)}${a.context.size ? ` of ${formatTokens(a.context.size)}` : ""} tokens`;
   return (
     <>
       <div className="status-context">
-        <span className="status-fill tabular" title={`Context window used by the last turn: ${fill} tokens`}>
+        <span className="status-fig status-fill tabular" title={fillTitle}>
           <Ring pct={used} />
           <span className="status-fill-label">Context</span>
           <b>{used === null ? "—" : `${used}%`}</b>
-          <span className="status-fill-tokens">{fill}</span>
         </span>
+        <StatusSep className="status-fill-tokens" />
+        <span className="status-fig status-fill-tokens tabular" title={fillTitle}>{fill}</span>
         {text && (
-          <span
-            className={`ctx-cache tabular ${cacheTone(a)}`}
-            title={[a.cache.ttl ? `Prompt cache ttl ${a.cache.ttl}` : null, recache ? `Cold start ≈ ${recache} tokens` : null].filter(Boolean).join("\n") || undefined}
-          >
-            <i />
-            {text}
-          </span>
+          <>
+            <StatusSep />
+            <span
+              className={`ctx-cache tabular ${cacheTone(a)}`}
+              title={[a.cache.ttl ? `Prompt cache ttl ${a.cache.ttl}` : null, recache ? `Cold start ≈ ${recache} tokens` : null].filter(Boolean).join("\n") || undefined}
+            >
+              {text}
+            </span>
+          </>
         )}
         <button
           className={`status-verdict level-${a.level}`}
