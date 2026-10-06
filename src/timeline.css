@@ -36,6 +36,7 @@
 .tl-bar.agent { fill: var(--c-violet-dim); opacity: 1; }
 .tl-tool { stroke: var(--c-cyan-dim); stroke-width: 1.5; }
 .tl-tool.err { stroke: var(--c-red); stroke-width: 2; }
+.tl-tool.agent { stroke: var(--c-violet-dim); }
 .tl-prompt { cursor: pointer; }
 .tl-prompt rect { fill: var(--c-violet); }
 .tl-prompt:hover rect, .tl-prompt:focus-visible rect { fill: var(--c-text); }

@@ -182,8 +182,8 @@ export function TimelineTab({
               {/* activity: prompts above, tool calls below */}
               <line className="tl-grid" x1={PAD_L} x2={PAD_L + innerW} y1={top.activity + LANES.activity / 2} y2={top.activity + LANES.activity / 2} />
               {data.tools.map((e, i) => (
-                <line key={i} className={`tl-tool ${e.isError ? "err" : ""}`} x1={X(e.t)} x2={X(e.t)} y1={top.activity + LANES.activity / 2 + 3} y2={top.activity + LANES.activity - 2}>
-                  <title>{`${e.tool}${e.isError ? " (failed)" : ""} · ${e.preview}`}</title>
+                <line key={i} className={`tl-tool ${e.isError ? "err" : e.sub ? "agent" : ""}`} x1={X(e.t)} x2={X(e.t)} y1={top.activity + LANES.activity / 2 + 3} y2={top.activity + LANES.activity - 2}>
+                  <title>{`${e.tool}${e.sub ? " (sub-agent)" : ""}${e.isError ? " (failed)" : ""} · ${e.preview}`}</title>
                 </line>
               ))}
               {data.prompts.map((p) => (

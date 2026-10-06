@@ -8,7 +8,8 @@ import { freshTokens, useUnit } from "../utils/units";
 import { projectColor } from "../utils/fleetStats";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPatch } from "diff";
-import type { Session, SessionQuality, ToolName } from "../types";
+import type { Session, SessionQuality, ToolCall, ToolName } from "../types";
+import { callsBetween, callsPerPrompt, countCalls, countFailed, countSubCalls, onlyFailed } from "../utils/toolCalls";
 import { estimateHint, formatBytes, formatClockAt, formatCost, formatDuration, formatTokens, outcomeColor, outcomeLabel } from "../utils/format";
 import { SESSION_IDLE_GAP_MS } from "../utils/fleetStats";
 import { downloadSessionHtml } from "../utils/exportSession";
@@ -620,10 +621,8 @@ function OverviewTab({
   const durationMin = effDurationMs / 60_000;
 
   const promptKinds = prompts.map((p) => classifyPrompt(p.text));
-  const promptTools = prompts.map((p, i) => {
-    const nextT = prompts[i + 1]?.t ?? Infinity;
-    return toolSeq.filter((t) => t.t >= p.t && t.t < nextT).length;
-  });
+  // calls made while each prompt ran, sub-agent calls included
+  const promptTools = callsPerPrompt(toolSeq, prompts);
 
   if (liveEmpty) {
     return (
@@ -929,16 +928,20 @@ function ToolsTab({
   focus: { promptIdx: number; start: number; end: number } | null;
   onClearFocus: () => void;
 }) {
+  const [failedOnly, setFailedOnly] = useState(false);
   const sortedTools = (Object.entries(session.toolCounts) as Array<[ToolName, number]>)
     .filter(([, v]) => v > 0)
     .sort(([, a], [, b]) => b - a);
   const maxTool = Math.max(...sortedTools.map(([, v]) => v), 1);
-  const total = sortedTools.reduce((a, [, v]) => a + v, 0);
-  const allSequence = session.toolSequence ?? [];
-  const filtered = focus
-    ? allSequence.filter((s) => s.t >= focus.start && s.t < focus.end)
-    : allSequence;
-  const sequence = [...filtered].reverse();
+  const all = session.toolSequence ?? [];
+  const total = countCalls(all);
+  const inFocus = focus ? callsBetween(all, focus.start, focus.end) : all;
+  const failed = countFailed(inFocus);
+  const subCalls = countSubCalls(inFocus);
+  const shown = failedOnly && failed > 0 ? onlyFailed(inFocus) : inFocus;
+  // newest first; the newest call of a live session may still be running
+  const sequence = [...shown].reverse();
+  const truncated = all.length >= 300;
 
   // the calls in order on the left; their count per tool in a card on the right (above it on narrow screens)
   return (
@@ -947,10 +950,23 @@ function ToolsTab({
         <div className="d-panel tools-tab">
           <div className="section-title">
             <span>
-              Tool calls <InfoDot title="Every tool Claude invoked during the session (Read, Edit, Bash, Grep, Glob, Write, Agent, etc.), in order, with their result size. Click a row to expand the result preview. The By tool card counts the calls per tool." />
+              Tool calls <InfoDot title="Every tool call of the session, newest first, with its result size: a call that started a sub-agent holds the sub-agent's calls. Click a row to expand its input and result. The By tool card counts the calls per tool." />
             </span>
-            <span className="dim mono tabular">
-              {focus ? `${sequence.length} of ${total}` : `${total} total`}
+            <span className="tools-head-meta">
+              <span className="dim tabular">
+                {focus ? `${countCalls(inFocus)} of ${total} calls` : `${total} calls`}
+                {subCalls > 0 && ` · ${subCalls} in sub-agents`}
+              </span>
+              {failed > 0 && (
+                <span className="seg" role="group" aria-label="Show">
+                  <button className={`tool-view-btn ${failedOnly ? "" : "active"}`} onMouseDown={keepFocus} onClick={() => setFailedOnly(false)} aria-pressed={!failedOnly}>
+                    All
+                  </button>
+                  <button className={`tool-view-btn ${failedOnly ? "active" : ""}`} onMouseDown={keepFocus} onClick={() => setFailedOnly(true)} aria-pressed={failedOnly}>
+                    Failed <span className="tools-failed-n tabular">{failed}</span>
+                  </button>
+                </span>
+              )}
             </span>
           </div>
           {focus && (
@@ -973,15 +989,16 @@ function ToolsTab({
             <div className="tool-sequence">
               {sequence.map((s, i) => (
                 <ToolSeqRow
-                  key={i}
+                  key={`${s.t}-${i}`}
                   entry={s}
                   startedAt={session.startedAt}
-                  pending={session.live && i === 0 && !s.result}
+                  pending={!!session.live && i === 0 && !s.result && !s.orphan && !failedOnly}
+                  openSub={failedOnly}
                 />
               ))}
-              {sequence.length >= 300 && (
+              {truncated && (
                 <div className="mono dim" style={{ padding: "8px 10px", fontSize: "var(--fs-sm)" }}>
-                  (older tool calls truncated — showing first 300 captured)
+                  (later tool calls truncated — showing the first 300 of each transcript)
                 </div>
               )}
             </div>
@@ -1013,35 +1030,45 @@ function ToolsTab({
   );
 }
 
+/** One call. A call that started a sub-agent opens onto the sub-agent's calls, nested under it. */
 function ToolSeqRow({
   entry,
   startedAt,
   pending,
+  openSub = false,
 }: {
-  entry: NonNullable<Session["toolSequence"]>[number];
+  entry: ToolCall;
   startedAt: string;
   pending?: boolean;
+  /** Start with the sub-agent's calls shown (the failed-only view). */
+  openSub?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(openSub);
   const hasResult = !!entry.result;
   const hasFull = !!entry.full;
   const expandable = hasResult || hasFull;
   const isError = !!entry.result?.isError;
   const resultOneLine = entry.result?.text.replace(/\s+/g, " ").trim() ?? "";
-  const status = pending ? "running" : isError ? "error" : hasResult ? "ok" : "no result";
+  const status = entry.orphan ? "sub-agent" : pending ? "running" : isError ? "error" : hasResult ? "ok" : "no result";
+  const kids = entry.children ?? [];
+  const kidsFailed = kids.filter((c) => c.result?.isError).length;
+  // newest first, like the calls around them; the newest one runs while its sub-agent does
+  const kidsShown = [...kids].reverse();
   return (
-    <div className={`tool-seq-row ${expandable ? "has-result" : ""} ${open ? "open" : ""} ${pending ? "pending" : ""}`}>
+    <div className={`tool-seq-row ${expandable ? "has-result" : ""} ${open ? "open" : ""} ${pending ? "pending" : ""} ${entry.orphan ? "orphan" : ""}`}>
       <button
         className="tool-seq-main"
         onClick={() => expandable && setOpen((v) => !v)}
         disabled={!expandable}
         aria-label={expandable ? (open ? "Collapse tool details" : "Expand tool details") : undefined}
+        title={entry.orphan ? "A sub-agent whose starting call isn't in the transcript" : undefined}
       >
         <span className="tool-seq-time mono dim tabular">{formatClockAt(startedAt, entry.t)}</span>
         <span className={`tool-seq-status ${pending ? "run" : isError ? "err" : hasResult ? "ok" : ""}`} title={status} aria-label={status}>
           {pending ? "▶" : isError ? "✗" : hasResult ? "✓" : "·"}
         </span>
-        <span className="tool-seq-name mono" title={entry.tool}>{entry.tool}</span>
+        <span className="tool-seq-name mono" title={entry.tool}>{entry.orphan ? "Sub-agent" : entry.tool}</span>
         <span className="tool-seq-preview mono dim">{entry.preview}</span>
         <span className="tool-seq-size">
           {entry.result?.bytes != null && entry.result.bytes > 0 && (
@@ -1069,6 +1096,23 @@ function ToolSeqRow({
         <div className="tool-seq-result-hint mono">
           {resultOneLine.slice(0, 140)}{resultOneLine.length > 140 ? "…" : ""}
         </div>
+      )}
+      {kids.length > 0 && (
+        <>
+          <button className="tool-seq-sub-toggle mono" onClick={() => setSubOpen((v) => !v)} aria-expanded={subOpen}>
+            <span aria-hidden="true">{subOpen ? "▾" : "▸"}</span>
+            {" "}{kids.length} call{kids.length === 1 ? "" : "s"} in the sub-agent
+            {entry.agentLabel && <span className="dim"> · {entry.agentLabel}</span>}
+            {kidsFailed > 0 && <span className="tool-seq-sub-failed"> · {kidsFailed} failed</span>}
+          </button>
+          {subOpen && (
+            <div className="tool-seq-children">
+              {kidsShown.map((c, i) => (
+                <ToolSeqRow key={`${c.t}-${i}`} entry={c} startedAt={startedAt} pending={pending && i === 0 && !c.result} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
