@@ -47,13 +47,14 @@
   /* opaque data card: 1px top specular edge, 5% ring, soft long drop */
   --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.055), 0 1px 2px rgba(0, 0, 0, 0.35), 0 18px 40px -18px rgba(0, 0, 0, 0.65);
 
-  /* glass: one element per view (the page nav, the session tabs) plus transient popovers */
-  --glass: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.05));
+  /* glass: one element per view (the page nav, the session tabs) plus transient popovers;
+     evenly lit, with a glint in the middle of the top edge that fades out before the corners */
+  --glass: linear-gradient(90deg, transparent 18%, rgba(255, 255, 255, 0.14) 50%, transparent 82%) top / 100% 1px no-repeat, rgba(255, 255, 255, 0.075);
   --glass-blur: blur(24px) saturate(180%) brightness(1.08);
-  --shadow-glass: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 10px 30px rgba(0, 0, 0, 0.32), 0 1px 2px rgba(0, 0, 0, 0.3);
-  /* the selected segment inside glass or a fill track */
+  --shadow-glass: inset 0 0 0 1px rgba(255, 255, 255, 0.07), 0 10px 30px rgba(0, 0, 0, 0.32), 0 1px 2px rgba(0, 0, 0, 0.3);
+  /* the selected segment inside glass or a fill track: an even ring, no top edge */
   --c-lens: rgba(255, 255, 255, 0.14);
-  --shadow-lens: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lens: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.3);
   /* neutral fill for tracks, inputs and chips */
   --c-fill: rgba(255, 255, 255, 0.06);
 
