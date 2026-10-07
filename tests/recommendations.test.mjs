@@ -125,3 +125,10 @@ test("prompts carry the evidence they need", () => {
   assert.match(rec.title, /`timeout` isn't installed/);
   assert.match(rec.action.prompt, /timeout/);
 });
+
+test("counts the sessions started since a cause last happened", () => {
+  const nomatch = error("Exit code 1\n(eval):1: no matches found: *.pyc");
+  const older = [session([nomatch], { daysAgo: 3 }), session([nomatch], { daysAgo: 3 }), session([nomatch], { daysAgo: 3 })];
+  const card = buildRecommendations([...older, session([]), session([])], { now: NOW }).cards[0];
+  assert.equal(card.sessionsSince, 2);
+});

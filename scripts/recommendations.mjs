@@ -86,12 +86,14 @@ export function buildRecommendations(sessions, { now = Date.now(), windowDays = 
   const groups = new Groups();
   const coverage = { windowDays, sessions: 0, toolCalls: 0, toolResults: 0, failed: 0, denied: 0, waits: 0 };
   const recurring = new Map();
+  const starts = [];
 
   for (const s of sessions) {
     if (s.agent !== "claude") continue;
     const last = new Date(s.lastEventAt ?? s.startedAt).getTime();
     if (!(last >= from)) continue;
     coverage.sessions++;
+    starts.push(new Date(s.startedAt).getTime());
     coverage.toolCalls += Object.values(s.toolCounts ?? {}).reduce((a, b) => a + b, 0);
     coverage.toolResults += s.incidentStats?.toolResults ?? 0;
 
@@ -209,6 +211,9 @@ export function buildRecommendations(sessions, { now = Date.now(), windowDays = 
       ...iso(ev),
     });
   }
+
+  // Sessions started since it last happened: a fix shows within a day, not after a quiet week.
+  for (const c of cards) c.sessionsSince = starts.filter((t) => t > Date.parse(c.lastAt)).length;
 
   // Something to paste or try first, then the widest spread.
   const actionable = (c) => (c.action?.snippet || c.action?.prompt || c.kind === "feature" ? 1 : 0);

@@ -43,10 +43,14 @@ function inline(text: string): ReactNode[] {
 const num = (n: number) => n.toLocaleString("en-US");
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
+/** Sessions in a row without it before a card fades: a fix shows within a day. */
+const QUIET_SESSIONS = 10;
+
 /** "30 sessions · last seen 2h ago": when it last happened tells whether a fix worked. */
 function evidenceText(card: Recommendation): { text: string; fading: boolean } {
   const sessions = `${card.sessionCount} session${card.sessionCount > 1 ? "s" : ""}`;
   if (card.trend.last7 === 0) return { text: `${sessions} · not seen since ${shortDate(card.lastAt)}`, fading: true };
+  if (card.sessionsSince >= QUIET_SESSIONS) return { text: `${sessions} · not seen in your last ${card.sessionsSince} sessions`, fading: true };
   return { text: `${sessions} · last seen ${formatRelative(card.lastAt)}`, fading: false };
 }
 

@@ -26,6 +26,8 @@ export interface Recommendation {
   sessionCount: number;
   lastAt: string;
   trend: { last7: number; prev7: number };
+  /** Sessions started since it last happened. */
+  sessionsSince: number;
   sessions: RecSession[];
 }
 
