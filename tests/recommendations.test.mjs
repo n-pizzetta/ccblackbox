@@ -56,7 +56,9 @@ test("a known cause shows from three sessions, with its fix", () => {
   const card = r.cards.find((c) => c.id === "cause:zsh-nomatch");
   assert.equal(card.sessionCount, 3);
   assert.equal(card.count, 4);
-  assert.match(card.fix.snippet, /setopt nonomatch/);
+  assert.match(card.title, /^4 commands failed/);
+  assert.match(card.action.snippet, /setopt nonomatch/);
+  assert.match(card.action.prompt, /setopt nonomatch/);
 });
 
 test("noise gets its own card while the errors it was attached to keep their cause", () => {
@@ -75,8 +77,9 @@ test("denials: protective commands are never suggested as allow rules, user reje
   const card = buildRecommendations(sessions, { now: NOW }).cards.find((c) => c.id === "denials");
   assert.equal(card.count, 4);
   assert.deepEqual(card.rows.map((r) => [r.label, r.protective]), [["gh pr merge", true], ["pnpm dlx depcheck", false]]);
-  assert.match(card.fix.snippet, /"Bash\(pnpm dlx depcheck \*\)"/);
-  assert.doesNotMatch(card.fix.snippet, /merge/);
+  assert.match(card.action.snippet, /"Bash\(pnpm dlx depcheck \*\)"/);
+  assert.doesNotMatch(card.action.snippet, /merge/);
+  assert.match(card.action.prompt, /Leave the others denied/);
 });
 
 test("long waits make a card only when they happened this week", () => {
@@ -110,4 +113,15 @@ test("coverage warns when tool calls were found but no result could be read", ()
   const r = buildRecommendations([s], { now: NOW });
   assert.match(r.coverage.warning, /none of their results could be read/);
   assert.equal(buildRecommendations([session([])], { now: NOW }).coverage.warning, undefined);
+});
+
+test("prompts carry the evidence they need", () => {
+  const sandbox = error("Claude requested permissions to write to /Users/someone/.cache/tool/x, but you haven't granted it yet.");
+  const card = buildRecommendations([session([sandbox]), session([sandbox]), session([sandbox])], { now: NOW }).cards[0];
+  assert.equal(card.id, "cause:sandbox-write");
+  assert.match(card.action.prompt, /\.cache\/tool/);
+  const missing = error("Exit code 127\nzsh: command not found: timeout", { command: "timeout 20 claude agents" });
+  const rec = buildRecommendations([session([missing]), session([missing]), session([missing])], { now: NOW }).cards[0];
+  assert.match(rec.title, /`timeout` isn't installed/);
+  assert.match(rec.action.prompt, /timeout/);
 });

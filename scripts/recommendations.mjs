@@ -70,6 +70,13 @@ function allowRules(rows) {
     .map((r) => `"Bash(${r.label} *)"`);
 }
 
+/** Resolves the prompt, which can depend on the evidence (the latest error, the counts). */
+function actionOf(action, ev) {
+  if (!action) return undefined;
+  const { prompt, ...rest } = action;
+  return { ...rest, ...(prompt ? { prompt: typeof prompt === "function" ? prompt(ev) : prompt } : {}) };
+}
+
 /**
  * @param sessions full sessions from parseAllSessions (with `incidents`)
  * @returns {{ generatedAt: string, windowDays: number, cards: object[], coverage: object }}
@@ -118,28 +125,37 @@ export function buildRecommendations(sessions, { now = Date.now(), windowDays = 
   const cards = [];
   for (const [id, group] of groups.map) {
     const ev = evidence(group, now);
-    if (id.startsWith("cause:")) {
+    if (id.startsWith("cause:") || id.startsWith("noise:")) {
       if (ev.sessionCount < MIN_SESSIONS) continue;
-      const c = CAUSES.find((x) => `cause:${x.id}` === id);
-      cards.push({ id, kind: c.kind, title: c.title, why: c.why, fix: c.fix, sample: group.incidents.at(-1).text?.slice(0, 240), ...iso(ev) });
-    } else if (id.startsWith("noise:")) {
-      if (ev.sessionCount < MIN_SESSIONS) continue;
-      const n = NOISE.find((x) => `noise:${x.id}` === id);
-      cards.push({ id, kind: "setup", title: n.title, why: n.why, fix: n.fix, ...iso(ev) });
+      const c = id.startsWith("cause:") ? CAUSES.find((x) => `cause:${x.id}` === id) : NOISE.find((x) => `noise:${x.id}` === id);
+      const sample = group.incidents.at(-1).text?.slice(0, 240);
+      cards.push({
+        id, kind: c.kind ?? "setup",
+        title: c.title(ev.count),
+        what: c.what,
+        action: actionOf(c.action, { ...ev, sample }),
+        details: c.details,
+        ...(id.startsWith("cause:") ? { sample } : {}),
+        ...iso(ev),
+      });
     } else if (id === "denials") {
       if (ev.count < MIN_DENIALS) continue;
       const rows = denialRows(group.incidents);
       const rules = allowRules(rows);
       cards.push({
         id, kind: "permissions",
-        title: `${ev.count} actions denied`,
-        why: "Each denial stops the agent and makes it look for another way. Some protect you (merges, pushes, force or destructive commands): keep those. For commands you do want, an allow rule is applied before the auto mode classifier.",
+        title: `${ev.count} actions stopped by Claude Code before they ran`,
+        what: "Some stops protect you (merges, pushes, credentials): those are marked \"keep\". Others may be commands you actually want Claude to run.",
         rows,
-        fix: {
-          text: rules.length ? "Allow the commands you meant to run, in /permissions or your settings:" : "None of these look safe to allow blindly: open the sessions to see what was attempted.",
-          ...(rules.length ? { snippet: `"permissions": { "allow": [${rules.join(", ")}] }`, where: "~/.claude/settings.json" } : {}),
-          docs: "https://code.claude.com/docs/en/permissions",
-        },
+        action: rules.length
+          ? {
+              text: "Allow the ones you want, in `/permissions` or your settings.",
+              snippet: `"permissions": { "allow": [${rules.join(", ")}] }`,
+              prompt: `Claude Code keeps stopping these commands in my sessions: ${rows.map((r) => `${r.label} (${r.count}×)`).join(", ")}. Add narrow allow rules for ${rules.join(", ")} to my ~/.claude/settings.json, explain what each one allows, and show me the diff before saving. Leave the others denied.`,
+              docs: "https://code.claude.com/docs/en/permissions",
+            }
+          : { text: "None of these look safe to allow automatically. Open a session in the details to see what Claude was trying to do.", docs: "https://code.claude.com/docs/en/permissions" },
+        details: "The stops come from auto mode's safety check or your permission rules; the reason Claude Code gave is next to each command. An allow rule is applied before auto mode's check.",
         ...iso(ev),
       });
     } else if (id === "waits") {
@@ -147,11 +163,12 @@ export function buildRecommendations(sessions, { now = Date.now(), windowDays = 
       cards.push({
         id, kind: "feature",
         title: `Sessions waited over 10 min for you ${ev.trend.last7} times this week`,
-        why: "A session asked a question or a plan approval and sat there while you were elsewhere. Claude Code's agent view shows blocked sessions with their question, and notifies you.",
-        fix: {
-          text: "Background sessions with `/bg` (or ← on an empty prompt) and keep `claude agents` open: a session that needs you turns yellow and shows its question.",
+        what: "A session asked you a question or a plan to approve, and sat there while you were busy elsewhere.",
+        action: {
+          text: "Try Claude Code's agent view: put sessions in the background with `/bg` and keep `claude agents` open. A session that needs you turns yellow and shows its question.",
           docs: "https://code.claude.com/docs/en/agent-view",
         },
+        details: "Counted from the time between a question (or a plan to approve) and your answer. The sessions below show the question each one asked.",
         ...iso(ev),
       });
     }
@@ -164,28 +181,37 @@ export function buildRecommendations(sessions, { now = Date.now(), windowDays = 
     .slice(0, MAX_RECURRING);
   for (const { key, group } of unknown) {
     const ev = evidence(group, now);
-    const sample = group.incidents.at(-1);
+    const sample = group.incidents.at(-1).text?.slice(0, 240) ?? "";
     // Name the command only when it is the one failing, not one of many.
     const heads = group.incidents.map((i) => (i.tool === "Bash" ? commandHead(i.command) : toolLabel(i.tool)));
     const top = Object.entries(heads.reduce((m, h) => ((m[h] = (m[h] ?? 0) + 1), m), {})).sort((x, y) => y[1] - x[1])[0];
     const head = top && top[0] !== "null" && top[1] >= 0.8 * heads.length ? top[0] : null;
-    const missing = /command not found: (\S+)/.exec(sample.text ?? "")?.[1];
+    const missing = /command not found: (\S+)/.exec(sample)?.[1];
     cards.push({
       id: `recurring:${key.slice(0, 60)}`,
       kind: "recurring",
       title: missing
-        ? `\`${missing}\` isn't installed, in ${ev.sessionCount} sessions`
-        : head ? `The same ${head} error in ${ev.sessionCount} sessions` : `The same error in ${ev.sessionCount} sessions`,
-      why: missing
-        ? "Agents reach for it as if it were there (it ships with Linux). Install it, or say in CLAUDE.md that it isn't available."
-        : "A failure that comes back across sessions usually points to the setup rather than the task. Open one to see what triggered it.",
-      sample: sample.text?.slice(0, 240),
+        ? `${ev.count} commands failed: \`${missing}\` isn't installed`
+        : `The same ${head ? `\`${head}\` ` : ""}error came back in ${ev.sessionCount} sessions`,
+      what: missing
+        ? `Claude uses \`${missing}\` as if it were there (it ships with Linux, not with macOS).`
+        : "An error that keeps coming back across sessions usually comes from your setup, not from the task. Here it is:",
+      sample,
+      action: missing
+        ? {
+            text: "Install it, or tell Claude once that it isn't available.",
+            prompt: `\`${missing}\` isn't installed on my machine and my Claude Code sessions keep calling it ("command not found"). Tell me the simplest way to get it, or add a line to my ~/.claude/CLAUDE.md saying it isn't available. Ask me which one before changing anything.`,
+          }
+        : {
+            text: "Ask Claude what in your setup causes it.",
+            prompt: `This error keeps coming back across my Claude Code sessions (${ev.count} times in ${ev.sessionCount} sessions): "${sample}". Tell me the likely cause in my setup and the simplest fix. Don't change anything before I confirm.`,
+          },
       ...iso(ev),
     });
   }
 
-  // Something to do first (a snippet to paste, a feature to try), then the widest spread.
-  const actionable = (c) => (c.fix?.snippet || c.kind === "feature" ? 1 : 0);
+  // Something to paste or try first, then the widest spread.
+  const actionable = (c) => (c.action?.snippet || c.action?.prompt || c.kind === "feature" ? 1 : 0);
   const order = { setup: 0, permissions: 1, feature: 2, habit: 3, recurring: 4 };
   cards.sort((a, b) => actionable(b) - actionable(a) || b.sessionCount - a.sessionCount || order[a.kind] - order[b.kind]);
 

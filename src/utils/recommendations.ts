@@ -5,14 +5,19 @@ export type RecKind = "setup" | "permissions" | "feature" | "habit" | "recurring
 
 export interface RecSession { id: string; goal: string; project: string; count: number; lastAt: string; detail?: string; /** Longest wait on the user, for the waits card. */ waitMs?: number }
 export interface RecRow { label: string; count: number; tool: string | null; protective: boolean; reason: string | null }
-export interface RecFix { text: string; snippet?: string; where?: string; docs?: string }
+/** What to do: a line to copy, and a prompt to paste into Claude Code, which explains and applies it. */
+export interface RecAction { text: string; snippet?: string; prompt?: string; docs?: string }
 
 export interface Recommendation {
   id: string;
   kind: RecKind;
+  /** The effect, counted, in plain words. */
   title: string;
-  why: string;
-  fix?: RecFix;
+  /** What happens, in one sentence. */
+  what: string;
+  action?: RecAction;
+  /** The mechanism, shown folded. */
+  details?: string;
   /** Latest error text, noise stripped. */
   sample?: string;
   /** Denied commands, for the permissions card. */
